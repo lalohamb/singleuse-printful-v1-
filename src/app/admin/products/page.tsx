@@ -1,0 +1,147 @@
+"use client";
+import { useEffect, useState } from "react";
+import { Plus, Edit2, Trash2, Search, X, Loader2, RefreshCw, Star, Package } from "lucide-react";
+import { supabase, formatPrice } from "@/lib/supabase";
+import ProtectedAdmin from "@/components/ProtectedAdmin";
+import type { Product, Category } from "@/types";
+
+function Products() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState<Product | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
+
+  const fetchData = () => {
+    Promise.all([
+      supabase.from("products").select("*").order("created_at", { ascending: false }),
+      supabase.from("categories").select("*").order("name"),
+    ]).then(([pRes, cRes]) => { setProducts((pRes.data || []) as Product[]); setCategories((cRes.data || []) as Category[]); setLoading(false); });
+  };
+
+  useEffect(() => { fetchData(); }, []);
+
+  const filtered = products.filter((p) => p.title.toLowerCase().includes(search.toLowerCase()));
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this product?")) return;
+    await supabase.from("products").delete().eq("id", id);
+    fetchData();
+  };
+
+  const handleToggleFeatured = async (p: Product) => {
+    await supabase.from("products").update({ featured: !p.featured }).eq("id", p.id);
+    fetchData();
+  };
+
+  const handleSyncPrintify = async () => {
+    setSyncing(true); setSyncMsg(null);
+    try {
+      const { data: settingsData } = await supabase.from("settings").select("printify_shop_id").limit(1).maybeSingle();
+      const shopId = settingsData?.printify_shop_id;
+      if (!shopId) { setSyncMsg("No Printify Shop ID set. Add it in Admin → Settings."); setSyncing(false); return; }
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+      const res = await fetch(`${supabaseUrl}/functions/v1/printify-proxy/sync?shop_id=${shopId}`, { method: "POST", headers: { Authorization: `Bearer ${anonKey}`, "Content-Type": "application/json" } });
+      if (!res.ok) { const err = await res.json().catch(() => ({ error: "Sync failed" })); throw new Error(err.error || "Sync failed"); }
+      const data = await res.json();
+      setSyncMsg(`Synced ${data.synced || 0} products from Printify!`);
+      fetchData();
+    } catch (err) { setSyncMsg(err instanceof Error ? err.message : "Sync failed"); }
+    finally { setSyncing(false); }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="relative flex-1 max-w-xs"><Search size={18} className="absolute left-3 top-2.5 text-secondary-400" /><input type="text" placeholder="Search products..." value={search} onChange={(e) => setSearch(e.target.value)} className="input-field pl-10 py-2" /></div>
+        <div className="flex items-center gap-3">
+          <button onClick={handleSyncPrintify} disabled={syncing} className="btn-outline py-2">{syncing ? <Loader2 size={18} className="mr-2 animate-spin" /> : <RefreshCw size={18} className="mr-2" />}Sync Printify</button>
+          <button onClick={() => { setEditing(null); setShowModal(true); }} className="btn-primary py-2"><Plus size={18} className="mr-2" />Add Product</button>
+        </div>
+      </div>
+      {syncMsg && <div className="bg-primary-50 border border-primary-100 text-primary-700 rounded-lg p-3 text-sm">{syncMsg}</div>}
+      {loading ? <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-2 border-secondary-300 border-t-secondary-900" /></div> : (
+        <div className="bg-white rounded-xl border border-secondary-100 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-secondary-50 border-b border-secondary-100">
+                <tr>
+                  <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700">Product</th>
+                  <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700 hidden md:table-cell">Category</th>
+                  <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700">Price</th>
+                  <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700 hidden lg:table-cell">Status</th>
+                  <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700">Featured</th>
+                  <th className="text-right px-4 py-3 text-sm font-semibold text-secondary-700">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-secondary-50">
+                {filtered.map((p) => (
+                  <tr key={p.id} className="hover:bg-secondary-50 transition-colors">
+                    <td className="px-4 py-3"><div className="flex items-center gap-3"><img src={p.image_url || ""} alt={p.title} className="w-12 h-12 rounded-lg object-cover bg-secondary-100 flex-shrink-0" /><div className="min-w-0"><p className="font-medium text-secondary-900 truncate">{p.title}</p>{p.printify_id && <p className="text-xs text-secondary-400">Printify: {p.printify_id}</p>}</div></div></td>
+                    <td className="px-4 py-3 text-sm text-secondary-600 hidden md:table-cell">{categories.find((c) => c.id === p.category_id)?.name || "Uncategorized"}</td>
+                    <td className="px-4 py-3 font-medium text-secondary-900">{formatPrice(p.price)}</td>
+                    <td className="px-4 py-3 hidden lg:table-cell"><span className={`text-xs px-2 py-1 rounded-full ${p.status === "active" ? "bg-success-50 text-success-600" : p.status === "draft" ? "bg-warning-50 text-warning-600" : "bg-secondary-100 text-secondary-500"}`}>{p.status}</span></td>
+                    <td className="px-4 py-3"><button onClick={() => handleToggleFeatured(p)} className="p-1.5 rounded-lg hover:bg-secondary-100 transition-colors"><Star size={18} className={p.featured ? "fill-gold-500 text-gold-500" : "text-secondary-300"} /></button></td>
+                    <td className="px-4 py-3"><div className="flex items-center justify-end gap-1"><button onClick={() => { setEditing(p); setShowModal(true); }} className="p-2 text-secondary-500 hover:text-secondary-900 hover:bg-secondary-100 rounded-lg transition-colors"><Edit2 size={16} /></button><button onClick={() => handleDelete(p.id)} className="p-2 text-secondary-500 hover:text-error-500 hover:bg-error-50 rounded-lg transition-colors"><Trash2 size={16} /></button></div></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {filtered.length === 0 && <div className="text-center py-12 text-secondary-400"><Package size={40} className="mx-auto mb-3 text-secondary-200" />No products found</div>}
+        </div>
+      )}
+      {showModal && <ProductModal product={editing} categories={categories} onClose={() => { setShowModal(false); setEditing(null); }} onSave={() => { setShowModal(false); setEditing(null); fetchData(); }} />}
+    </div>
+  );
+}
+
+function ProductModal({ product, categories, onClose, onSave }: { product: Product | null; categories: Category[]; onClose: () => void; onSave: () => void }) {
+  const [form, setForm] = useState({ title: product?.title || "", description: product?.description || "", price: product?.price?.toString() || "", cost: product?.cost?.toString() || "0", image_url: product?.image_url || "", category_id: product?.category_id || "", status: product?.status || "active", featured: product?.featured || false });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSave = async () => {
+    setSaving(true); setError(null);
+    const payload = { title: form.title, description: form.description, price: parseFloat(form.price) || 0, cost: parseFloat(form.cost) || 0, image_url: form.image_url, category_id: form.category_id || null, status: form.status, featured: form.featured, images: form.image_url ? [form.image_url] : [], updated_at: new Date().toISOString() };
+    const result = product ? await supabase.from("products").update(payload).eq("id", product.id) : await supabase.from("products").insert({ ...payload, variants: [{ id: "S", label: "Small", color: "Default" }] });
+    if (result.error) { setError(result.error.message); setSaving(false); } else onSave();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-secondary-900/50" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-6 border-b border-secondary-100 sticky top-0 bg-white rounded-t-2xl">
+          <h2 className="text-lg font-bold text-secondary-900">{product ? "Edit Product" : "Add Product"}</h2>
+          <button onClick={onClose} className="p-2 text-secondary-400 hover:text-secondary-900"><X size={20} /></button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div><label className="label-text">Title</label><input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="input-field" placeholder="Product title" /></div>
+          <div><label className="label-text">Description</label><textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="input-field min-h-[80px]" placeholder="Product description" /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><label className="label-text">Price ($)</label><input type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="input-field" placeholder="32.00" /></div>
+            <div><label className="label-text">Cost ($)</label><input type="number" step="0.01" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} className="input-field" placeholder="12.50" /></div>
+          </div>
+          <div><label className="label-text">Image URL</label><input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} className="input-field" placeholder="https://..." />{form.image_url && <img src={form.image_url} alt="Preview" className="w-24 h-24 object-cover rounded-lg mt-2 bg-secondary-100" />}</div>
+          <div><label className="label-text">Category</label><select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })} className="input-field"><option value="">Uncategorized</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+          <div><label className="label-text">Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className="input-field"><option value="active">Active</option><option value="draft">Draft</option><option value="archived">Archived</option></select></div>
+          <label className="flex items-center gap-3 cursor-pointer"><input type="checkbox" checked={form.featured} onChange={(e) => setForm({ ...form, featured: e.target.checked })} className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500" /><span className="text-sm font-medium text-secondary-700">Featured product</span></label>
+          {error && <div className="bg-error-50 border border-error-100 text-error-700 rounded-lg p-3 text-sm">{error}</div>}
+        </div>
+        <div className="flex gap-3 p-6 border-t border-secondary-100 sticky bottom-0 bg-white rounded-b-2xl">
+          <button onClick={onClose} className="btn-outline flex-1 py-2">Cancel</button>
+          <button onClick={handleSave} disabled={saving || !form.title || !form.price} className="btn-primary flex-1 py-2">{saving ? <Loader2 size={18} className="mr-2 animate-spin" /> : null}{product ? "Save Changes" : "Create Product"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function AdminProductsPage() {
+  return <ProtectedAdmin><Products /></ProtectedAdmin>;
+}
