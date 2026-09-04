@@ -22,16 +22,8 @@ function errorResponse(message: string, status = 500) {
   });
 }
 
-async function getPrintifyToken(supabase: ReturnType<typeof createClient>): Promise<string | null> {
-  const { data, error } = await supabase
-    .from("settings")
-    .select("printify_connected")
-    .limit(1)
-    .maybeSingle();
-
-  if (error || !data) return null;
-
-  // The Printify API token is stored as an edge function secret
+function getPrintifyToken(): string | null {
+  // The Printify API token is stored as an edge function secret.
   return Deno.env.get("PRINTIFY_API_TOKEN") ?? null;
 }
 
@@ -65,10 +57,14 @@ Deno.serve(async (req: Request) => {
     );
 
     const url = new URL(req.url);
-    const path = url.pathname.replace("/functions/v1/printify-proxy", "");
-    const segments = path.split("/").filter(Boolean);
+    // The edge runtime may deliver the path as either
+    // "/functions/v1/printify-proxy/<route>" or "/printify-proxy/<route>".
+    // Take everything after the function name so routing works in both cases.
+    const allSegments = url.pathname.split("/").filter(Boolean);
+    const fnIdx = allSegments.lastIndexOf("printify-proxy");
+    const segments = fnIdx >= 0 ? allSegments.slice(fnIdx + 1) : allSegments;
 
-    const token = await getPrintifyToken(supabase);
+    const token = getPrintifyToken();
     if (!token) {
       return errorResponse("Printify is not configured. Set the PRINTIFY_API_TOKEN secret.", 400);
     }
@@ -80,7 +76,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // GET /products — list products from a shop
-    if (req.method === "GET" && segments[0] === "products") {
+    if (req.method === "GET" && segments[0] === "products" && !segments[1]) {
       const shopId = url.searchParams.get("shop_id");
       if (!shopId) return errorResponse("shop_id query parameter is required", 400);
       const page = url.searchParams.get("page") || "1";
@@ -230,57 +226,127 @@ Deno.serve(async (req: Request) => {
       const shopId = url.searchParams.get("shop_id");
       if (!shopId) return errorResponse("shop_id query parameter is required", 400);
 
-      const printifyProducts = await printifyFetch(
-        `/shops/${shopId}/products.json?limit=100`,
-        token
-      );
+      const synced: string[] = [];
+      const errors: Array<{ id: string; error: string }> = [];
+      let page = 1;
+      let lastPage = 1;
 
-      const synced: any[] = [];
-      for (const p of printifyProducts.data || []) {
-        const detail = await printifyFetch(
-          `/shops/${shopId}/products/${p.id}.json`,
+      do {
+        const listing = await printifyFetch(
+          `/shops/${shopId}/products.json?limit=50&page=${page}`,
           token
         );
+        lastPage = Number(listing.last_page) || 1;
 
-        const variants = (detail.variants || []).map((v: any) => ({
-          id: String(v.id),
-          label: v.title || v.id,
-          color: v.options?.color || "Default",
-          size: v.options?.size || "",
-          price: parseFloat(v.cost) || 0,
-        }));
+        for (const p of listing.data || []) {
+          try {
+            const detail = await printifyFetch(
+              `/shops/${shopId}/products/${p.id}.json`,
+              token
+            );
 
-        const images = (detail.images || []).map((img: any) => img.src || img);
+            // Map each option value id -> { type, title } so we can resolve
+            // a variant's numeric option ids into color/size labels.
+            const optionValues = new Map<number, { type: string; title: string }>();
+            for (const opt of detail.options || []) {
+              for (const val of opt.values || []) {
+                optionValues.set(val.id, { type: opt.type, title: val.title });
+              }
+            }
 
-        // Upsert into local products table
-        const { data, error } = await supabase
-          .from("products")
-          .upsert({
-            printify_id: String(detail.id),
-            title: detail.title,
-            description: detail.description || "",
-            price: parseFloat(detail.variants?.[0]?.retail_price || "0") / 100,
-            cost: parseFloat(detail.variants?.[0]?.cost || "0") / 100,
-            image_url: images[0] || null,
-            images: images,
-            variants: variants,
-            status: detail.is_locked ? "active" : "active",
-            blueprint_id: String(detail.blueprint_id || ""),
-            print_provider_id: String(detail.print_provider_id || ""),
-            updated_at: new Date().toISOString(),
-          }, { onConflict: "printify_id" })
-          .select();
+            const allVariants = detail.variants || [];
+            const enabled = allVariants.filter((v: any) => v.is_enabled);
+            // Only sell enabled variants; fall back to all if none are enabled.
+            const usable = enabled.length ? enabled : allVariants;
 
-        if (!error && data) synced.push(data[0]);
-      }
+            const variants = usable.map((v: any) => {
+              let color = "Default";
+              let size = "";
+              for (const vid of v.options || []) {
+                const meta = optionValues.get(vid);
+                if (!meta) continue;
+                if (meta.type === "color") color = meta.title;
+                else if (meta.type === "size") size = meta.title;
+              }
+              return {
+                id: String(v.id),
+                label: v.title || String(v.id),
+                color,
+                size,
+                // Printify prices are integer cents.
+                price: (Number(v.price) || 0) / 100,
+              };
+            });
 
-      // Update settings to mark printify as connected
+            // Price/cost come from the default (or first usable) variant.
+            const priceVariant =
+              usable.find((v: any) => v.is_default) || usable[0] || {};
+            const price = (Number(priceVariant.price) || 0) / 100;
+            const cost = (Number(priceVariant.cost) || 0) / 100;
+
+            // Dedupe image srcs, keeping the default image first.
+            const seen = new Set<string>();
+            const images: string[] = [];
+            const ordered = [...(detail.images || [])].sort(
+              (a: any, b: any) => (b.is_default ? 1 : 0) - (a.is_default ? 1 : 0)
+            );
+            for (const img of ordered) {
+              const src = typeof img === "string" ? img : img.src;
+              if (src && !seen.has(src)) {
+                seen.add(src);
+                images.push(src);
+              }
+            }
+
+            const { data, error } = await supabase
+              .from("products")
+              .upsert(
+                {
+                  printify_id: String(detail.id),
+                  title: detail.title,
+                  description: detail.description || "",
+                  price,
+                  cost,
+                  image_url: images[0] || null,
+                  images,
+                  variants,
+                  status: detail.visible ? "active" : "draft",
+                  blueprint_id: String(detail.blueprint_id || ""),
+                  print_provider_id: String(detail.print_provider_id || ""),
+                  updated_at: new Date().toISOString(),
+                },
+                { onConflict: "printify_id" }
+              )
+              .select("id");
+
+            if (error) errors.push({ id: String(p.id), error: error.message });
+            else if (data && data[0]) synced.push(String(detail.id));
+          } catch (e) {
+            errors.push({
+              id: String(p.id),
+              error: e instanceof Error ? e.message : String(e),
+            });
+          }
+        }
+
+        page++;
+      } while (page <= lastPage);
+
+      // Record the connected shop so the storefront/admin know the source.
       await supabase
         .from("settings")
-        .update({ printify_connected: true, updated_at: new Date().toISOString() })
+        .update({
+          printify_connected: true,
+          printify_shop_id: shopId,
+          updated_at: new Date().toISOString(),
+        })
         .neq("id", "00000000-0000-0000-0000-000000000000");
 
-      return jsonResponse({ synced: synced.length, products: synced });
+      return jsonResponse({
+        synced: synced.length,
+        errors: errors.length,
+        error_details: errors.slice(0, 10),
+      });
     }
 
     return errorResponse("Not found", 404);
