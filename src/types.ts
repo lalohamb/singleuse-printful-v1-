@@ -56,6 +56,8 @@ export interface StoreSettings {
   store_name: string;
   tagline: string;
   hero_image_url: string | null;
+  story_image_url: string | null;
+  hero_object_position: string | null;
   hero_title: string | null;
   hero_subtitle: string | null;
   announcement: string | null;

@@ -25,7 +25,9 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
     <div>
       <section className="relative h-[70vh] min-h-[500px] flex items-center overflow-hidden">
         <div className="absolute inset-0">
-          <img src="https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940" alt="Body and Sleeves apparel" className="w-full h-full object-cover" style={{ objectPosition: "70% top" }} />
+          {/* LINE BELOW TO SET HERO IMAGE BACKGROUND TO FULL PIC>> :style={{ objectPosition: "100% " }} <<;END 09-04-2026*/}
+          {/* https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/object-position*/ } 
+          <img src={settings?.hero_image_url || "https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"} alt="Body and Sleeves apparel" className="w-full h-full object-cover" style={{ objectPosition: settings?.hero_object_position || "250px 25px" }} />
           <div className="absolute inset-0 bg-gradient-to-r from-secondary-900/85 via-secondary-900/55 to-transparent" />
         </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
@@ -150,7 +152,7 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="relative rounded-2xl overflow-hidden bg-secondary-900 px-8 py-16 text-center">
           <div className="absolute inset-0 opacity-20">
-            <img src="https://images.pexels.com/photos/29646005/pexels-photo-29646005.jpeg?auto=compress&cs=tinysrgb&h=650&w=940" alt="" className="w-full h-full object-cover" />
+            <img src={settings?.story_image_url || "https://images.pexels.com/photos/29646005/pexels-photo-29646005.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"} alt="" className="w-full h-full object-cover" />
           </div>
           <div className="relative">
             <h2 className="text-3xl lg:text-5xl font-bold text-white mb-4">Wear Your Story</h2>
