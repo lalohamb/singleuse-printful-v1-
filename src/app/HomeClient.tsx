@@ -4,13 +4,18 @@ import { useState } from "react";
 import { ArrowRight, Truck, Shield, Sparkles, Heart, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Product, StoreSettings, Category } from "@/types";
 import ProductCard from "@/components/ProductCard";
+import Reveal from "@/components/Reveal";
+import { formatPrice } from "@/lib/supabase";
 
-export default function HomeClient({ settings, featured, newArrivals, trending, categories }: {
+const AFFIRMATIONS = ["Empower Yourself", "Empower the Culture", "Wear Your Heritage", "Faith · Family · Culture", "Black-Owned & Made to Order"];
+
+export default function HomeClient({ settings, featured, newArrivals, trending, categories, categoryImages }: {
   settings: StoreSettings | null;
   featured: Product[];
   newArrivals: Product[];
   trending: Product[];
   categories: Category[];
+  categoryImages: Record<string, string>;
 }) {
   const [slide, setSlide] = useState(0);
   const slideCount = newArrivals.length;
@@ -47,6 +52,21 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
             <div key={f.title} className="flex items-center gap-3">
               <f.icon size={28} className="text-gold-400 flex-shrink-0" />
               <div><p className="font-semibold text-sm">{f.title}</p><p className="text-xs text-secondary-400">{f.desc}</p></div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section aria-hidden className="bg-secondary-900 bg-weave text-white py-4 overflow-hidden border-y border-white/10">
+        <div className="flex w-max animate-marquee">
+          {[0, 1].map((dup) => (
+            <div key={dup} className="flex items-center shrink-0">
+              {AFFIRMATIONS.map((t, i) => (
+                <span key={i} className="flex items-center">
+                  <span className="mx-6 text-lg sm:text-2xl font-display font-semibold tracking-wide whitespace-nowrap">{t}</span>
+                  <span className="text-gold-400 text-xl">✦</span>
+                </span>
+              ))}
             </div>
           ))}
         </div>
@@ -94,16 +114,23 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
           <h2 className="text-3xl lg:text-4xl font-bold text-secondary-900">Shop by Category</h2>
           <p className="text-secondary-500 mt-3">Find your style across our curated collections</p>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {categories.map((cat) => (
-            <Link key={cat.id} href={`/shop?category=${cat.slug}`} className="group relative aspect-square rounded-xl overflow-hidden bg-secondary-100 hover:shadow-lg transition-shadow">
-              <div className="absolute inset-0 bg-gradient-to-t from-secondary-900/70 to-transparent" />
-              <div className="absolute bottom-0 left-0 right-0 p-4">
-                <h3 className="text-white font-semibold text-lg group-hover:text-gold-400 transition-colors">{cat.name}</h3>
-              </div>
-            </Link>
-          ))}
-        </div>
+        <Reveal>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            {categories.map((cat) => (
+              <Link key={cat.id} href={`/shop?category=${cat.slug}`} className="group relative aspect-square rounded-xl overflow-hidden bg-secondary-900 hover:shadow-xl hover:shadow-gold-500/10 transition-all">
+                {categoryImages[cat.id] && (
+                  <img src={categoryImages[cat.id]} alt={cat.name} className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-secondary-900 via-secondary-900/30 to-transparent" />
+                <div className="absolute bottom-0 left-0 right-0 p-4">
+                  <h3 className="text-white font-display font-bold text-lg leading-tight">{cat.name}</h3>
+                  <span className="inline-block mt-1 text-gold-400 text-xs font-medium opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all">Shop now →</span>
+                </div>
+                <div className="kente-bar absolute bottom-0 left-0 right-0 h-1" />
+              </Link>
+            ))}
+          </div>
+        </Reveal>
       </section>
 
       {featured.length > 0 && (
@@ -112,21 +139,11 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
             <div><h2 className="text-3xl lg:text-4xl font-bold text-secondary-900">Featured Picks</h2><p className="text-secondary-500 mt-2">Our most loved pieces this season</p></div>
             <Link href="/shop" className="hidden sm:flex items-center gap-2 text-secondary-700 hover:text-primary-600 font-medium transition-colors">View All <ArrowRight size={18} /></Link>
           </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-            {featured.map((p) => <ProductCard key={p.id} product={p} />)}
-          </div>
-        </section>
-      )}
-
-      {trending.length > 0 && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="flex items-center justify-between mb-8">
-            <div><h2 className="text-3xl lg:text-4xl font-bold text-secondary-900">Trending Now</h2><p className="text-secondary-500 mt-2">What everyone's wearing</p></div>
-            <Link href="/shop" className="hidden sm:flex items-center gap-2 text-secondary-700 hover:text-primary-600 font-medium transition-colors">View All <ArrowRight size={18} /></Link>
-          </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-            {trending.map((p) => <ProductCard key={p.id} product={p} />)}
-          </div>
+          <Reveal>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+              {featured.map((p) => <ProductCard key={p.id} product={p} />)}
+            </div>
+          </Reveal>
         </section>
       )}
 
@@ -142,6 +159,34 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
           </div>
         </div>
       </section>
+
+      {trending.length > 0 && (
+        <section className="bg-secondary-900 bg-weave text-white py-14 overflow-hidden -mb-32">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-10 flex items-center justify-between">
+            <div>
+              <h2 className="text-3xl lg:text-4xl font-bold text-white">Trending Now</h2>
+              <p className="text-secondary-400 mt-2">What everyone&apos;s wearing</p>
+            </div>
+            <Link href="/shop" className="hidden sm:flex items-center gap-2 text-gold-400 hover:text-gold-300 font-medium transition-colors">View All <ArrowRight size={18} /></Link>
+          </div>
+          <div className="flex gap-8 w-max animate-marquee pause-hover pl-8">
+            {[0, 1].map((dup) => (
+              <div key={dup} className="flex gap-8 shrink-0">
+                {trending.map((p, i) => (
+                  <Link key={`${dup}-${p.id}`} href={`/product/${p.id}`} className="group relative w-56 sm:w-64 shrink-0">
+                    <span className="absolute -top-6 -left-3 z-10 text-7xl font-display font-bold text-transparent [-webkit-text-stroke:2px_#d4af37] select-none pointer-events-none">{i + 1}</span>
+                    <div className="aspect-[3/4] rounded-xl overflow-hidden bg-secondary-800">
+                      <img src={p.image_url || ""} alt={p.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    </div>
+                    <p className="mt-3 font-medium text-white truncate">{p.title}</p>
+                    <p className="text-gold-400 text-sm">{formatPrice(p.price)}</p>
+                  </Link>
+                ))}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

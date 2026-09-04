@@ -20,6 +20,28 @@
   .card { @apply bg-white rounded-xl border border-secondary-100 shadow-sm hover:shadow-lg transition-shadow; }
 }
 
+@layer utilities {
+  /* Scroll-reveal: hidden until .reveal-visible is added by IntersectionObserver */
+  .reveal { opacity: 0; transform: translateY(28px); transition: opacity 0.7s ease-out, transform 0.7s ease-out; }
+  .reveal-visible { opacity: 1; transform: translateY(0); }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; transform: none; transition: none; }
+    .animate-marquee { animation: none !important; }
+  }
+  /* Pan-African accent bar (green / gold / red) — used as a slim divider */
+  .kente-bar {
+    background: linear-gradient(90deg,
+      #1a7a4c 0%, #1a7a4c 33.33%,
+      #d4af37 33.33%, #d4af37 66.66%,
+      #b23a2e 66.66%, #b23a2e 100%);
+  }
+  /* Subtle diagonal weave texture for dark sections */
+  .bg-weave {
+    background-image: repeating-linear-gradient(45deg, rgba(212,175,55,0.06) 0, rgba(212,175,55,0.06) 2px, transparent 2px, transparent 14px);
+  }
+  .pause-hover:hover { animation-play-state: paused; }
+}
+
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: #f5f5f5; }
 ::-webkit-scrollbar-thumb { background: #c7c7c7; border-radius: 4px; }

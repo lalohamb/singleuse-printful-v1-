@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, Minus, Plus, ShoppingBag, Check, Truck, RefreshCw } from "lucide-react";
@@ -13,10 +13,46 @@ export default function ProductDetailClient({ product, related }: { product: Pro
   const { addToCart } = useCart();
   const variants = Array.isArray(product.variants) ? product.variants : [];
   const images = Array.isArray(product.images) && product.images.length > 0 ? product.images : [product.image_url || ""];
+
+  // Unique colors in variant order, and a color -> image lookup (populated by
+  // the Printify sync). Hide the color picker when there's no real choice.
+  const colors = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const v of variants) { if (v.color && !seen.has(v.color)) { seen.add(v.color); out.push(v.color); } }
+    return out;
+  }, [variants]);
+  const colorImage = (c: string) => variants.find((v) => v.color === c && v.image_url)?.image_url || null;
+  const hasColorChoice = colors.length > 1 || (colors.length === 1 && colors[0] !== "Default");
+
+  const [selectedColor, setSelectedColor] = useState<string>(variants[0]?.color || "");
+  // Sizes/styles available for the currently selected color.
+  const sizes = useMemo(() => {
+    const seen = new Set<string>();
+    const out: { id: string; label: string }[] = [];
+    for (const v of variants) {
+      if (v.color !== selectedColor) continue;
+      const label = v.size || v.label;
+      if (!seen.has(label)) { seen.add(label); out.push({ id: v.id, label }); }
+    }
+    return out;
+  }, [variants, selectedColor]);
+
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(variants[0] || null);
+  const [mainImage, setMainImage] = useState<string>(colorImage(variants[0]?.color || "") || images[0] || product.image_url || "");
   const [quantity, setQuantity] = useState(1);
-  const [activeImage, setActiveImage] = useState(0);
   const [added, setAdded] = useState(false);
+
+  const pickColor = (c: string) => {
+    setSelectedColor(c);
+    const img = colorImage(c);
+    if (img) setMainImage(img);
+    setSelectedVariant(variants.find((v) => v.color === c) || null);
+  };
+  const pickSize = (label: string) => {
+    const v = variants.find((x) => x.color === selectedColor && (x.size || x.label) === label);
+    if (v) setSelectedVariant(v);
+  };
 
   const handleAddToCart = () => {
     if (!selectedVariant) return;
@@ -33,12 +69,12 @@ export default function ProductDetailClient({ product, related }: { product: Pro
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
         <div>
           <div className="aspect-[3/4] rounded-2xl overflow-hidden bg-secondary-50 mb-4">
-            <img src={images[activeImage] || product.image_url || ""} alt={product.title} className="w-full h-full object-cover" />
+            <img src={mainImage || product.image_url || ""} alt={product.title} className="w-full h-full object-cover transition-opacity duration-300" />
           </div>
           {images.length > 1 && (
-            <div className="flex gap-3">
+            <div className="flex gap-3 flex-wrap">
               {images.map((img, i) => (
-                <button key={i} onClick={() => setActiveImage(i)} className={`w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${activeImage === i ? "border-secondary-900" : "border-transparent opacity-60 hover:opacity-100"}`}>
+                <button key={i} onClick={() => setMainImage(img)} className={`w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${mainImage === img ? "border-secondary-900" : "border-transparent opacity-60 hover:opacity-100"}`}>
                   <img src={img} alt="" className="w-full h-full object-cover" />
                 </button>
               ))}
@@ -50,13 +86,32 @@ export default function ProductDetailClient({ product, related }: { product: Pro
           <h1 className="text-3xl lg:text-4xl font-bold text-secondary-900">{product.title}</h1>
           <p className="text-2xl font-bold text-secondary-900 mt-4">{formatPrice(product.price)}</p>
           <p className="text-secondary-600 mt-6 leading-relaxed">{product.description}</p>
-          {variants.length > 0 && (
+          {hasColorChoice && (
             <div className="mt-8">
-              <label className="label-text">Select Size / Style</label>
+              <label className="label-text">Color: <span className="font-normal text-secondary-500">{selectedColor}</span></label>
               <div className="flex flex-wrap gap-2">
-                {variants.map((v) => (
-                  <button key={v.id + v.label} onClick={() => setSelectedVariant(v)} className={`px-4 py-2.5 border rounded-lg font-medium text-sm transition-all ${selectedVariant?.id === v.id && selectedVariant?.label === v.label ? "border-secondary-900 bg-secondary-900 text-white" : "border-secondary-200 text-secondary-700 hover:border-secondary-400"}`}>{v.label}</button>
-                ))}
+                {colors.map((c) => {
+                  const img = colorImage(c);
+                  const active = selectedColor === c;
+                  return (
+                    <button key={c} onClick={() => pickColor(c)} title={c} aria-label={c} className={`relative rounded-lg border-2 transition-all ${active ? "border-secondary-900" : "border-secondary-200 hover:border-secondary-400"} ${img ? "w-14 h-14 overflow-hidden" : "px-3 py-2 text-sm font-medium"}`}>
+                    {img ? <img src={img} alt={c} className="w-full h-full object-cover" /> : c}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {sizes.length > 0 && (
+            <div className="mt-6">
+              <label className="label-text">{hasColorChoice ? "Size" : "Select Size / Style"}</label>
+              <div className="flex flex-wrap gap-2">
+                {sizes.map((s) => {
+                  const active = (selectedVariant?.size || selectedVariant?.label) === s.label;
+                  return (
+                    <button key={s.id + s.label} onClick={() => pickSize(s.label)} className={`px-4 py-2.5 border rounded-lg font-medium text-sm transition-all ${active ? "border-secondary-900 bg-secondary-900 text-white" : "border-secondary-200 text-secondary-700 hover:border-secondary-400"}`}>{s.label}</button>
+                  );
+                })}
               </div>
             </div>
           )}

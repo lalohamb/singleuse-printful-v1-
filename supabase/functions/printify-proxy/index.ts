@@ -270,6 +270,36 @@ Deno.serve(async (req: Request) => {
             // Only sell enabled variants; fall back to all if none are enabled.
             const usable = enabled.length ? enabled : allVariants;
 
+            // variant id -> color, so we can link Printify images (which carry
+            // variant_ids) to a color and show the right image on color select.
+            const colorOf = (v: any): string => {
+              for (const vid of v.options || []) {
+                const meta = optionValues.get(vid);
+                if (meta?.type === "color") return meta.title;
+              }
+              return "Default";
+            };
+            const variantColor = new Map<string, string>();
+            for (const v of allVariants) variantColor.set(String(v.id), colorOf(v));
+
+            // color -> image src. Only use images that are specific to a
+            // single color (the default/collage mockup spans many colors, so
+            // it can't represent one color). First single-color image wins.
+            const colorImage = new Map<string, string>();
+            for (const img of detail.images || []) {
+              const src = typeof img === "string" ? img : img.src;
+              if (!src) continue;
+              const cset = new Set<string>();
+              for (const vid of img.variant_ids || []) {
+                const c = variantColor.get(String(vid));
+                if (c) cset.add(c);
+              }
+              if (cset.size === 1) {
+                const c = [...cset][0];
+                if (!colorImage.has(c)) colorImage.set(c, src);
+              }
+            }
+
             const variants = usable.map((v: any) => {
               let color = "Default";
               let size = "";
@@ -286,6 +316,7 @@ Deno.serve(async (req: Request) => {
                 size,
                 // Printify prices are integer cents.
                 price: (Number(v.price) || 0) / 100,
+                image_url: colorImage.get(color) || null,
               };
             });
 

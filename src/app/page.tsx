@@ -15,13 +15,20 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env
 export const revalidate = 60;
 
 export default async function HomePage() {
-  const [settingsRes, featuredRes, newArrivalsRes, trendingRes, categoriesRes] = await Promise.all([
+  const [settingsRes, featuredRes, newArrivalsRes, trendingRes, categoriesRes, catImgRes] = await Promise.all([
     supabase.from("settings").select("*").limit(1).maybeSingle(),
     supabase.from("products").select("*").eq("status", "active").eq("featured", true).limit(4),
     supabase.from("products").select("*").eq("status", "active").eq("is_new_arrival", true).order("created_at", { ascending: false }).limit(12),
-    supabase.from("products").select("*").eq("status", "active").eq("is_trending", true).limit(4),
+    supabase.from("products").select("*").eq("status", "active").eq("is_trending", true).limit(12),
     supabase.from("categories").select("*").order("name"),
+    supabase.from("products").select("category_id, image_url").eq("status", "active").not("image_url", "is", null).not("category_id", "is", null),
   ]);
+
+  // Representative image per category (first active product with an image).
+  const categoryImages: Record<string, string> = {};
+  for (const row of (catImgRes.data || []) as Array<{ category_id: string; image_url: string }>) {
+    if (row.category_id && row.image_url && !categoryImages[row.category_id]) categoryImages[row.category_id] = row.image_url;
+  }
 
   return (
     <StorefrontLayout>
@@ -31,6 +38,7 @@ export default async function HomePage() {
         newArrivals={newArrivalsRes.data || []}
         trending={trendingRes.data || []}
         categories={categoriesRes.data || []}
+        categoryImages={categoryImages}
       />
     </StorefrontLayout>
   );
