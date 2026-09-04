@@ -15,9 +15,11 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env
 export const revalidate = 60;
 
 export default async function HomePage() {
-  const [settingsRes, productsRes, categoriesRes] = await Promise.all([
+  const [settingsRes, featuredRes, newArrivalsRes, trendingRes, categoriesRes] = await Promise.all([
     supabase.from("settings").select("*").limit(1).maybeSingle(),
-    supabase.from("products").select("*").eq("status", "active").order("featured", { ascending: false }).limit(8),
+    supabase.from("products").select("*").eq("status", "active").eq("featured", true).limit(4),
+    supabase.from("products").select("*").eq("status", "active").eq("is_new_arrival", true).order("created_at", { ascending: false }).limit(4),
+    supabase.from("products").select("*").eq("status", "active").eq("is_trending", true).limit(4),
     supabase.from("categories").select("*").order("name"),
   ]);
 
@@ -25,7 +27,9 @@ export default async function HomePage() {
     <StorefrontLayout>
       <HomeClient
         settings={settingsRes.data}
-        products={productsRes.data || []}
+        featured={featuredRes.data || []}
+        newArrivals={newArrivalsRes.data || []}
+        trending={trendingRes.data || []}
         categories={categoriesRes.data || []}
       />
     </StorefrontLayout>

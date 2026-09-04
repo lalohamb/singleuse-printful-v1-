@@ -18,6 +18,11 @@ export interface Product {
   images: string[];
   status: string;
   featured: boolean;
+  is_new_arrival: boolean;
+  is_trending: boolean;
+  is_bestseller: boolean;
+  is_on_sale: boolean;
+  content_locked: boolean;
   print_provider_id: string | null;
   blueprint_id: string | null;
   variants: ProductVariant[];

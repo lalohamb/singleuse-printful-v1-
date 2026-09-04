@@ -231,6 +231,17 @@ Deno.serve(async (req: Request) => {
       let page = 1;
       let lastPage = 1;
 
+      // Prefetch which existing products are content-locked so re-sync can
+      // preserve admin-edited title/description/image while still refreshing
+      // commerce fields (price, variants, status).
+      const { data: lockedRows } = await supabase
+        .from("products")
+        .select("printify_id, content_locked")
+        .not("printify_id", "is", null);
+      const lockedMap = new Map<string, boolean>(
+        (lockedRows || []).map((r: any) => [String(r.printify_id), !!r.content_locked])
+      );
+
       do {
         const listing = await printifyFetch(
           `/shops/${shopId}/products.json?limit=50&page=${page}`,
@@ -298,25 +309,35 @@ Deno.serve(async (req: Request) => {
               }
             }
 
+            // Commerce fields are always refreshed from Printify.
+            const payload: Record<string, unknown> = {
+              printify_id: String(detail.id),
+              price,
+              cost,
+              variants,
+              status: detail.visible ? "active" : "draft",
+              blueprint_id: String(detail.blueprint_id || ""),
+              print_provider_id: String(detail.print_provider_id || ""),
+              updated_at: new Date().toISOString(),
+            };
+
+            // Content fields are overwritten ONLY when the row is not
+            // content-locked. New products are absent from lockedMap, so
+            // isLocked is false and title is always supplied on first insert
+            // (satisfies the NOT NULL title constraint). For locked existing
+            // rows the omitted columns keep their curated values, because
+            // Postgres upsert only updates the columns present in the payload.
+            const isLocked = lockedMap.get(String(detail.id)) === true;
+            if (!isLocked) {
+              payload.title = detail.title;
+              payload.description = detail.description || "";
+              payload.image_url = images[0] || null;
+              payload.images = images;
+            }
+
             const { data, error } = await supabase
               .from("products")
-              .upsert(
-                {
-                  printify_id: String(detail.id),
-                  title: detail.title,
-                  description: detail.description || "",
-                  price,
-                  cost,
-                  image_url: images[0] || null,
-                  images,
-                  variants,
-                  status: detail.visible ? "active" : "draft",
-                  blueprint_id: String(detail.blueprint_id || ""),
-                  print_provider_id: String(detail.print_provider_id || ""),
-                  updated_at: new Date().toISOString(),
-                },
-                { onConflict: "printify_id" }
-              )
+              .upsert(payload, { onConflict: "printify_id" })
               .select("id");
 
             if (error) errors.push({ id: String(p.id), error: error.message });

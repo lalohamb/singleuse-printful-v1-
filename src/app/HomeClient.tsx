@@ -4,13 +4,13 @@ import { ArrowRight, Truck, Shield, Sparkles, Heart } from "lucide-react";
 import type { Product, StoreSettings, Category } from "@/types";
 import ProductCard from "@/components/ProductCard";
 
-export default function HomeClient({ settings, products, categories }: {
+export default function HomeClient({ settings, featured, newArrivals, trending, categories }: {
   settings: StoreSettings | null;
-  products: Product[];
+  featured: Product[];
+  newArrivals: Product[];
+  trending: Product[];
   categories: Category[];
 }) {
-  const featured = products.filter((p) => p.featured).slice(0, 4);
-  const rest = products.filter((p) => !p.featured).slice(0, 4);
 
   return (
     <div>
@@ -77,7 +77,7 @@ export default function HomeClient({ settings, products, categories }: {
         </section>
       )}
 
-      {rest.length > 0 && (
+      {newArrivals.length > 0 && (
         <section className="bg-secondary-50 py-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between mb-8">
@@ -85,8 +85,20 @@ export default function HomeClient({ settings, products, categories }: {
               <Link href="/shop" className="hidden sm:flex items-center gap-2 text-secondary-700 hover:text-primary-600 font-medium transition-colors">View All <ArrowRight size={18} /></Link>
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-              {rest.map((p) => <ProductCard key={p.id} product={p} />)}
+              {newArrivals.map((p) => <ProductCard key={p.id} product={p} />)}
             </div>
+          </div>
+        </section>
+      )}
+
+      {trending.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="flex items-center justify-between mb-8">
+            <div><h2 className="text-3xl lg:text-4xl font-bold text-secondary-900">Trending Now</h2><p className="text-secondary-500 mt-2">What everyone's wearing</p></div>
+            <Link href="/shop" className="hidden sm:flex items-center gap-2 text-secondary-700 hover:text-primary-600 font-medium transition-colors">View All <ArrowRight size={18} /></Link>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+            {trending.map((p) => <ProductCard key={p.id} product={p} />)}
           </div>
         </section>
       )}

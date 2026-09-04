@@ -10,6 +10,7 @@ export default function ShopClient({ products, categories }: { products: Product
   const router = useRouter();
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState("featured");
+  const [flagFilter, setFlagFilter] = useState<"" | "is_new_arrival" | "is_trending">("");
   const activeCategory = searchParams.get("category") || "";
 
   const setCategory = (slug: string) => {
@@ -22,12 +23,15 @@ export default function ShopClient({ products, categories }: { products: Product
       const cat = categories.find((c) => c.slug === activeCategory);
       if (cat) list = list.filter((p) => p.category_id === cat.id);
     }
+    if (flagFilter) list = list.filter((p) => (p as unknown as Record<string, boolean>)[flagFilter]);
     if (sortBy === "price-low") list.sort((a, b) => a.price - b.price);
     else if (sortBy === "price-high") list.sort((a, b) => b.price - a.price);
     else if (sortBy === "newest") list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    else if (sortBy === "new") list.sort((a, b) => (b.is_new_arrival ? 1 : 0) - (a.is_new_arrival ? 1 : 0));
+    else if (sortBy === "trending") list.sort((a, b) => (b.is_trending ? 1 : 0) - (a.is_trending ? 1 : 0));
     else list.sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0));
     return list;
-  }, [products, categories, activeCategory, sortBy]);
+  }, [products, categories, activeCategory, sortBy, flagFilter]);
 
   const activeCatName = categories.find((c) => c.slug === activeCategory)?.name || "All Products";
 
@@ -53,6 +57,12 @@ export default function ShopClient({ products, categories }: { products: Product
                 <button key={cat.id} onClick={() => setCategory(cat.slug)} className={`block w-full text-left px-3 py-2 rounded-lg transition-colors ${activeCategory === cat.slug ? "bg-secondary-900 text-white font-medium" : "text-secondary-700 hover:bg-secondary-50"}`}>{cat.name}</button>
               ))}
             </div>
+            <h2 className="font-semibold text-secondary-900 mt-6 mb-4">Collections</h2>
+            <div className="space-y-1">
+              {([["is_new_arrival", "New Arrivals"], ["is_trending", "Trending"]] as const).map(([key, label]) => (
+                <button key={key} onClick={() => setFlagFilter((f) => f === key ? "" : key)} className={`block w-full text-left px-3 py-2 rounded-lg transition-colors ${flagFilter === key ? "bg-secondary-900 text-white font-medium" : "text-secondary-700 hover:bg-secondary-50"}`}>{label}</button>
+              ))}
+            </div>
           </div>
         </aside>
         <div className="flex-1">
@@ -61,6 +71,8 @@ export default function ShopClient({ products, categories }: { products: Product
               <label className="text-sm text-secondary-600">Sort by:</label>
               <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="text-sm border border-secondary-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500">
                 <option value="featured">Featured</option>
+                <option value="new">New Arrivals</option>
+                <option value="trending">Trending</option>
                 <option value="newest">Newest</option>
                 <option value="price-low">Price: Low to High</option>
                 <option value="price-high">Price: High to Low</option>

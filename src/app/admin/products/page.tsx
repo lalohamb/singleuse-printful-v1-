@@ -1,8 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus, Edit2, Trash2, Search, X, Loader2, RefreshCw, Star, Package } from "lucide-react";
+import { Plus, Edit2, Trash2, Search, X, Loader2, RefreshCw, Star, Package, Lock } from "lucide-react";
 import { supabase, formatPrice } from "@/lib/supabase";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
+import { ACTIVE_FLAGS } from "@/lib/productFlags";
 import type { Product, Category } from "@/types";
 
 function Products() {
@@ -14,6 +15,9 @@ function Products() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkCategory, setBulkCategory] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const fetchData = () => {
     Promise.all([
@@ -25,6 +29,22 @@ function Products() {
   useEffect(() => { fetchData(); }, []);
 
   const filtered = products.filter((p) => p.title.toLowerCase().includes(search.toLowerCase()));
+
+  const toggleRow = (id: string) => setSelectedIds((s) => {
+    const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n;
+  });
+  const toggleAll = () => setSelectedIds((s) => s.size === filtered.length ? new Set() : new Set(filtered.map((p) => p.id)));
+  const clearSel = () => setSelectedIds(new Set());
+
+  const runBulk = async (patch: Record<string, unknown>) => {
+    if (!selectedIds.size) return;
+    setBulkBusy(true);
+    await supabase.from("products").update(patch).in("id", Array.from(selectedIds));
+    setBulkBusy(false); clearSel(); fetchData();
+  };
+  const bulkAssignCategory = () => runBulk({ category_id: bulkCategory || null });
+  const bulkSetFlag = (key: string, value: boolean) => runBulk({ [key]: value });
+  const bulkSetStatus = (status: string) => runBulk({ status });
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this product?")) return;
@@ -64,27 +84,46 @@ function Products() {
         </div>
       </div>
       {syncMsg && <div className="bg-primary-50 border border-primary-100 text-primary-700 rounded-lg p-3 text-sm">{syncMsg}</div>}
+      {selectedIds.size > 0 && (
+        <div className="bg-primary-50 border border-primary-100 rounded-lg p-3 flex flex-wrap items-center gap-3">
+          <span className="text-sm font-medium text-secondary-900">{selectedIds.size} selected</span>
+          <select value={bulkCategory} onChange={(e) => setBulkCategory(e.target.value)} className="input-field py-1.5 max-w-[200px]">
+            <option value="">Uncategorized</option>
+            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <button onClick={bulkAssignCategory} disabled={bulkBusy} className="btn-primary py-1.5">Assign category</button>
+          {ACTIVE_FLAGS.map((f) => (
+            <button key={f.key as string} onClick={() => bulkSetFlag(f.key as string, true)} disabled={bulkBusy} className="btn-outline py-1.5">+ {f.label}</button>
+          ))}
+          <button onClick={() => bulkSetStatus("archived")} disabled={bulkBusy} className="btn-outline py-1.5">Archive</button>
+          <button onClick={clearSel} className="text-sm text-secondary-500 underline">Clear</button>
+        </div>
+      )}
       {loading ? <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-2 border-secondary-300 border-t-secondary-900" /></div> : (
         <div className="bg-white rounded-xl border border-secondary-100 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-secondary-50 border-b border-secondary-100">
                 <tr>
+                  <th className="px-4 py-3 w-10"><input type="checkbox" aria-label="Select all" checked={filtered.length > 0 && selectedIds.size === filtered.length} onChange={toggleAll} className="w-4 h-4 rounded" /></th>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700">Product</th>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700 hidden md:table-cell">Category</th>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700">Price</th>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700 hidden lg:table-cell">Status</th>
+                  <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700 hidden lg:table-cell">Flags</th>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700">Featured</th>
                   <th className="text-right px-4 py-3 text-sm font-semibold text-secondary-700">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-secondary-50">
                 {filtered.map((p) => (
-                  <tr key={p.id} className="hover:bg-secondary-50 transition-colors">
-                    <td className="px-4 py-3"><div className="flex items-center gap-3"><img src={p.image_url || ""} alt={p.title} className="w-12 h-12 rounded-lg object-cover bg-secondary-100 flex-shrink-0" /><div className="min-w-0"><p className="font-medium text-secondary-900 truncate">{p.title}</p>{p.printify_id && <p className="text-xs text-secondary-400">Printify: {p.printify_id}</p>}</div></div></td>
+                  <tr key={p.id} className={`hover:bg-secondary-50 transition-colors ${selectedIds.has(p.id) ? "bg-primary-50/50" : ""}`}>
+                    <td className="px-4 py-3"><input type="checkbox" aria-label={`Select ${p.title}`} checked={selectedIds.has(p.id)} onChange={() => toggleRow(p.id)} className="w-4 h-4 rounded" /></td>
+                    <td className="px-4 py-3"><div className="flex items-center gap-3"><img src={p.image_url || ""} alt={p.title} className="w-12 h-12 rounded-lg object-cover bg-secondary-100 flex-shrink-0" /><div className="min-w-0"><p className="font-medium text-secondary-900 truncate flex items-center gap-1">{p.content_locked && <Lock size={12} className="text-warning-500 flex-shrink-0" aria-label="Content locked" />}{p.title}</p>{p.printify_id && <p className="text-xs text-secondary-400">Printify: {p.printify_id}</p>}</div></div></td>
                     <td className="px-4 py-3 text-sm text-secondary-600 hidden md:table-cell">{categories.find((c) => c.id === p.category_id)?.name || "Uncategorized"}</td>
                     <td className="px-4 py-3 font-medium text-secondary-900">{formatPrice(p.price)}</td>
                     <td className="px-4 py-3 hidden lg:table-cell"><span className={`text-xs px-2 py-1 rounded-full ${p.status === "active" ? "bg-success-50 text-success-600" : p.status === "draft" ? "bg-warning-50 text-warning-600" : "bg-secondary-100 text-secondary-500"}`}>{p.status}</span></td>
+                    <td className="px-4 py-3 hidden lg:table-cell"><div className="flex flex-wrap gap-1">{ACTIVE_FLAGS.filter((f) => f.key !== "featured" && (p as unknown as Record<string, boolean>)[f.key as string]).map((f) => <span key={f.key as string} className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${f.badgeClass}`}>{f.badge}</span>)}</div></td>
                     <td className="px-4 py-3"><button onClick={() => handleToggleFeatured(p)} className="p-1.5 rounded-lg hover:bg-secondary-100 transition-colors"><Star size={18} className={p.featured ? "fill-gold-500 text-gold-500" : "text-secondary-300"} /></button></td>
                     <td className="px-4 py-3"><div className="flex items-center justify-end gap-1"><button onClick={() => { setEditing(p); setShowModal(true); }} className="p-2 text-secondary-500 hover:text-secondary-900 hover:bg-secondary-100 rounded-lg transition-colors"><Edit2 size={16} /></button><button onClick={() => handleDelete(p.id)} className="p-2 text-secondary-500 hover:text-error-500 hover:bg-error-50 rounded-lg transition-colors"><Trash2 size={16} /></button></div></td>
                   </tr>
@@ -101,13 +140,37 @@ function Products() {
 }
 
 function ProductModal({ product, categories, onClose, onSave }: { product: Product | null; categories: Category[]; onClose: () => void; onSave: () => void }) {
-  const [form, setForm] = useState({ title: product?.title || "", description: product?.description || "", price: product?.price?.toString() || "", cost: product?.cost?.toString() || "0", image_url: product?.image_url || "", category_id: product?.category_id || "", status: product?.status || "active", featured: product?.featured || false });
+  const [form, setForm] = useState({
+    title: product?.title || "", description: product?.description || "",
+    price: product?.price?.toString() || "", cost: product?.cost?.toString() || "0",
+    image_url: product?.image_url || "", category_id: product?.category_id || "",
+    status: product?.status || "active", featured: product?.featured || false,
+    is_new_arrival: product?.is_new_arrival || false, is_trending: product?.is_trending || false,
+    is_bestseller: product?.is_bestseller || false, is_on_sale: product?.is_on_sale || false,
+    content_locked: product?.content_locked || false,
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSave = async () => {
     setSaving(true); setError(null);
-    const payload = { title: form.title, description: form.description, price: parseFloat(form.price) || 0, cost: parseFloat(form.cost) || 0, image_url: form.image_url, category_id: form.category_id || null, status: form.status, featured: form.featured, images: form.image_url ? [form.image_url] : [], updated_at: new Date().toISOString() };
+    // Editing a synced product's text/image locks it so a Printify re-sync
+    // won't overwrite the curated content. New products aren't locked.
+    const textChanged = !!product && (
+      form.title !== (product.title || "") ||
+      form.description !== (product.description || "") ||
+      form.image_url !== (product.image_url || "")
+    );
+    const payload = {
+      title: form.title, description: form.description,
+      price: parseFloat(form.price) || 0, cost: parseFloat(form.cost) || 0,
+      image_url: form.image_url, category_id: form.category_id || null,
+      status: form.status, featured: form.featured,
+      is_new_arrival: form.is_new_arrival, is_trending: form.is_trending,
+      is_bestseller: form.is_bestseller, is_on_sale: form.is_on_sale,
+      content_locked: form.content_locked || textChanged,
+      images: form.image_url ? [form.image_url] : [], updated_at: new Date().toISOString(),
+    };
     const result = product ? await supabase.from("products").update(payload).eq("id", product.id) : await supabase.from("products").insert({ ...payload, variants: [{ id: "S", label: "Small", color: "Default" }] });
     if (result.error) { setError(result.error.message); setSaving(false); } else onSave();
   };
@@ -130,7 +193,23 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
           <div><label className="label-text">Image URL</label><input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} className="input-field" placeholder="https://..." />{form.image_url && <img src={form.image_url} alt="Preview" className="w-24 h-24 object-cover rounded-lg mt-2 bg-secondary-100" />}</div>
           <div><label className="label-text">Category</label><select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })} className="input-field"><option value="">Uncategorized</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
           <div><label className="label-text">Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className="input-field"><option value="active">Active</option><option value="draft">Draft</option><option value="archived">Archived</option></select></div>
-          <label className="flex items-center gap-3 cursor-pointer"><input type="checkbox" checked={form.featured} onChange={(e) => setForm({ ...form, featured: e.target.checked })} className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500" /><span className="text-sm font-medium text-secondary-700">Featured product</span></label>
+          <div>
+            <label className="label-text">Badges</label>
+            <div className="grid grid-cols-2 gap-2">
+              {ACTIVE_FLAGS.map((f) => (
+                <label key={f.key as string} className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={!!(form as unknown as Record<string, boolean>)[f.key as string]} onChange={(e) => setForm({ ...form, [f.key]: e.target.checked })} className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500" />
+                  <span className="text-sm font-medium text-secondary-700">{f.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          {product && form.content_locked && (
+            <div className="bg-warning-50 border border-warning-100 text-warning-700 rounded-lg p-3 text-sm flex items-center justify-between gap-3">
+              <span>Content locked — title, description &amp; image are preserved on Printify re-sync.</span>
+              <button type="button" onClick={() => setForm({ ...form, content_locked: false })} className="underline font-medium flex-shrink-0">Unlock</button>
+            </div>
+          )}
           {error && <div className="bg-error-50 border border-error-100 text-error-700 rounded-lg p-3 text-sm">{error}</div>}
         </div>
         <div className="flex gap-3 p-6 border-t border-secondary-100 sticky bottom-0 bg-white rounded-b-2xl">
