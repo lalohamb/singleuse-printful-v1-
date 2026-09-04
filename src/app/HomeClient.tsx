@@ -4,7 +4,6 @@ import { useState } from "react";
 import { ArrowRight, Truck, Shield, Sparkles, Heart, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Product, StoreSettings, Category } from "@/types";
 import ProductCard from "@/components/ProductCard";
-import { formatPrice } from "@/lib/supabase";
 
 export default function HomeClient({ settings, featured, newArrivals, trending, categories }: {
   settings: StoreSettings | null;
@@ -62,28 +61,26 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
             </div>
             <Link href="/shop" className="hidden sm:flex items-center gap-2 text-secondary-700 hover:text-primary-600 font-medium transition-colors">View All <ArrowRight size={18} /></Link>
           </div>
-          <div className="relative overflow-hidden rounded-2xl bg-secondary-900">
+          <div className="relative overflow-hidden rounded-2xl bg-secondary-50">
             <div className="flex transition-transform duration-500 ease-out" style={{ transform: `translateX(-${slide * 100}%)` }}>
               {newArrivals.map((p) => (
-                <Link key={p.id} href={`/product/${p.id}`} className="relative w-full flex-shrink-0 group">
-                  <div className="h-[380px] sm:h-[520px]">
-                    <img src={p.image_url || ""} alt={p.title} className="w-full h-full object-cover" />
+                <div key={p.id} className="relative w-full flex-shrink-0">
+                  <div className="h-[440px] sm:h-[640px] flex items-center justify-center p-2 sm:p-4">
+                    <img src={p.image_url || ""} alt={p.title} className="max-h-full max-w-full object-contain" />
                   </div>
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-secondary-900/85 via-secondary-900/40 to-transparent p-6 sm:p-10">
-                    <h3 className="text-2xl sm:text-4xl font-bold text-white max-w-3xl">{p.title}</h3>
-                    <p className="text-gold-400 text-lg sm:text-2xl font-semibold mt-2">{formatPrice(p.price)}</p>
-                    <span className="inline-flex items-center gap-2 mt-4 text-white group-hover:text-gold-400 transition-colors font-medium">View product <ArrowRight size={18} /></span>
+                  <div className="absolute inset-x-0 bottom-0 flex justify-center pb-6">
+                    <Link href={`/product/${p.id}`} className="btn-gold shadow-lg">View full product details <ArrowRight size={18} className="ml-2" /></Link>
                   </div>
-                </Link>
+                </div>
               ))}
             </div>
             {slideCount > 1 && (
               <>
                 <button onClick={() => goSlide(-1)} aria-label="Previous new arrival" className="absolute left-3 top-1/2 -translate-y-1/2 p-2 sm:p-3 rounded-full bg-white/90 shadow hover:bg-white text-secondary-900 transition-colors"><ChevronLeft size={22} /></button>
                 <button onClick={() => goSlide(1)} aria-label="Next new arrival" className="absolute right-3 top-1/2 -translate-y-1/2 p-2 sm:p-3 rounded-full bg-white/90 shadow hover:bg-white text-secondary-900 transition-colors"><ChevronRight size={22} /></button>
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 flex gap-2">
                   {newArrivals.map((_, i) => (
-                    <button key={i} onClick={() => setSlide(i)} aria-label={`Go to slide ${i + 1}`} className={`w-2.5 h-2.5 rounded-full transition-colors ${i === slide ? "bg-white" : "bg-white/50 hover:bg-white/75"}`} />
+                    <button key={i} onClick={() => setSlide(i)} aria-label={`Go to slide ${i + 1}`} className={`w-2.5 h-2.5 rounded-full transition-colors ${i === slide ? "bg-secondary-900" : "bg-secondary-300 hover:bg-secondary-400"}`} />
                   ))}
                 </div>
               </>
