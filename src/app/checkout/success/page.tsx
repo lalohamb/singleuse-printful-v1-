@@ -1,12 +1,12 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle, Package, Mail } from "lucide-react";
 import { supabase, formatPrice } from "@/lib/supabase";
 import type { Order } from "@/types";
 
-export default function CheckoutSuccessPage() {
+function CheckoutSuccessContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id");
   const [order, setOrder] = useState<Order | null>(null);
@@ -44,5 +44,13 @@ export default function CheckoutSuccessPage() {
         <Link href="/" className="btn-outline">Back to Home</Link>
       </div>
     </div>
+  );
+}
+
+export default function CheckoutSuccessPage() {
+  return (
+    <Suspense fallback={<div className="max-w-2xl mx-auto px-4 py-20 text-center"><div className="inline-block animate-spin rounded-full h-8 w-8 border-2 border-secondary-300 border-t-secondary-900" /></div>}>
+      <CheckoutSuccessContent />
+    </Suspense>
   );
 }

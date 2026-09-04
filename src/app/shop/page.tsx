@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { createClient } from "@supabase/supabase-js";
 import StorefrontLayout from "@/components/StorefrontLayout";
 import ShopClient from "./ShopClient";
@@ -18,7 +19,9 @@ export default async function ShopPage() {
 
   return (
     <StorefrontLayout>
-      <ShopClient products={productsRes.data || []} categories={categoriesRes.data || []} />
+      <Suspense fallback={null}>
+        <ShopClient products={productsRes.data || []} categories={categoriesRes.data || []} />
+      </Suspense>
     </StorefrontLayout>
   );
 }
