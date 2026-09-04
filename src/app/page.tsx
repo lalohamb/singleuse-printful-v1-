@@ -18,7 +18,7 @@ export default async function HomePage() {
   const [settingsRes, featuredRes, newArrivalsRes, trendingRes, categoriesRes] = await Promise.all([
     supabase.from("settings").select("*").limit(1).maybeSingle(),
     supabase.from("products").select("*").eq("status", "active").eq("featured", true).limit(4),
-    supabase.from("products").select("*").eq("status", "active").eq("is_new_arrival", true).order("created_at", { ascending: false }).limit(4),
+    supabase.from("products").select("*").eq("status", "active").eq("is_new_arrival", true).order("created_at", { ascending: false }).limit(12),
     supabase.from("products").select("*").eq("status", "active").eq("is_trending", true).limit(4),
     supabase.from("categories").select("*").order("name"),
   ]);

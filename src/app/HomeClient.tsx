@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
-import { ArrowRight, Truck, Shield, Sparkles, Heart } from "lucide-react";
+import { useRef } from "react";
+import { ArrowRight, Truck, Shield, Sparkles, Heart, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Product, StoreSettings, Category } from "@/types";
 import ProductCard from "@/components/ProductCard";
 
@@ -11,6 +12,11 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
   trending: Product[];
   categories: Category[];
 }) {
+  const newRef = useRef<HTMLDivElement>(null);
+  const scrollNew = (dir: number) => {
+    const el = newRef.current;
+    if (el) el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: "smooth" });
+  };
 
   return (
     <div>
@@ -48,6 +54,28 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
         </div>
       </section>
 
+      {newArrivals.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="text-3xl lg:text-4xl font-bold text-secondary-900">New Arrivals</h2>
+              <p className="text-secondary-500 mt-2">Fresh designs just dropped</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => scrollNew(-1)} aria-label="Previous new arrivals" className="p-2 rounded-full border border-secondary-200 text-secondary-700 hover:bg-secondary-50 transition-colors"><ChevronLeft size={20} /></button>
+              <button onClick={() => scrollNew(1)} aria-label="Next new arrivals" className="p-2 rounded-full border border-secondary-200 text-secondary-700 hover:bg-secondary-50 transition-colors"><ChevronRight size={20} /></button>
+            </div>
+          </div>
+          <div ref={newRef} className="flex gap-4 lg:gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-4 -mx-1 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {newArrivals.map((p) => (
+              <div key={p.id} className="w-52 sm:w-60 lg:w-64 flex-shrink-0 snap-start">
+                <ProductCard product={p} />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="text-center mb-12">
           <h2 className="text-3xl lg:text-4xl font-bold text-secondary-900">Shop by Category</h2>
@@ -73,20 +101,6 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
             {featured.map((p) => <ProductCard key={p.id} product={p} />)}
-          </div>
-        </section>
-      )}
-
-      {newArrivals.length > 0 && (
-        <section className="bg-secondary-50 py-16">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between mb-8">
-              <div><h2 className="text-3xl lg:text-4xl font-bold text-secondary-900">New Arrivals</h2><p className="text-secondary-500 mt-2">Fresh designs just dropped</p></div>
-              <Link href="/shop" className="hidden sm:flex items-center gap-2 text-secondary-700 hover:text-primary-600 font-medium transition-colors">View All <ArrowRight size={18} /></Link>
-            </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-              {newArrivals.map((p) => <ProductCard key={p.id} product={p} />)}
-            </div>
           </div>
         </section>
       )}
