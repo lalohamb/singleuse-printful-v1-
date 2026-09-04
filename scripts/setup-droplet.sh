@@ -6,7 +6,7 @@ set -e
 
 APP_DIR="/var/www/bodyandsleeves"
 DOMAIN="146.190.252.82"        # <-- change this
-REPO="https://github.com/lalohamb/bodyandsleeves-next.git"  # <-- change this
+REPO="REPO="https://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@github.com/lalohamb/bodyandsleeves-next.git"  # <-- change this
 
 # --- Node.js 22 ---
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
@@ -40,7 +40,7 @@ pm2 save
 cat > /etc/nginx/sites-available/bodyandsleeves << EOF
 server {
     listen 80;
-    server_name $DOMAIN www.$DOMAIN;
+    server_name $DOMAIN;
 
     location / {
         proxy_pass http://localhost:3000;
@@ -59,4 +59,3 @@ nginx -t && systemctl reload nginx
 
 echo ""
 echo "✅ Done. App running at http://$DOMAIN"
-echo "👉 Add SSL: apt install certbot python3-certbot-nginx -y && certbot --nginx -d $DOMAIN -d www.$DOMAIN"
