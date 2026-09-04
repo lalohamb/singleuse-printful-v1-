@@ -1,9 +1,10 @@
 "use client";
 import Link from "next/link";
-import { useRef } from "react";
+import { useState } from "react";
 import { ArrowRight, Truck, Shield, Sparkles, Heart, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Product, StoreSettings, Category } from "@/types";
 import ProductCard from "@/components/ProductCard";
+import { formatPrice } from "@/lib/supabase";
 
 export default function HomeClient({ settings, featured, newArrivals, trending, categories }: {
   settings: StoreSettings | null;
@@ -12,11 +13,9 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
   trending: Product[];
   categories: Category[];
 }) {
-  const newRef = useRef<HTMLDivElement>(null);
-  const scrollNew = (dir: number) => {
-    const el = newRef.current;
-    if (el) el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: "smooth" });
-  };
+  const [slide, setSlide] = useState(0);
+  const slideCount = newArrivals.length;
+  const goSlide = (dir: number) => setSlide((s) => (s + dir + slideCount) % slideCount);
 
   return (
     <div>
@@ -54,24 +53,41 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
         </div>
       </section>
 
-      {newArrivals.length > 0 && (
+      {slideCount > 0 && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="flex items-center justify-between mb-8">
             <div>
               <h2 className="text-3xl lg:text-4xl font-bold text-secondary-900">New Arrivals</h2>
               <p className="text-secondary-500 mt-2">Fresh designs just dropped</p>
             </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => scrollNew(-1)} aria-label="Previous new arrivals" className="p-2 rounded-full border border-secondary-200 text-secondary-700 hover:bg-secondary-50 transition-colors"><ChevronLeft size={20} /></button>
-              <button onClick={() => scrollNew(1)} aria-label="Next new arrivals" className="p-2 rounded-full border border-secondary-200 text-secondary-700 hover:bg-secondary-50 transition-colors"><ChevronRight size={20} /></button>
-            </div>
+            <Link href="/shop" className="hidden sm:flex items-center gap-2 text-secondary-700 hover:text-primary-600 font-medium transition-colors">View All <ArrowRight size={18} /></Link>
           </div>
-          <div ref={newRef} className="flex gap-4 lg:gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-4 -mx-1 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {newArrivals.map((p) => (
-              <div key={p.id} className="w-52 sm:w-60 lg:w-64 flex-shrink-0 snap-start">
-                <ProductCard product={p} />
-              </div>
-            ))}
+          <div className="relative overflow-hidden rounded-2xl bg-secondary-900">
+            <div className="flex transition-transform duration-500 ease-out" style={{ transform: `translateX(-${slide * 100}%)` }}>
+              {newArrivals.map((p) => (
+                <Link key={p.id} href={`/product/${p.id}`} className="relative w-full flex-shrink-0 group">
+                  <div className="h-[380px] sm:h-[520px]">
+                    <img src={p.image_url || ""} alt={p.title} className="w-full h-full object-cover" />
+                  </div>
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-secondary-900/85 via-secondary-900/40 to-transparent p-6 sm:p-10">
+                    <h3 className="text-2xl sm:text-4xl font-bold text-white max-w-3xl">{p.title}</h3>
+                    <p className="text-gold-400 text-lg sm:text-2xl font-semibold mt-2">{formatPrice(p.price)}</p>
+                    <span className="inline-flex items-center gap-2 mt-4 text-white group-hover:text-gold-400 transition-colors font-medium">View product <ArrowRight size={18} /></span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+            {slideCount > 1 && (
+              <>
+                <button onClick={() => goSlide(-1)} aria-label="Previous new arrival" className="absolute left-3 top-1/2 -translate-y-1/2 p-2 sm:p-3 rounded-full bg-white/90 shadow hover:bg-white text-secondary-900 transition-colors"><ChevronLeft size={22} /></button>
+                <button onClick={() => goSlide(1)} aria-label="Next new arrival" className="absolute right-3 top-1/2 -translate-y-1/2 p-2 sm:p-3 rounded-full bg-white/90 shadow hover:bg-white text-secondary-900 transition-colors"><ChevronRight size={22} /></button>
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                  {newArrivals.map((_, i) => (
+                    <button key={i} onClick={() => setSlide(i)} aria-label={`Go to slide ${i + 1}`} className={`w-2.5 h-2.5 rounded-full transition-colors ${i === slide ? "bg-white" : "bg-white/50 hover:bg-white/75"}`} />
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </section>
       )}
