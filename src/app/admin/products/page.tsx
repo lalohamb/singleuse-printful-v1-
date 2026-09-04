@@ -102,7 +102,7 @@ function Products() {
       {loading ? <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-2 border-secondary-300 border-t-secondary-900" /></div> : (
         <div className="bg-white rounded-xl border border-secondary-100 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[820px]">
               <thead className="bg-secondary-50 border-b border-secondary-100">
                 <tr>
                   <th className="px-4 py-3 w-10"><input type="checkbox" aria-label="Select all" checked={filtered.length > 0 && selectedIds.size === filtered.length} onChange={toggleAll} className="w-4 h-4 rounded" /></th>
@@ -119,7 +119,7 @@ function Products() {
                 {filtered.map((p) => (
                   <tr key={p.id} className={`hover:bg-secondary-50 transition-colors ${selectedIds.has(p.id) ? "bg-primary-50/50" : ""}`}>
                     <td className="px-4 py-3"><input type="checkbox" aria-label={`Select ${p.title}`} checked={selectedIds.has(p.id)} onChange={() => toggleRow(p.id)} className="w-4 h-4 rounded" /></td>
-                    <td className="px-4 py-3"><div className="flex items-center gap-3"><img src={p.image_url || ""} alt={p.title} className="w-12 h-12 rounded-lg object-cover bg-secondary-100 flex-shrink-0" /><div className="min-w-0"><p className="font-medium text-secondary-900 truncate flex items-center gap-1">{p.content_locked && <Lock size={12} className="text-warning-500 flex-shrink-0" aria-label="Content locked" />}{p.title}</p>{p.printify_id && <p className="text-xs text-secondary-400">Printify: {p.printify_id}</p>}</div></div></td>
+                    <td className="px-4 py-3"><div className="flex items-center gap-3"><img src={p.image_url || ""} alt={p.title} className="w-12 h-12 rounded-lg object-cover bg-secondary-100 flex-shrink-0" /><div className="min-w-0 max-w-[240px]"><p className="font-medium text-secondary-900 truncate flex items-center gap-1">{p.content_locked && <Lock size={12} className="text-warning-500 flex-shrink-0" aria-label="Content locked" />}{p.title}</p>{p.printify_id && <p className="text-xs text-secondary-400 truncate">Printify: {p.printify_id}</p>}</div></div></td>
                     <td className="px-4 py-3 text-sm text-secondary-600 hidden md:table-cell">{categories.find((c) => c.id === p.category_id)?.name || "Uncategorized"}</td>
                     <td className="px-4 py-3 font-medium text-secondary-900">{formatPrice(p.price)}</td>
                     <td className="px-4 py-3 hidden lg:table-cell"><span className={`text-xs px-2 py-1 rounded-full ${p.status === "active" ? "bg-success-50 text-success-600" : p.status === "draft" ? "bg-warning-50 text-warning-600" : "bg-secondary-100 text-secondary-500"}`}>{p.status}</span></td>
