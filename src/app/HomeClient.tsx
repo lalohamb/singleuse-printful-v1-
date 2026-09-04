@@ -74,15 +74,16 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
         </div>
       </section>
 
- <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="text-center mb-12">
+ <section className="w-full pt-0 pb-16 px-1">
+        <div className="text-center mb-2">
           {/* <h2 className="text-3xl lg:text-4xl font-bold text-secondary-900">Shop by Category</h2> */}
-          <p className="text-secondary-500 mt-3">Find your style across our curated collections</p>
+          <h2 className="text-3xl lg:text-4xl font-bold text-secondary-900">Find your style across our curated collections</h2>
+          {/* <p className="text-secondary-500 mt-3">Find your style across our curated collections</p> */}
         </div>
         <Reveal>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+          <div className="flex overflow-x-auto scrollbar-hide gap-1">
             {categories.map((cat) => (
-              <Link key={cat.id} href={`/shop?category=${cat.slug}`} className="group relative aspect-square rounded-xl overflow-hidden bg-secondary-900 hover:shadow-xl hover:shadow-gold-500/10 transition-all">
+              <Link key={cat.id} href={`/shop?category=${cat.slug}`} className="group relative flex-1 min-w-[140px] aspect-square overflow-hidden bg-secondary-900 hover:shadow-xl hover:shadow-gold-500/10 transition-all">
                 {categoryImages[cat.id] && (
                   <img src={categoryImages[cat.id]} alt={cat.name} className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" />
                 )}
@@ -183,7 +184,7 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
             <Link href="/shop" className="hidden sm:flex items-center gap-2 text-secondary-700 hover:text-primary-600 font-medium transition-colors">View All <ArrowRight size={18} /></Link>
           </div>
           <Reveal>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 lg:gap-6">
               {featured.map((p) => <ProductCard key={p.id} product={p} />)}
             </div>
           </Reveal>
@@ -202,7 +203,7 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
               <Link href="/about" className="btn-gold self-start">Read Our Story <ArrowRight size={18} className="ml-2" /></Link>
             </div>
             <div className="relative min-h-[400px] bg-secondary-800">
-              <img src={settings?.hero_image_url || "https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"} alt="Our story" className="absolute inset-0 w-full h-full object-cover opacity-80" />
+              <img src={settings?.our_why_image_url || settings?.hero_image_url || "https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"} alt="Our story" className="absolute inset-0 w-full h-full object-cover opacity-80" style={{ objectPosition: settings?.our_why_object_position || "center" }} />
               <div className="absolute inset-0 bg-gradient-to-t from-secondary-900/60 to-transparent" />
             </div>
           </div>

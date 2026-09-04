@@ -17,7 +17,7 @@ export const revalidate = 60;
 export default async function HomePage() {
   const [settingsRes, featuredRes, newArrivalsRes, trendingRes, categoriesRes, catImgRes] = await Promise.all([
     supabase.from("settings").select("*").limit(1).maybeSingle(),
-    supabase.from("products").select("*").eq("status", "active").eq("featured", true).limit(4),
+    supabase.from("products").select("*").eq("status", "active").eq("featured", true).limit(8),
     supabase.from("products").select("*").eq("status", "active").eq("is_new_arrival", true).order("created_at", { ascending: false }).limit(12),
     supabase.from("products").select("*").eq("status", "active").eq("is_trending", true).limit(12),
     supabase.from("categories").select("*").order("name"),
@@ -34,7 +34,7 @@ export default async function HomePage() {
     <StorefrontLayout>
       <HomeClient
         settings={settingsRes.data}
-        featured={featuredRes.data || []}
+        featured={[...(featuredRes.data || [])].sort(() => Math.random() - 0.5).slice(0, 8)}
         newArrivals={newArrivalsRes.data || []}
         trending={trendingRes.data || []}
         categories={categoriesRes.data || []}

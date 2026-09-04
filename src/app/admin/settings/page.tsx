@@ -23,7 +23,7 @@ function Settings() {
 
   const handleSave = async () => {
     setSaving(true);
-    const { error } = await supabase.from("settings").update({ store_name: form.store_name, tagline: form.tagline, hero_title: form.hero_title, hero_subtitle: form.hero_subtitle, hero_image_url: form.hero_image_url, story_image_url: form.story_image_url, hero_object_position: form.hero_object_position, announcement: form.announcement, announcement_active: form.announcement_active, shipping_free_threshold: form.shipping_free_threshold, default_shipping_cost: form.default_shipping_cost, printify_shop_id: form.printify_shop_id, updated_at: new Date().toISOString() }).eq("id", settings?.id);
+    const { error } = await supabase.from("settings").update({ store_name: form.store_name, tagline: form.tagline, hero_title: form.hero_title, hero_subtitle: form.hero_subtitle, hero_image_url: form.hero_image_url, story_image_url: form.story_image_url, hero_object_position: form.hero_object_position, our_why_image_url: form.our_why_image_url, our_why_object_position: form.our_why_object_position, announcement: form.announcement, announcement_active: form.announcement_active, shipping_free_threshold: form.shipping_free_threshold, default_shipping_cost: form.default_shipping_cost, printify_shop_id: form.printify_shop_id, updated_at: new Date().toISOString() }).eq("id", settings?.id);
     if (!error) { setSaved(true); setSaveError(null); setTimeout(() => setSaved(false), 2000); }
     else { setSaveError(error.message); }
     setSaving(false);
@@ -73,6 +73,36 @@ function Settings() {
           <div><label className="label-text">&ldquo;Wear Your Story&rdquo; Background Image URL</label><input value={form.story_image_url || ""} onChange={(e) => setForm({ ...form, story_image_url: e.target.value })} className="input-field" />{form.story_image_url && <img src={form.story_image_url} alt="Story section preview" className="w-full h-auto max-h-none rounded-lg mt-2 bg-secondary-100" />}</div>
         </div>
       </section>
+
+      <section className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-secondary-900 mb-6">Our Why Section</h2>
+        <div className="space-y-4">
+          <div><label className="label-text">Image URL</label><input value={form.our_why_image_url || ""} onChange={(e) => setForm({ ...form, our_why_image_url: e.target.value })} className="input-field" placeholder="https://..." /></div>
+          <div>
+            <label className="label-text">Image Position</label>
+            {(() => {
+              const parts = (form.our_why_object_position || "0px 0px").replace(/px/g, "").split(" ");
+              const x = parseInt(parts[0]) || 0;
+              const y = parseInt(parts[1]) || 0;
+              const setPos = (nx: number, ny: number) => setForm({ ...form, our_why_object_position: `${nx}px ${ny}px` });
+              return (
+                <div className="space-y-3 mt-1">
+                  <div className="flex items-center gap-3"><span className="text-xs text-secondary-500 w-16">X: {x}px</span><input type="range" min={-1000} max={1000} value={x} onChange={(e) => setPos(parseInt(e.target.value), y)} className="flex-1 accent-gold-500" /></div>
+                  <div className="flex items-center gap-3"><span className="text-xs text-secondary-500 w-16">Y: {y}px</span><input type="range" min={-1000} max={1000} value={y} onChange={(e) => setPos(x, parseInt(e.target.value))} className="flex-1 accent-gold-500" /></div>
+                  <div className="flex items-center justify-between"><p className="text-xs text-secondary-400">Value: <code>{form.our_why_object_position || "0px 0px"}</code></p><button type="button" onClick={() => setForm({ ...form, our_why_object_position: "0px 0px" })} className="text-xs text-red-400 hover:text-red-600">Reset position</button></div>
+                  {form.our_why_image_url && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3"><span className="text-xs text-secondary-500 w-24">Height: {previewH}px</span><input type="range" min={200} max={800} value={previewH} onChange={(e) => setPreviewH(parseInt(e.target.value))} className="flex-1 accent-gold-500" /></div>
+                      <div className="relative w-full rounded-lg bg-secondary-100 overflow-hidden" style={{ height: previewH }}><img src={form.our_why_image_url} alt="Our Why preview" className="w-full h-full object-cover" style={{ objectPosition: form.our_why_object_position || "center" }} /><span className="absolute bottom-2 right-2 text-xs bg-black/50 text-white px-2 py-1 rounded">Live preview</span></div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      </section>
+
       <section className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6">
         <h2 className="text-lg font-semibold text-secondary-900 mb-6">Announcement Bar</h2>
         <div className="space-y-4">
