@@ -74,50 +74,13 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
         </div>
       </section>
 
-      {slideCount > 0 && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="text-3xl lg:text-4xl font-bold text-secondary-900">New Arrivals</h2>
-              <p className="text-secondary-500 mt-2">Fresh designs just dropped</p>
-            </div>
-            <Link href="/shop" className="hidden sm:flex items-center gap-2 text-secondary-700 hover:text-primary-600 font-medium transition-colors">View All <ArrowRight size={18} /></Link>
-          </div>
-          <div className="relative overflow-hidden rounded-2xl bg-secondary-50">
-            <div className="flex transition-transform duration-500 ease-out" style={{ transform: `translateX(-${slide * 100}%)` }}>
-              {newArrivals.map((p) => (
-                <div key={p.id} className="relative w-full flex-shrink-0">
-                  <div className="h-[440px] sm:h-[640px] flex items-center justify-center p-2 sm:p-4">
-                    <img src={p.image_url || ""} alt={p.title} className="max-h-full max-w-full object-contain" />
-                  </div>
-                  <div className="absolute inset-x-0 bottom-0 flex justify-center pb-6">
-                    <Link href={`/product/${p.id}`} className="btn-gold shadow-lg">View full product details <ArrowRight size={18} className="ml-2" /></Link>
-                  </div>
-                </div>
-              ))}
-            </div>
-            {slideCount > 1 && (
-              <>
-                <button onClick={() => goSlide(-1)} aria-label="Previous new arrival" className="absolute left-3 top-1/2 -translate-y-1/2 p-2 sm:p-3 rounded-full bg-white/90 shadow hover:bg-white text-secondary-900 transition-colors"><ChevronLeft size={22} /></button>
-                <button onClick={() => goSlide(1)} aria-label="Next new arrival" className="absolute right-3 top-1/2 -translate-y-1/2 p-2 sm:p-3 rounded-full bg-white/90 shadow hover:bg-white text-secondary-900 transition-colors"><ChevronRight size={22} /></button>
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 flex gap-2">
-                  {newArrivals.map((_, i) => (
-                    <button key={i} onClick={() => setSlide(i)} aria-label={`Go to slide ${i + 1}`} className={`w-2.5 h-2.5 rounded-full transition-colors ${i === slide ? "bg-secondary-900" : "bg-secondary-300 hover:bg-secondary-400"}`} />
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        </section>
-      )}
-
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+ <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="text-center mb-12">
-          <h2 className="text-3xl lg:text-4xl font-bold text-secondary-900">Shop by Category</h2>
+          {/* <h2 className="text-3xl lg:text-4xl font-bold text-secondary-900">Shop by Category</h2> */}
           <p className="text-secondary-500 mt-3">Find your style across our curated collections</p>
         </div>
         <Reveal>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
             {categories.map((cat) => (
               <Link key={cat.id} href={`/shop?category=${cat.slug}`} className="group relative aspect-square rounded-xl overflow-hidden bg-secondary-900 hover:shadow-xl hover:shadow-gold-500/10 transition-all">
                 {categoryImages[cat.id] && (
@@ -135,6 +98,84 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
         </Reveal>
       </section>
 
+      {slideCount > 0 && (
+        <section className="relative w-full bg-secondary-900 overflow-hidden" style={{ minHeight: 600 }}>
+          {/* background image layer */}
+          <div className="absolute inset-0 transition-opacity duration-700">
+            <img src={newArrivals[slide]?.image_url || ""} alt="" className="w-full h-full object-cover opacity-20 blur-sm scale-105" />
+            <div className="absolute inset-0 bg-gradient-to-r from-secondary-900 via-secondary-900/90 to-secondary-900/40" />
+          </div>
+
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col lg:flex-row items-center gap-0 min-h-[600px]">
+            {/* left — editorial text */}
+            <div className="flex-1 py-16 lg:py-24 flex flex-col justify-center z-10">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="kente-bar h-0.5 w-12 rounded-full" />
+                <span className="text-gold-400 text-xs font-medium tracking-[0.25em] uppercase">Drop {String(slide + 1).padStart(2, "0")} / {String(slideCount).padStart(2, "0")}</span>
+              </div>
+              <p className="text-white/40 text-xs tracking-widest uppercase mb-3">New Arrival</p>
+              <h2 className="text-4xl sm:text-5xl lg:text-6xl font-display font-bold text-white leading-none mb-6">{newArrivals[slide]?.title}</h2>
+              <p className="text-2xl font-semibold text-gold-400 mb-8">{formatPrice(newArrivals[slide]?.price)}</p>
+              <div className="flex items-center gap-4">
+                <Link href={`/product/${newArrivals[slide]?.id}`} className="btn-gold">Shop Now <ArrowRight size={18} className="ml-2" /></Link>
+                <Link href="/shop" className="text-white/60 hover:text-white text-sm font-medium transition-colors">View All Arrivals →</Link>
+              </div>
+              {slideCount > 1 && (
+                <div className="flex items-center gap-6 mt-12">
+                  <button onClick={() => goSlide(-1)} aria-label="Previous" className="flex items-center gap-2 text-white/40 hover:text-white transition-colors group">
+                    <ChevronLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
+                    <span className="text-xs tracking-widest uppercase">Prev</span>
+                  </button>
+                  <div className="flex gap-2">
+                    {newArrivals.map((_, i) => (
+                      <button key={i} onClick={() => setSlide(i)} className={`transition-all duration-300 rounded-full ${i === slide ? "w-8 h-1.5 bg-gold-400" : "w-1.5 h-1.5 bg-white/30 hover:bg-white/60"}`} />
+                    ))}
+                  </div>
+                  <button onClick={() => goSlide(1)} aria-label="Next" className="flex items-center gap-2 text-white/40 hover:text-white transition-colors group">
+                    <span className="text-xs tracking-widest uppercase">Next</span>
+                    <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* right — product image */}
+            <div className="relative w-full lg:w-[480px] flex-shrink-0 flex items-end justify-center pt-8 lg:pt-0" style={{ minHeight: 500 }}>
+              <img
+                key={slide}
+                src={newArrivals[slide]?.image_url || ""}
+                alt={newArrivals[slide]?.title}
+                className="relative z-10 max-h-[520px] w-auto object-contain drop-shadow-2xl animate-slide-up"
+              />
+            </div>
+          </div>
+        </section>
+      )}
+
+     
+
+      {/* D — Brand Values Band */}
+      <Reveal>
+        <section className="bg-secondary-900 bg-weave text-white py-16">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-0 divide-y md:divide-y-0 md:divide-x divide-white/10">
+              {[
+                { stat: "100%", label: "Black-Owned & Operated", sub: "Built from the ground up with purpose" },
+                { stat: "0 Waste", label: "Made to Order", sub: "Every piece printed fresh — nothing sits on a shelf" },
+                { stat: "XS–5XL", label: "Size Inclusive", sub: "Empowerment has no size limit" },
+              ].map((v) => (
+                <div key={v.stat} className="flex flex-col items-center text-center px-8 py-10">
+                  <span className="text-5xl lg:text-6xl font-display font-bold text-gold-400 mb-3">{v.stat}</span>
+                  <p className="font-semibold text-lg text-white mb-1">{v.label}</p>
+                  <p className="text-secondary-400 text-sm max-w-xs">{v.sub}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="kente-bar h-1 mt-8" />
+        </section>
+      </Reveal>
+
       {featured.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="flex items-center justify-between mb-8">
@@ -148,6 +189,53 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
           </Reveal>
         </section>
       )}
+
+      {/* A — Our Why Split Panel */}
+      <Reveal>
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+          <div className="grid grid-cols-1 lg:grid-cols-2 rounded-2xl overflow-hidden shadow-2xl">
+            <div className="bg-secondary-900 px-10 py-16 flex flex-col justify-center">
+              <div className="kente-bar h-1 w-24 mb-8 rounded-full" />
+              <p className="text-gold-400 text-sm font-medium tracking-widest uppercase mb-4">Our Why</p>
+              <h2 className="text-3xl lg:text-5xl font-bold text-white leading-tight mb-6">&ldquo;We don&apos;t just sell clothes. We tell stories.&rdquo;</h2>
+              <p className="text-white/60 text-lg leading-relaxed mb-8">Body &amp; Sleeves was born from a desire to see our culture celebrated, not just represented. Every thread, every design, every drop is an act of love for Black culture, faith, and family.</p>
+              <Link href="/about" className="btn-gold self-start">Read Our Story <ArrowRight size={18} className="ml-2" /></Link>
+            </div>
+            <div className="relative min-h-[400px] bg-secondary-800">
+              <img src={settings?.hero_image_url || "https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"} alt="Our story" className="absolute inset-0 w-full h-full object-cover opacity-80" />
+              <div className="absolute inset-0 bg-gradient-to-t from-secondary-900/60 to-transparent" />
+            </div>
+          </div>
+        </section>
+      </Reveal>
+
+      {/* B — Social Proof / Reviews */}
+      <Reveal>
+        <section className="bg-secondary-50 py-16">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-10">
+              <p className="text-gold-500 text-sm font-medium tracking-widest uppercase mb-2">Customer Love</p>
+              <h2 className="text-3xl lg:text-4xl font-bold text-secondary-900">What the Culture is Saying</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[
+                { quote: "I wore my shirt to a family reunion and got so many compliments. This brand truly gets us.", name: "Jasmine T.", location: "Atlanta, GA", product: "Culture First Tee" },
+                { quote: "The quality is unmatched. Soft, true to size, and the design is everything. Will be ordering again.", name: "Marcus W.", location: "Houston, TX", product: "Faith Over Fear Hoodie" },
+                { quote: "Finally a brand that celebrates who we are. Every piece feels intentional and powerful.", name: "Aaliyah R.", location: "Chicago, IL", product: "Heritage Collection" },
+              ].map((r) => (
+                <div key={r.name} className="bg-white rounded-2xl p-8 shadow-sm border border-secondary-100 flex flex-col">
+                  <div className="flex gap-1 mb-4">{[...Array(5)].map((_, i) => <span key={i} className="text-gold-400 text-lg">★</span>)}</div>
+                  <p className="text-secondary-700 leading-relaxed flex-1 mb-6">&ldquo;{r.quote}&rdquo;</p>
+                  <div className="border-t border-secondary-100 pt-4">
+                    <p className="font-semibold text-secondary-900">{r.name}</p>
+                    <p className="text-xs text-secondary-400">{r.location} &middot; {r.product}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      </Reveal>
 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="relative rounded-2xl overflow-hidden bg-secondary-900 px-8 py-16 text-center">
