@@ -10,6 +10,10 @@ export const metadata: Metadata = {
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
+// ISR: regenerate this page at most once per 60s so product/settings edits
+// and Printify re-syncs show up on the storefront without a manual rebuild.
+export const revalidate = 60;
+
 export default async function HomePage() {
   const [settingsRes, productsRes, categoriesRes] = await Promise.all([
     supabase.from("settings").select("*").limit(1).maybeSingle(),
