@@ -5,8 +5,8 @@
 set -e
 
 APP_DIR="/var/www/bodyandsleeves"
-DOMAIN="yourdomain.com"        # <-- change this
-REPO="https://github.com/yourusername/yourrepo.git"  # <-- change this
+DOMAIN="146.190.252.82"        # <-- change this
+REPO="https://github.com/lalohamb/bodyandsleeves-next.git"  # <-- change this
 
 # --- Node.js 22 ---
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
