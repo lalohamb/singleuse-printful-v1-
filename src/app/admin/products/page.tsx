@@ -95,7 +95,6 @@ function Products() {
           {ACTIVE_FLAGS.map((f) => (
             <button key={f.key as string} onClick={() => bulkSetFlag(f.key as string, true)} disabled={bulkBusy} className="btn-outline py-1.5">+ {f.label}</button>
           ))}
-          <button onClick={() => bulkSetStatus("archived")} disabled={bulkBusy} className="btn-outline py-1.5">Archive</button>
           <button onClick={clearSel} className="text-sm text-secondary-500 underline">Clear</button>
         </div>
       )}
@@ -144,7 +143,7 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
     title: product?.title || "", description: product?.description || "",
     price: product?.price?.toString() || "", cost: product?.cost?.toString() || "0",
     image_url: product?.image_url || "", category_id: product?.category_id || "",
-    status: product?.status || "active", featured: product?.featured || false,
+    featured: product?.featured || false,
     is_new_arrival: product?.is_new_arrival || false, is_trending: product?.is_trending || false,
     is_bestseller: product?.is_bestseller || false, is_on_sale: product?.is_on_sale || false,
     content_locked: product?.content_locked || false,
@@ -165,7 +164,7 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
       title: form.title, description: form.description,
       price: parseFloat(form.price) || 0, cost: parseFloat(form.cost) || 0,
       image_url: form.image_url, category_id: form.category_id || null,
-      status: form.status, featured: form.featured,
+      featured: form.featured,
       is_new_arrival: form.is_new_arrival, is_trending: form.is_trending,
       is_bestseller: form.is_bestseller, is_on_sale: form.is_on_sale,
       content_locked: form.content_locked || textChanged,
@@ -192,7 +191,7 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
           </div>
           <div><label className="label-text">Image URL</label><input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} className="input-field" placeholder="https://..." />{form.image_url && <img src={form.image_url} alt="Preview" className="w-24 h-24 object-cover rounded-lg mt-2 bg-secondary-100" />}</div>
           <div><label className="label-text">Category</label><select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })} className="input-field"><option value="">Uncategorized</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-          <div><label className="label-text">Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className="input-field"><option value="active">Active</option><option value="draft">Draft</option><option value="archived">Archived</option></select></div>
+
           <div>
             <label className="label-text">Badges</label>
             <div className="grid grid-cols-2 gap-2">
