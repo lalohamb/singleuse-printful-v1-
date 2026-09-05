@@ -1,9 +1,20 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Save, Loader2, Check, Store, Truck, CreditCard, Printer } from "lucide-react";
+import { Save, Loader2, Check, Store, Truck, CreditCard, Printer, Send, Mail } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
 import type { StoreSettings } from "@/types";
+
+function StatusBadge({ status }: { status: "checking" | "connected" | "warning" | "disconnected" }) {
+  const map = {
+    checking: "bg-secondary-100 text-secondary-500",
+    connected: "bg-success-50 text-success-600",
+    warning: "bg-warning-50 text-warning-600",
+    disconnected: "bg-error-50 text-error-600",
+  };
+  const labels = { checking: "Checking...", connected: "Connected", warning: "Account Issue", disconnected: "Not Connected" };
+  return <span className={`text-xs px-3 py-1 rounded-full ${map[status]}`}>{labels[status]}</span>;
+}
 
 function Settings() {
   const [settings, setSettings] = useState<StoreSettings | null>(null);
@@ -14,14 +25,30 @@ function Settings() {
   const [loading, setLoading] = useState(true);
   const [previewH, setPreviewH] = useState(400);
 
-  const [stripeOk, setStripeOk] = useState<boolean | null>(null);
+  const [stripeOk, setStripeOk] = useState<"checking" | "connected" | "warning" | "disconnected">("checking");
+  const [mailerOk, setMailerOk] = useState<"checking" | "connected" | "warning" | "disconnected">("checking");
+  const [resendOk, setResendOk] = useState<"checking" | "connected" | "warning" | "disconnected">("checking");
 
   useEffect(() => {
     supabase.from("settings").select("*").limit(1).maybeSingle().then(({ data }) => {
       if (data) { setSettings(data as StoreSettings); setForm(data as StoreSettings); }
       setLoading(false);
     });
-    fetch("/api/stripe-admin?action=balance").then((r) => setStripeOk(r.ok));
+    fetch("/api/stripe-admin?action=balance").then((r) => {
+      if (r.status === 200) setStripeOk("connected");
+      else if (r.status === 401) setStripeOk("disconnected");
+      else setStripeOk("warning");
+    });
+    fetch("/api/mailerlite?action=groups").then((r) => {
+      if (r.status === 200) setMailerOk("connected");
+      else if (r.status === 401) setMailerOk("disconnected");
+      else setMailerOk("warning");
+    });
+    fetch("/api/resend?path=/domains").then((r) => {
+      if (r.status === 200) setResendOk("connected");
+      else if (r.status === 401) setResendOk("disconnected");
+      else setResendOk("warning");
+    });
   }, []);
 
   const handleSave = async () => {
@@ -129,9 +156,37 @@ function Settings() {
             </div>
           <div><label className="label-text">Printify Shop ID</label><input value={form.printify_shop_id || ""} onChange={(e) => setForm({ ...form, printify_shop_id: e.target.value })} className="input-field" placeholder="e.g. 12345678" /><p className="text-xs text-secondary-400 mt-1">Find this in your Printify dashboard URL or via the API</p></div>
           <div className="flex items-center justify-between p-4 bg-secondary-50 rounded-lg">
-              <div className="flex items-center gap-3"><CreditCard size={22} className={settings?.stripe_connected ? "text-success-500" : "text-secondary-400"} /><div><p className="font-medium text-secondary-900">Stripe</p><p className="text-sm text-secondary-500">Payment processing</p></div></div>
-              <span className={`text-xs px-3 py-1 rounded-full ${stripeOk === null ? "bg-secondary-100 text-secondary-500" : stripeOk ? "bg-success-50 text-success-600" : "bg-error-50 text-error-600"}`}>{stripeOk === null ? "Checking..." : stripeOk ? "Connected" : "Not Connected"}</span>
+              <div className="flex items-center gap-3"><CreditCard size={22} className={stripeOk === "connected" ? "text-success-500" : stripeOk === "warning" ? "text-warning-500" : "text-secondary-400"} /><div><p className="font-medium text-secondary-900">Stripe</p><p className="text-sm text-secondary-500">Payment processing</p></div></div>
+              <StatusBadge status={stripeOk} />
             </div>
+          <div className="flex items-center justify-between p-4 bg-secondary-50 rounded-lg">
+              <div className="flex items-center gap-3"><Send size={22} className={mailerOk === "connected" ? "text-success-500" : mailerOk === "warning" ? "text-warning-500" : "text-secondary-400"} /><div><p className="font-medium text-secondary-900">MailerLite</p><p className="text-sm text-secondary-500">Email marketing</p></div></div>
+              <StatusBadge status={mailerOk} />
+            </div>
+          <div className="flex items-center justify-between p-4 bg-secondary-50 rounded-lg">
+              <div className="flex items-center gap-3"><Mail size={22} className={resendOk === "connected" ? "text-success-500" : resendOk === "warning" ? "text-warning-500" : "text-secondary-400"} /><div><p className="font-medium text-secondary-900">Resend</p><p className="text-sm text-secondary-500">Transactional email</p></div></div>
+              <StatusBadge status={resendOk} />
+            </div>
+
+          {/* Connection info panel */}
+          <div className="mt-2 rounded-lg border border-secondary-100 bg-secondary-50 p-4 space-y-3 text-xs text-secondary-600">
+            <p className="font-semibold text-secondary-700 text-sm">Connection Status Guide</p>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+              <span><span className="font-medium text-success-600">Connected</span> — API key is valid and active.</span>
+              <span><span className="font-medium text-warning-600">Account Issue</span> — Key found but access denied (suspended or missing permissions).</span>
+              <span><span className="font-medium text-error-600">Not Connected</span> — API key is missing or invalid.</span>
+              <span><span className="font-medium text-secondary-500">Checking…</span> — Status is being verified on page load.</span>
+            </div>
+            <div className="border-t border-secondary-200 pt-3 space-y-1">
+              <p className="font-semibold text-secondary-700">Where to manage keys</p>
+              <ul className="space-y-1 list-none">
+                <li><span className="font-medium">Stripe</span> — Set <code className="bg-secondary-100 px-1 rounded">STRIPE_SECRET_KEY</code> in <code className="bg-secondary-100 px-1 rounded">.env.local</code> and as a Supabase secret via <code className="bg-secondary-100 px-1 rounded">supabase secrets set</code>. Manage at <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noreferrer" className="text-primary-600 underline">dashboard.stripe.com/apikeys</a>.</li>
+                <li><span className="font-medium">MailerLite</span> — Set <code className="bg-secondary-100 px-1 rounded">MAILER_LITE_API_KEY</code> in <code className="bg-secondary-100 px-1 rounded">.env.local</code>. Generate at <a href="https://dashboard.mailerlite.com/integrations/api" target="_blank" rel="noreferrer" className="text-primary-600 underline">dashboard.mailerlite.com/integrations/api</a>.</li>
+                <li><span className="font-medium">Resend</span> — Set <code className="bg-secondary-100 px-1 rounded">RESEND_API_KEY</code> in <code className="bg-secondary-100 px-1 rounded">.env.local</code>. Manage at <a href="https://resend.com/api-keys" target="_blank" rel="noreferrer" className="text-primary-600 underline">resend.com/api-keys</a>. Sending domain must be verified.</li>
+                <li><span className="font-medium">Printify</span> — Status is read from the database. Update <code className="bg-secondary-100 px-1 rounded">PRINTIFY_API_TOKEN</code> in <code className="bg-secondary-100 px-1 rounded">.env.local</code> and set the Shop ID above.</li>
+              </ul>
+            </div>
+          </div>
         </div>
       </section>
       <div className="flex items-center justify-end gap-4 sticky bottom-4">

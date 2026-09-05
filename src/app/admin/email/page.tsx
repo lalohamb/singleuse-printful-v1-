@@ -56,7 +56,7 @@ function EmailPanel() {
       {/* Send Email */}
       <section className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6">
         <h2 className="text-lg font-semibold text-secondary-900 flex items-center gap-2 mb-6">
-          <Mail size={22} className="text-primary-500" />Send Email
+          <Mail size={22} className="text-primary-500" />Send Email via Resend
         </h2>
         <form onSubmit={handleSend} className="space-y-4">
           <div>
@@ -83,7 +83,7 @@ function EmailPanel() {
       {/* Recent Emails */}
       <section className="bg-white rounded-xl border border-secondary-100 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between p-6 border-b border-secondary-100">
-          <h2 className="font-semibold text-secondary-900">Recent Emails</h2>
+          <h2 className="font-semibold text-secondary-900">Recent Emails · Resend</h2>
           <button onClick={fetchEmails} className="text-secondary-400 hover:text-secondary-700 transition-colors">
             <RefreshCw size={18} className={loadingEmails ? "animate-spin" : ""} />
           </button>
