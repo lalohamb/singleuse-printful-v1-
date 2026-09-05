@@ -1,9 +1,33 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Save, Loader2, Check, Store, Truck, CreditCard, Printer, Send, Mail } from "lucide-react";
+import { Save, Loader2, Check, Store, Truck, CreditCard, Printer, Send, Mail, Share2 } from "lucide-react";
+import type { StoreSettings } from "@/types";
+
+type SocialKey = keyof StoreSettings["social_links"];
+
+const SOCIAL_META: { key: SocialKey; label: string; placeholder: string }[] = [
+  { key: "instagram", label: "Instagram",  placeholder: "https://instagram.com/yourhandle" },
+  { key: "tiktok",    label: "TikTok",     placeholder: "https://tiktok.com/@yourhandle" },
+  { key: "facebook",  label: "Facebook",   placeholder: "https://facebook.com/yourpage" },
+  { key: "youtube",   label: "YouTube",    placeholder: "https://youtube.com/@yourchannel" },
+  { key: "pinterest", label: "Pinterest",  placeholder: "https://pinterest.com/yourprofile" },
+  { key: "snapchat",  label: "Snapchat",   placeholder: "https://snapchat.com/add/yourhandle" },
+  { key: "threads",   label: "Threads",    placeholder: "https://threads.net/@yourhandle" },
+  { key: "email",     label: "Email",      placeholder: "mailto:hello@yourdomain.com" },
+];
+
+const DEFAULT_SOCIAL: StoreSettings["social_links"] = {
+  instagram: { url: "https://instagram.com/body_and_sleeves", enabled: true },
+  tiktok:    { url: "https://tiktok.com/@bodyandsleeves",      enabled: true },
+  facebook:  { url: "https://facebook.com/bodyandsleeves",     enabled: true },
+  youtube:   { url: "https://youtube.com/@bodyandsleeves",     enabled: true },
+  pinterest: { url: "https://pinterest.com/bodyandsleeves",    enabled: true },
+  snapchat:  { url: "https://snapchat.com/add/bodyandsleeves", enabled: true },
+  threads:   { url: "https://threads.net/@bodyandsleeves",     enabled: true },
+  email:     { url: "mailto:Hello.BodyandSleeves@gmail.com",   enabled: true },
+};
 import { supabase } from "@/lib/supabase";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
-import type { StoreSettings } from "@/types";
 
 function StatusBadge({ status }: { status: "checking" | "connected" | "warning" | "disconnected" }) {
   const map = {
@@ -22,6 +46,9 @@ function Settings() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [social, setSocial] = useState<StoreSettings["social_links"]>(DEFAULT_SOCIAL);
+  const [socialSaving, setSocialSaving] = useState(false);
+  const [socialSaved, setSocialSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [previewH, setPreviewH] = useState(400);
 
@@ -31,7 +58,11 @@ function Settings() {
 
   useEffect(() => {
     supabase.from("settings").select("*").limit(1).maybeSingle().then(({ data }) => {
-      if (data) { setSettings(data as StoreSettings); setForm(data as StoreSettings); }
+      if (data) {
+        setSettings(data as StoreSettings);
+        setForm(data as StoreSettings);
+        if (data.social_links) setSocial(data.social_links as StoreSettings["social_links"]);
+      }
       setLoading(false);
     });
     fetch("/api/stripe-admin?action=balance").then((r) => {
@@ -58,6 +89,16 @@ function Settings() {
     else { setSaveError(error.message); }
     setSaving(false);
   };
+
+  const handleSocialSave = async () => {
+    setSocialSaving(true);
+    const { error } = await supabase.from("settings").update({ social_links: social, updated_at: new Date().toISOString() }).eq("id", settings?.id);
+    if (!error) { setSocialSaved(true); setTimeout(() => setSocialSaved(false), 2000); }
+    setSocialSaving(false);
+  };
+
+  const setSocialField = (key: SocialKey, field: "url" | "enabled", value: string | boolean) =>
+    setSocial((prev) => ({ ...prev, [key]: { ...prev[key], [field]: value } }));
 
   if (loading) return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-2 border-secondary-300 border-t-secondary-900" /></div>;
 
@@ -189,6 +230,43 @@ function Settings() {
           </div>
         </div>
       </section>
+      <section className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-secondary-900 flex items-center gap-2 mb-2"><Share2 size={22} className="text-primary-500" />Social Media</h2>
+        <p className="text-sm text-secondary-500 mb-6">Toggle and update the social links shown in the footer. Disabled icons are hidden from visitors.</p>
+        <div className="space-y-3">
+          {SOCIAL_META.map(({ key, label, placeholder }) => (
+            <div key={key} className="flex items-center gap-3 p-3 bg-secondary-50 rounded-lg">
+              <button
+                type="button"
+                onClick={() => setSocialField(key, "enabled", !social[key]?.enabled)}
+                className={`relative flex-shrink-0 w-10 h-6 rounded-full transition-colors ${social[key]?.enabled ? "bg-primary-500" : "bg-secondary-200"}`}
+                aria-label={`Toggle ${label}`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${social[key]?.enabled ? "translate-x-4" : "translate-x-0"}`} />
+              </button>
+              <span className={`text-sm font-medium w-20 flex-shrink-0 ${social[key]?.enabled ? "text-secondary-900" : "text-secondary-400"}`}>{label}</span>
+              <input
+                value={social[key]?.url || ""}
+                onChange={(e) => setSocialField(key, "url", e.target.value)}
+                placeholder={placeholder}
+                disabled={!social[key]?.enabled}
+                className="input-field flex-1 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              />
+              {social[key]?.url && social[key]?.enabled && (
+                <a href={social[key].url} target="_blank" rel="noreferrer" className="text-secondary-400 hover:text-primary-500 transition-colors flex-shrink-0" title="Preview link">
+                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+                </a>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="flex justify-end mt-4">
+          <button onClick={handleSocialSave} disabled={socialSaving} className="btn-primary">
+            {socialSaving ? <><Loader2 size={18} className="mr-2 animate-spin" />Saving...</> : socialSaved ? <><Check size={18} className="mr-2" />Saved!</> : <><Save size={18} className="mr-2" />Save Social Links</>}
+          </button>
+        </div>
+      </section>
+
       <div className="flex items-center justify-end gap-4 sticky bottom-4">
         {saveError && <p className="text-sm text-red-500">{saveError}</p>}
         <button onClick={handleSave} disabled={saving} className="btn-primary shadow-lg">

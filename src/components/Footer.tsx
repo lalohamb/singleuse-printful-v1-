@@ -1,5 +1,12 @@
 import Link from "next/link";
 import { Mail } from "lucide-react";
+import { createClient } from "@supabase/supabase-js";
+import type { StoreSettings } from "@/types";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 function InstagramIcon({ size = 22 }: { size?: number }) {
   return (
@@ -10,7 +17,6 @@ function InstagramIcon({ size = 22 }: { size?: number }) {
     </svg>
   );
 }
-
 function TikTokIcon({ size = 22 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
@@ -18,7 +24,6 @@ function TikTokIcon({ size = 22 }: { size?: number }) {
     </svg>
   );
 }
-
 function FacebookIcon({ size = 22 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
@@ -26,7 +31,6 @@ function FacebookIcon({ size = 22 }: { size?: number }) {
     </svg>
   );
 }
-
 function YouTubeIcon({ size = 22 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
@@ -34,7 +38,6 @@ function YouTubeIcon({ size = 22 }: { size?: number }) {
     </svg>
   );
 }
-
 function PinterestIcon({ size = 22 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
@@ -42,7 +45,6 @@ function PinterestIcon({ size = 22 }: { size?: number }) {
     </svg>
   );
 }
-
 function SnapchatIcon({ size = 22 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
@@ -50,7 +52,6 @@ function SnapchatIcon({ size = 22 }: { size?: number }) {
     </svg>
   );
 }
-
 function ThreadsIcon({ size = 22 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
@@ -59,7 +60,31 @@ function ThreadsIcon({ size = 22 }: { size?: number }) {
   );
 }
 
-export default function Footer() {
+const ICON_MAP: Record<string, React.ComponentType<{ size?: number }>> = {
+  instagram: InstagramIcon,
+  tiktok: TikTokIcon,
+  facebook: FacebookIcon,
+  youtube: YouTubeIcon,
+  pinterest: PinterestIcon,
+  snapchat: SnapchatIcon,
+  threads: ThreadsIcon,
+};
+
+const DEFAULT_SOCIAL: StoreSettings["social_links"] = {
+  instagram: { url: "https://instagram.com/body_and_sleeves", enabled: true },
+  tiktok:    { url: "https://tiktok.com/@bodyandsleeves",      enabled: true },
+  facebook:  { url: "https://facebook.com/bodyandsleeves",     enabled: true },
+  youtube:   { url: "https://youtube.com/@bodyandsleeves",     enabled: true },
+  pinterest: { url: "https://pinterest.com/bodyandsleeves",    enabled: true },
+  snapchat:  { url: "https://snapchat.com/add/bodyandsleeves", enabled: true },
+  threads:   { url: "https://threads.net/@bodyandsleeves",     enabled: true },
+  email:     { url: "mailto:Hello.BodyandSleeves@gmail.com",   enabled: true },
+};
+
+export default async function Footer() {
+  const { data } = await supabase.from("settings").select("social_links").limit(1).maybeSingle();
+  const social: StoreSettings["social_links"] = data?.social_links ?? DEFAULT_SOCIAL;
+
   return (
     <footer className="bg-secondary-900 text-secondary-300 mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
@@ -67,15 +92,22 @@ export default function Footer() {
           <div className="col-span-1 md:col-span-2">
             <span className="font-display text-3xl font-bold text-white">Body<span className="text-gold-500">&amp;</span>Sleeves</span>
             <p className="mt-4 text-secondary-400 max-w-md">A Black-owned, made-to-order apparel brand celebrating the richness of Black culture, faith, and family. Empower yourself. Empower the Culture.</p>
-            <div className="flex items-center gap-4 mt-6">
-              <a href="https://instagram.com/body_and_sleeves" target="_blank" rel="noopener noreferrer" className="text-secondary-400 hover:text-white transition-colors" aria-label="Instagram"><InstagramIcon size={22} /></a>
-              <a href="https://tiktok.com/@bodyandsleeves" target="_blank" rel="noopener noreferrer" className="text-secondary-400 hover:text-white transition-colors" aria-label="TikTok"><TikTokIcon size={22} /></a>
-              <a href="https://facebook.com/bodyandsleeves" target="_blank" rel="noopener noreferrer" className="text-secondary-400 hover:text-white transition-colors" aria-label="Facebook"><FacebookIcon size={22} /></a>
-              <a href="https://youtube.com/@bodyandsleeves" target="_blank" rel="noopener noreferrer" className="text-secondary-400 hover:text-white transition-colors" aria-label="YouTube"><YouTubeIcon size={22} /></a>
-              <a href="https://pinterest.com/bodyandsleeves" target="_blank" rel="noopener noreferrer" className="text-secondary-400 hover:text-white transition-colors" aria-label="Pinterest"><PinterestIcon size={22} /></a>
-              <a href="https://snapchat.com/add/bodyandsleeves" target="_blank" rel="noopener noreferrer" className="text-secondary-400 hover:text-white transition-colors" aria-label="Snapchat"><SnapchatIcon size={22} /></a>
-              <a href="https://threads.net/@bodyandsleeves" target="_blank" rel="noopener noreferrer" className="text-secondary-400 hover:text-white transition-colors" aria-label="Threads"><ThreadsIcon size={22} /></a>
-              <a href="mailto:Hello.BodyandSleeves@gmail.com" className="text-secondary-400 hover:text-white transition-colors" aria-label="Email"><Mail size={22} /></a>
+            <div className="flex items-center gap-4 mt-6 flex-wrap">
+              {(Object.keys(ICON_MAP) as Array<keyof typeof ICON_MAP>).map((key) => {
+                const entry = social[key as keyof StoreSettings["social_links"]];
+                if (!entry?.enabled || !entry.url) return null;
+                const Icon = ICON_MAP[key];
+                return (
+                  <a key={key} href={entry.url} target={entry.url.startsWith("mailto") ? undefined : "_blank"} rel="noopener noreferrer" className="text-secondary-400 hover:text-white transition-colors" aria-label={key}>
+                    <Icon size={22} />
+                  </a>
+                );
+              })}
+              {social.email?.enabled && social.email.url && (
+                <a href={social.email.url} className="text-secondary-400 hover:text-white transition-colors" aria-label="Email">
+                  <Mail size={22} />
+                </a>
+              )}
             </div>
           </div>
           <div>

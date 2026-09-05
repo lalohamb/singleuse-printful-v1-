@@ -69,6 +69,16 @@ export interface StoreSettings {
   printify_connected: boolean;
   printify_shop_id: string | null;
   stripe_connected: boolean;
+  social_links: {
+    instagram: { url: string; enabled: boolean };
+    tiktok:    { url: string; enabled: boolean };
+    facebook:  { url: string; enabled: boolean };
+    youtube:   { url: string; enabled: boolean };
+    pinterest: { url: string; enabled: boolean };
+    snapchat:  { url: string; enabled: boolean };
+    threads:   { url: string; enabled: boolean };
+    email:     { url: string; enabled: boolean };
+  };
 }
 
 export interface ShippingAddress {

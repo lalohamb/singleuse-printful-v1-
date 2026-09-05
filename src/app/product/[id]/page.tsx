@@ -1,29 +1,77 @@
 import type { Metadata } from "next";
 import { createClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
+import Script from "next/script";
 import StorefrontLayout from "@/components/StorefrontLayout";
 import ProductDetailClient from "./ProductDetailClient";
 import type { Product } from "@/types";
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
+async function getSeoSettings() {
+  const { data } = await supabase.from("seo_settings").select("site_url, default_og_image, jsonld_enabled, canonical_enabled, meta_title_suffix").limit(1).maybeSingle();
+  return data;
+}
+
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const { data } = await supabase.from("products").select("title, description").eq("id", params.id).maybeSingle();
-  if (!data) return { title: "Product Not Found" };
-  return { title: data.title, description: data.description || undefined };
+  const [productRes, seo] = await Promise.all([
+    supabase.from("products").select("title, description, image_url").eq("id", params.id).maybeSingle(),
+    getSeoSettings(),
+  ]);
+  if (!productRes.data) return { title: "Product Not Found" };
+  const { title, description, image_url } = productRes.data;
+  const base = (seo?.site_url || "https://bodyandsleeves.com").replace(/\/$/, "");
+  const ogImage = image_url || seo?.default_og_image || null;
+  return {
+    title,
+    description: description || undefined,
+    ...(seo?.canonical_enabled && { alternates: { canonical: `${base}/product/${params.id}` } }),
+    openGraph: {
+      title,
+      description: description || undefined,
+      url: `${base}/product/${params.id}`,
+      type: "website",
+      ...(ogImage && { images: [{ url: ogImage, width: 800, height: 800, alt: title }] }),
+    },
+  };
 }
 
 export default async function ProductPage({ params }: { params: { id: string } }) {
-  const [productRes, relatedRes] = await Promise.all([
+  const [productRes, relatedRes, seo] = await Promise.all([
     supabase.from("products").select("*").eq("id", params.id).maybeSingle(),
     supabase.from("products").select("*").eq("status", "active").neq("id", params.id).limit(4),
+    getSeoSettings(),
   ]);
 
   if (!productRes.data) notFound();
+  const product = productRes.data as Product;
+  const base = (seo?.site_url || "https://bodyandsleeves.com").replace(/\/$/, "");
+
+  const jsonLd = seo?.jsonld_enabled ? {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.title,
+    description: product.description || undefined,
+    image: product.image_url || undefined,
+    url: `${base}/product/${product.id}`,
+    offers: {
+      "@type": "Offer",
+      price: product.price.toFixed(2),
+      priceCurrency: "USD",
+      availability: "https://schema.org/InStock",
+      url: `${base}/product/${product.id}`,
+    },
+    brand: { "@type": "Brand", name: "Body & Sleeves" },
+  } : null;
 
   return (
     <StorefrontLayout>
-      <ProductDetailClient product={productRes.data as Product} related={(relatedRes.data || []) as Product[]} />
+      {jsonLd && (
+        <Script id="product-jsonld" type="application/ld+json" strategy="beforeInteractive">
+          {JSON.stringify(jsonLd)}
+        </Script>
+      )}
+      <ProductDetailClient product={product} related={(relatedRes.data || []) as Product[]} />
     </StorefrontLayout>
   );
 }
