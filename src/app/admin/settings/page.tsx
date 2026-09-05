@@ -14,16 +14,19 @@ function Settings() {
   const [loading, setLoading] = useState(true);
   const [previewH, setPreviewH] = useState(400);
 
+  const [stripeOk, setStripeOk] = useState<boolean | null>(null);
+
   useEffect(() => {
     supabase.from("settings").select("*").limit(1).maybeSingle().then(({ data }) => {
       if (data) { setSettings(data as StoreSettings); setForm(data as StoreSettings); }
       setLoading(false);
     });
+    fetch("/api/stripe-admin?action=balance").then((r) => setStripeOk(r.ok));
   }, []);
 
   const handleSave = async () => {
     setSaving(true);
-    const { error } = await supabase.from("settings").update({ store_name: form.store_name, tagline: form.tagline, hero_title: form.hero_title, hero_subtitle: form.hero_subtitle, hero_image_url: form.hero_image_url, story_image_url: form.story_image_url, hero_object_position: form.hero_object_position, our_why_image_url: form.our_why_image_url, our_why_object_position: form.our_why_object_position, announcement: form.announcement, announcement_active: form.announcement_active, shipping_free_threshold: form.shipping_free_threshold, default_shipping_cost: form.default_shipping_cost, printify_shop_id: form.printify_shop_id, updated_at: new Date().toISOString() }).eq("id", settings?.id);
+    const { error } = await supabase.from("settings").update({ store_name: form.store_name, tagline: form.tagline, hero_title: form.hero_title, hero_subtitle: form.hero_subtitle, hero_image_url: form.hero_image_url, story_image_url: form.story_image_url, hero_object_position: form.hero_object_position, our_why_image_url: form.our_why_image_url, our_why_object_position: form.our_why_object_position, announcement: form.announcement, announcement_active: form.announcement_active, shipping_free_threshold: form.shipping_free_threshold, default_shipping_cost: form.default_shipping_cost, printify_shop_id: form.printify_shop_id, stripe_connected: form.stripe_connected, updated_at: new Date().toISOString() }).eq("id", settings?.id);
     if (!error) { setSaved(true); setSaveError(null); setTimeout(() => setSaved(false), 2000); }
     else { setSaveError(error.message); }
     setSaving(false);
@@ -127,7 +130,7 @@ function Settings() {
           <div><label className="label-text">Printify Shop ID</label><input value={form.printify_shop_id || ""} onChange={(e) => setForm({ ...form, printify_shop_id: e.target.value })} className="input-field" placeholder="e.g. 12345678" /><p className="text-xs text-secondary-400 mt-1">Find this in your Printify dashboard URL or via the API</p></div>
           <div className="flex items-center justify-between p-4 bg-secondary-50 rounded-lg">
               <div className="flex items-center gap-3"><CreditCard size={22} className={settings?.stripe_connected ? "text-success-500" : "text-secondary-400"} /><div><p className="font-medium text-secondary-900">Stripe</p><p className="text-sm text-secondary-500">Payment processing</p></div></div>
-              <span className={`text-xs px-3 py-1 rounded-full ${settings?.stripe_connected ? "bg-success-50 text-success-600" : "bg-secondary-100 text-secondary-500"}`}>{settings?.stripe_connected ? "Connected" : "Not Connected"}</span>
+              <span className={`text-xs px-3 py-1 rounded-full ${stripeOk === null ? "bg-secondary-100 text-secondary-500" : stripeOk ? "bg-success-50 text-success-600" : "bg-error-50 text-error-600"}`}>{stripeOk === null ? "Checking..." : stripeOk ? "Connected" : "Not Connected"}</span>
             </div>
         </div>
       </section>

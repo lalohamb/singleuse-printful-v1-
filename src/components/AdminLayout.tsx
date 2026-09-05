@@ -2,7 +2,7 @@
 import { type ReactNode, useState } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingBag, Settings as SettingsIcon, LogOut, Menu, FolderTree, ExternalLink } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag, Settings as SettingsIcon, LogOut, Menu, FolderTree, ExternalLink, Mail, CreditCard } from "lucide-react";
 import { useAdminAuth } from "@/lib/admin-auth";
 
 const navItems = [
@@ -10,6 +10,8 @@ const navItems = [
   { path: "/admin/products", label: "Products", icon: Package },
   { path: "/admin/categories", label: "Categories", icon: FolderTree },
   { path: "/admin/orders", label: "Orders", icon: ShoppingBag },
+  { path: "/admin/email", label: "Email", icon: Mail },
+  { path: "/admin/stripe", label: "Stripe", icon: CreditCard },
   { path: "/admin/settings", label: "Settings", icon: SettingsIcon },
 ];
 
