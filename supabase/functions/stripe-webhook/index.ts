@@ -68,6 +68,34 @@ Deno.serve(async (req: Request) => {
           })
           .eq("stripe_session_id", session.id);
 
+        // Send order confirmation email via Resend
+        const resendKey = Deno.env.get("RESEND_API_KEY");
+        if (resendKey && session.metadata?.email) {
+          const customerEmail = session.metadata.email;
+          const orderItems = session.metadata?.items ? JSON.parse(session.metadata.items) : [];
+          const itemsHtml = orderItems.map((item: any) =>
+            `<tr><td style="padding:8px 0">${item.title} (${item.variant_label}) x${item.quantity}</td><td style="padding:8px 0;text-align:right">$${(item.price * item.quantity / 100).toFixed(2)}</td></tr>`
+          ).join("");
+          await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              from: "Body & Sleeves <orders@bodyandsleeves.com>",
+              to: customerEmail,
+              subject: `Order Confirmed – #${session.id.slice(-8).toUpperCase()}`,
+              html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+                <h2>Thanks for your order, ${session.metadata.shipping_name?.split(" ")[0]}!</h2>
+                <p>Your order <strong>#${session.id.slice(-8).toUpperCase()}</strong> has been confirmed and is being processed.</p>
+                <table style="width:100%;border-collapse:collapse">${itemsHtml}</table>
+                <hr/>
+                <p><strong>Total: $${((session.amount_total ?? 0) / 100).toFixed(2)}</strong></p>
+                <p>We'll send you another email when your order ships.</p>
+                <p>— Body & Sleeves</p>
+              </div>`,
+            }),
+          }).catch((e: Error) => console.error("Resend error:", e.message));
+        }
+
         // Optionally forward to Printify for fulfillment
         const printifyToken = Deno.env.get("PRINTIFY_API_TOKEN");
         const printifyShopId = Deno.env.get("PRINTIFY_SHOP_ID");
