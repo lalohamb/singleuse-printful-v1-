@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus, Edit2, Trash2, Search, X, Loader2, RefreshCw, Star, Package, Lock } from "lucide-react";
+import { Plus, Edit2, Trash2, Search, X, Loader2, RefreshCw, Star, Package, Lock, CheckCircle, AlertTriangle } from "lucide-react";
 import { supabase, formatPrice } from "@/lib/supabase";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
 import { ACTIVE_FLAGS } from "@/lib/productFlags";
@@ -11,6 +11,7 @@ function Products() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [tab, setTab] = useState<"active" | "inactive">("active");
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -18,6 +19,7 @@ function Products() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkCategory, setBulkCategory] = useState("");
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [activating, setActivating] = useState<string | null>(null);
 
   const fetchData = () => {
     Promise.all([
@@ -29,11 +31,13 @@ function Products() {
   useEffect(() => { fetchData(); }, []);
 
   const filtered = products.filter((p) => p.title.toLowerCase().includes(search.toLowerCase()));
+  const activeFiltered = filtered.filter((p) => p.status === "active");
+  const inactiveFiltered = filtered.filter((p) => p.status !== "active");
 
   const toggleRow = (id: string) => setSelectedIds((s) => {
     const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n;
   });
-  const toggleAll = () => setSelectedIds((s) => s.size === filtered.length ? new Set() : new Set(filtered.map((p) => p.id)));
+  const toggleAll = () => setSelectedIds((s) => s.size === activeFiltered.length ? new Set() : new Set(activeFiltered.map((p) => p.id)));
   const clearSel = () => setSelectedIds(new Set());
 
   const runBulk = async (patch: Record<string, unknown>) => {
@@ -54,6 +58,13 @@ function Products() {
 
   const handleToggleFeatured = async (p: Product) => {
     await supabase.from("products").update({ featured: !p.featured }).eq("id", p.id);
+    fetchData();
+  };
+
+  const handleActivate = async (id: string) => {
+    setActivating(id);
+    await supabase.from("products").update({ status: "active", updated_at: new Date().toISOString() }).eq("id", id);
+    setActivating(null);
     fetchData();
   };
 
@@ -84,55 +95,144 @@ function Products() {
         </div>
       </div>
       {syncMsg && <div className="bg-primary-50 border border-primary-100 text-primary-700 rounded-lg p-3 text-sm">{syncMsg}</div>}
-      {selectedIds.size > 0 && (
-        <div className="bg-primary-50 border border-primary-100 rounded-lg p-3 flex flex-wrap items-center gap-3">
-          <span className="text-sm font-medium text-secondary-900">{selectedIds.size} selected</span>
-          <select value={bulkCategory} onChange={(e) => setBulkCategory(e.target.value)} className="input-field py-1.5 max-w-[200px]">
-            <option value="">Uncategorized</option>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          <button onClick={bulkAssignCategory} disabled={bulkBusy} className="btn-primary py-1.5">Assign category</button>
-          {ACTIVE_FLAGS.map((f) => (
-            <button key={f.key as string} onClick={() => bulkSetFlag(f.key as string, true)} disabled={bulkBusy} className="btn-outline py-1.5">+ {f.label}</button>
-          ))}
-          <button onClick={clearSel} className="text-sm text-secondary-500 underline">Clear</button>
-        </div>
+
+      {/* Tab switcher */}
+      <div className="flex gap-1 bg-secondary-100 p-1 rounded-lg w-fit">
+        <button onClick={() => setTab("active")} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === "active" ? "bg-white text-secondary-900 shadow-sm" : "text-secondary-500 hover:text-secondary-700"}`}>
+          Active <span className="ml-1.5 text-xs bg-success-100 text-success-700 px-1.5 py-0.5 rounded-full">{activeFiltered.length}</span>
+        </button>
+        <button onClick={() => setTab("inactive")} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === "inactive" ? "bg-white text-secondary-900 shadow-sm" : "text-secondary-500 hover:text-secondary-700"}`}>
+          Inactive &amp; Unsynced <span className="ml-1.5 text-xs bg-secondary-200 text-secondary-600 px-1.5 py-0.5 rounded-full">{inactiveFiltered.length}</span>
+        </button>
+      </div>
+
+      {/* ── ACTIVE TAB ── */}
+      {tab === "active" && (
+        <>
+          {selectedIds.size > 0 && (
+            <div className="bg-primary-50 border border-primary-100 rounded-lg p-3 flex flex-wrap items-center gap-3">
+              <span className="text-sm font-medium text-secondary-900">{selectedIds.size} selected</span>
+              <select value={bulkCategory} onChange={(e) => setBulkCategory(e.target.value)} className="input-field py-1.5 max-w-[200px]">
+                <option value="">Uncategorized</option>
+                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <button onClick={bulkAssignCategory} disabled={bulkBusy} className="btn-primary py-1.5">Assign category</button>
+              {ACTIVE_FLAGS.map((f) => (
+                <button key={f.key as string} onClick={() => bulkSetFlag(f.key as string, true)} disabled={bulkBusy} className="btn-outline py-1.5">+ {f.label}</button>
+              ))}
+              <button onClick={clearSel} className="text-sm text-secondary-500 underline">Clear</button>
+            </div>
+          )}
+          {loading ? <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-2 border-secondary-300 border-t-secondary-900" /></div> : (
+            <div className="bg-white rounded-xl border border-secondary-100 shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[820px]">
+                  <thead className="bg-secondary-50 border-b border-secondary-100">
+                    <tr>
+                      <th className="px-4 py-3 w-10"><input type="checkbox" aria-label="Select all" checked={activeFiltered.length > 0 && selectedIds.size === activeFiltered.length} onChange={toggleAll} className="w-4 h-4 rounded" /></th>
+                      <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700">Product</th>
+                      <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700 hidden md:table-cell">Category</th>
+                      <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700">Price</th>
+                      <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700 hidden lg:table-cell">Status</th>
+                      <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700 hidden lg:table-cell">Flags</th>
+                      <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700">Featured</th>
+                      <th className="text-right px-4 py-3 text-sm font-semibold text-secondary-700">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-secondary-50">
+                    {activeFiltered.map((p) => (
+                      <tr key={p.id} className={`hover:bg-secondary-50 transition-colors ${selectedIds.has(p.id) ? "bg-primary-50/50" : ""}`}>
+                        <td className="px-4 py-3"><input type="checkbox" aria-label={`Select ${p.title}`} checked={selectedIds.has(p.id)} onChange={() => toggleRow(p.id)} className="w-4 h-4 rounded" /></td>
+                        <td className="px-4 py-3"><div className="flex items-center gap-3"><img src={p.image_url || ""} alt={p.title} className="w-12 h-12 rounded-lg object-cover bg-secondary-100 flex-shrink-0" /><div className="min-w-0 max-w-[240px]"><p className="font-medium text-secondary-900 truncate flex items-center gap-1">{p.content_locked && <Lock size={12} className="text-warning-500 flex-shrink-0" aria-label="Content locked" />}{p.title}</p>{p.printify_id && <p className="text-xs text-secondary-400 truncate">Printify: {p.printify_id}</p>}</div></div></td>
+                        <td className="px-4 py-3 text-sm text-secondary-600 hidden md:table-cell">{categories.find((c) => c.id === p.category_id)?.name || "Uncategorized"}</td>
+                        <td className="px-4 py-3 font-medium text-secondary-900">{formatPrice(p.price)}</td>
+                        <td className="px-4 py-3 hidden lg:table-cell"><span className={`text-xs px-2 py-1 rounded-full ${p.status === "active" ? "bg-success-50 text-success-600" : p.status === "draft" ? "bg-warning-50 text-warning-600" : "bg-secondary-100 text-secondary-500"}`}>{p.status}</span></td>
+                        <td className="px-4 py-3 hidden lg:table-cell"><div className="flex flex-wrap gap-1">{ACTIVE_FLAGS.filter((f) => f.key !== "featured" && (p as unknown as Record<string, boolean>)[f.key as string]).map((f) => <span key={f.key as string} className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${f.badgeClass}`}>{f.badge}</span>)}</div></td>
+                        <td className="px-4 py-3"><button onClick={() => handleToggleFeatured(p)} className="p-1.5 rounded-lg hover:bg-secondary-100 transition-colors"><Star size={18} className={p.featured ? "fill-gold-500 text-gold-500" : "text-secondary-300"} /></button></td>
+                        <td className="px-4 py-3"><div className="flex items-center justify-end gap-1"><button onClick={() => { setEditing(p); setShowModal(true); }} className="p-2 text-secondary-500 hover:text-secondary-900 hover:bg-secondary-100 rounded-lg transition-colors"><Edit2 size={16} /></button><button onClick={() => handleDelete(p.id)} className="p-2 text-secondary-500 hover:text-error-500 hover:bg-error-50 rounded-lg transition-colors"><Trash2 size={16} /></button></div></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {activeFiltered.length === 0 && <div className="text-center py-12 text-secondary-400"><Package size={40} className="mx-auto mb-3 text-secondary-200" />No active products found</div>}
+            </div>
+          )}
+        </>
       )}
-      {loading ? <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-2 border-secondary-300 border-t-secondary-900" /></div> : (
+
+      {/* ── INACTIVE TAB ── */}
+      {tab === "inactive" && (
         <div className="bg-white rounded-xl border border-secondary-100 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px]">
+            <table className="w-full min-w-[700px]">
               <thead className="bg-secondary-50 border-b border-secondary-100">
                 <tr>
-                  <th className="px-4 py-3 w-10"><input type="checkbox" aria-label="Select all" checked={filtered.length > 0 && selectedIds.size === filtered.length} onChange={toggleAll} className="w-4 h-4 rounded" /></th>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700">Product</th>
-                  <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700 hidden md:table-cell">Category</th>
-                  <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700">Price</th>
-                  <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700 hidden lg:table-cell">Status</th>
-                  <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700 hidden lg:table-cell">Flags</th>
-                  <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700">Featured</th>
-                  <th className="text-right px-4 py-3 text-sm font-semibold text-secondary-700">Actions</th>
+                  <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700">Status</th>
+                  <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700 hidden md:table-cell">Printify ID</th>
+                  <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700 hidden lg:table-cell">Blueprint</th>
+                  <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700 hidden lg:table-cell">Shipping</th>
+                  <th className="text-right px-4 py-3 text-sm font-semibold text-secondary-700">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-secondary-50">
-                {filtered.map((p) => (
-                  <tr key={p.id} className={`hover:bg-secondary-50 transition-colors ${selectedIds.has(p.id) ? "bg-primary-50/50" : ""}`}>
-                    <td className="px-4 py-3"><input type="checkbox" aria-label={`Select ${p.title}`} checked={selectedIds.has(p.id)} onChange={() => toggleRow(p.id)} className="w-4 h-4 rounded" /></td>
-                    <td className="px-4 py-3"><div className="flex items-center gap-3"><img src={p.image_url || ""} alt={p.title} className="w-12 h-12 rounded-lg object-cover bg-secondary-100 flex-shrink-0" /><div className="min-w-0 max-w-[240px]"><p className="font-medium text-secondary-900 truncate flex items-center gap-1">{p.content_locked && <Lock size={12} className="text-warning-500 flex-shrink-0" aria-label="Content locked" />}{p.title}</p>{p.printify_id && <p className="text-xs text-secondary-400 truncate">Printify: {p.printify_id}</p>}</div></div></td>
-                    <td className="px-4 py-3 text-sm text-secondary-600 hidden md:table-cell">{categories.find((c) => c.id === p.category_id)?.name || "Uncategorized"}</td>
-                    <td className="px-4 py-3 font-medium text-secondary-900">{formatPrice(p.price)}</td>
-                    <td className="px-4 py-3 hidden lg:table-cell"><span className={`text-xs px-2 py-1 rounded-full ${p.status === "active" ? "bg-success-50 text-success-600" : p.status === "draft" ? "bg-warning-50 text-warning-600" : "bg-secondary-100 text-secondary-500"}`}>{p.status}</span></td>
-                    <td className="px-4 py-3 hidden lg:table-cell"><div className="flex flex-wrap gap-1">{ACTIVE_FLAGS.filter((f) => f.key !== "featured" && (p as unknown as Record<string, boolean>)[f.key as string]).map((f) => <span key={f.key as string} className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${f.badgeClass}`}>{f.badge}</span>)}</div></td>
-                    <td className="px-4 py-3"><button onClick={() => handleToggleFeatured(p)} className="p-1.5 rounded-lg hover:bg-secondary-100 transition-colors"><Star size={18} className={p.featured ? "fill-gold-500 text-gold-500" : "text-secondary-300"} /></button></td>
-                    <td className="px-4 py-3"><div className="flex items-center justify-end gap-1"><button onClick={() => { setEditing(p); setShowModal(true); }} className="p-2 text-secondary-500 hover:text-secondary-900 hover:bg-secondary-100 rounded-lg transition-colors"><Edit2 size={16} /></button><button onClick={() => handleDelete(p.id)} className="p-2 text-secondary-500 hover:text-error-500 hover:bg-error-50 rounded-lg transition-colors"><Trash2 size={16} /></button></div></td>
+                {inactiveFiltered.map((p) => (
+                  <tr key={p.id} className="hover:bg-secondary-50 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <img src={p.image_url || ""} alt={p.title} className="w-12 h-12 rounded-lg object-cover bg-secondary-100 flex-shrink-0 opacity-60" />
+                        <div className="min-w-0 max-w-[240px]">
+                          <p className="font-medium text-secondary-700 truncate">{p.title}</p>
+                          <p className="text-xs text-secondary-400">{formatPrice(p.price)}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                        p.status === "draft" ? "bg-warning-50 text-warning-600"
+                        : p.status === "archived" ? "bg-secondary-100 text-secondary-500"
+                        : "bg-secondary-100 text-secondary-500"
+                      }`}>{p.status}</span>
+                    </td>
+                    <td className="px-4 py-3 hidden md:table-cell">
+                      {p.printify_id
+                        ? <span className="text-xs font-mono text-secondary-500">{p.printify_id}</span>
+                        : <span className="text-xs text-secondary-300 italic">Not synced</span>}
+                    </td>
+                    <td className="px-4 py-3 hidden lg:table-cell">
+                      {p.blueprint_id && p.print_provider_id
+                        ? <span className="inline-flex items-center gap-1 text-xs text-success-600"><CheckCircle size={12} />Blueprint {p.blueprint_id}</span>
+                        : <span className="inline-flex items-center gap-1 text-xs text-warning-600"><AlertTriangle size={12} />Missing</span>}
+                    </td>
+                    <td className="px-4 py-3 hidden lg:table-cell">
+                      {(p.shipping_info as any)?.profiles?.length > 0
+                        ? <span className="inline-flex items-center gap-1 text-xs text-success-600"><CheckCircle size={12} />Stored</span>
+                        : <span className="inline-flex items-center gap-1 text-xs text-warning-600"><AlertTriangle size={12} />Missing — sync</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => handleActivate(p.id)}
+                        disabled={activating === p.id}
+                        className="btn-primary py-1.5 px-3 text-sm"
+                      >
+                        {activating === p.id ? <Loader2 size={14} className="animate-spin" /> : "Activate"}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          {filtered.length === 0 && <div className="text-center py-12 text-secondary-400"><Package size={40} className="mx-auto mb-3 text-secondary-200" />No products found</div>}
+          {inactiveFiltered.length === 0 && (
+            <div className="text-center py-12 text-secondary-400">
+              <CheckCircle size={40} className="mx-auto mb-3 text-success-200" />
+              All products are active
+            </div>
+          )}
         </div>
       )}
+
       {showModal && <ProductModal product={editing} categories={categories} onClose={() => { setShowModal(false); setEditing(null); }} onSave={() => { setShowModal(false); setEditing(null); fetchData(); }} />}
     </div>
   );
@@ -184,7 +284,11 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
         </div>
         <div className="p-6 space-y-4">
           <div><label className="label-text">Title</label><input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="input-field" placeholder="Product title" /></div>
-          <div><label className="label-text">Description</label><textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="input-field min-h-[80px]" placeholder="Product description" /></div>
+          <div>
+            <label className="label-text">Description</label>
+            <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="input-field min-h-[80px]" placeholder="Product description" />
+            <button type="button" onClick={() => setForm({ ...form, description: form.description.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&ldquo;/g, "\"").replace(/&rdquo;/g, "\"").replace(/&lsquo;/g, "'").replace(/&rsquo;/g, "'").replace(/&mdash;/g, "—").replace(/&ndash;/g, "–").replace(/&hellip;/g, "...").replace(/&#[0-9]+;/g, "").replace(/&[a-z]+;/g, "").trim() })} className="text-xs text-secondary-400 hover:text-secondary-700 mt-1 underline">Clean HTML tags</button>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div><label className="label-text">Price ($)</label><input type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="input-field" placeholder="32.00" /></div>
             <div><label className="label-text">Cost ($)</label><input type="number" step="0.01" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} className="input-field" placeholder="12.50" /></div>

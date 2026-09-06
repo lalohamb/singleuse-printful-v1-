@@ -98,7 +98,8 @@ Deno.serve(async (req: Request) => {
 
         // Optionally forward to Printify for fulfillment
         const printifyToken = Deno.env.get("PRINTIFY_API_TOKEN");
-        const printifyShopId = Deno.env.get("PRINTIFY_SHOP_ID");
+        const { data: settingsData } = await supabase.from("settings").select("printify_shop_id").limit(1).maybeSingle();
+        const printifyShopId = settingsData?.printify_shop_id || Deno.env.get("PRINTIFY_SHOP_ID");
 
         if (printifyToken && printifyShopId && session.metadata?.items) {
           try {

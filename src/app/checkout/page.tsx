@@ -1,9 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { ChevronLeft, Lock, Check, Loader2 } from "lucide-react";
+import { ChevronLeft, Lock, Check, Loader2, Truck } from "lucide-react";
 import { useCart } from "@/lib/cart";
-import { formatPrice, createStripeCheckout } from "@/lib/supabase";
+import { formatPrice, createStripeCheckout, getShippingQuote } from "@/lib/supabase";
+import type { CartItem } from "@/types";
 
 export default function CheckoutPage() {
   const { items, subtotal, clearCart } = useCart();
@@ -11,8 +12,30 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ email: "", firstName: "", lastName: "", address1: "", address2: "", city: "", state: "", zip: "", country: "US" });
 
-  const shippingCost = subtotal >= 75 ? 0 : 6.99;
-  const total = subtotal + shippingCost;
+  const [shippingCost, setShippingCost] = useState<number | null>(null);
+  const [shippingLoading, setShippingLoading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Fetch real shipping quote whenever country changes
+  useEffect(() => {
+    if (!items.length) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setShippingLoading(true);
+      const cost = await getShippingQuote({
+        country: form.country,
+        items: items.map((i: CartItem) => ({
+          product_id: i.product_id,
+          quantity: i.quantity,
+        })),
+      });
+      setShippingCost(cost);
+      setShippingLoading(false);
+    }, 400);
+  }, [form.country, items]);
+
+  const resolvedShipping = shippingCost ?? 6.99;
+  const total = subtotal + resolvedShipping;
   const updateForm = (key: string, value: string) => setForm((prev) => ({ ...prev, [key]: value }));
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -24,7 +47,7 @@ export default function CheckoutPage() {
         items: items.map((i) => ({ product_id: i.product_id, title: i.title, price: i.price, image_url: i.image_url, quantity: i.quantity, variant_id: i.variant_id, variant_label: i.variant_label, printify_id: i.printify_id })),
         shipping_address: { line1: form.address1, line2: form.address2 || undefined, city: form.city, state: form.state, zip: form.zip, country: form.country },
         shipping_name: `${form.firstName} ${form.lastName}`,
-        email: form.email, shipping_cost: shippingCost, subtotal, total,
+        email: form.email, shipping_cost: resolvedShipping, subtotal, total,
       });
       clearCart();
       window.location.href = result.url;
@@ -75,8 +98,8 @@ export default function CheckoutPage() {
             </select>
           </div>
           {error && <div className="bg-error-50 border border-error-100 text-error-700 rounded-lg p-4 text-sm">{error}</div>}
-          <button type="submit" disabled={loading} className="btn-primary w-full">
-            {loading ? <><Loader2 size={20} className="mr-2 animate-spin" />Processing...</> : <><Lock size={20} className="mr-2" />Pay {formatPrice(total)} with Stripe</>}
+          <button type="submit" disabled={loading || shippingLoading} className="btn-primary w-full">
+            {loading ? <><Loader2 size={20} className="mr-2 animate-spin" />Processing...</> : <><Lock size={20} className="mr-2" />Pay {shippingLoading ? "..." : formatPrice(total)} with Stripe</>}
           </button>
           <p className="text-xs text-secondary-500 text-center">You will be redirected to Stripe&apos;s secure checkout to complete your payment.</p>
         </form>
@@ -98,9 +121,20 @@ export default function CheckoutPage() {
             </div>
             <div className="border-t border-secondary-200 mt-4 pt-4 space-y-2">
               <div className="flex justify-between text-secondary-600"><span>Subtotal</span><span>{formatPrice(subtotal)}</span></div>
-              <div className="flex justify-between text-secondary-600"><span>Shipping</span><span>{shippingCost === 0 ? "Free" : formatPrice(shippingCost)}</span></div>
-              {shippingCost === 0 && <p className="text-xs text-success-600 flex items-center gap-1"><Check size={14} /> You qualified for free shipping!</p>}
-              <div className="flex justify-between text-lg font-bold text-secondary-900 pt-2 border-t border-secondary-200"><span>Total</span><span>{formatPrice(total)}</span></div>
+              <div className="flex justify-between text-secondary-600">
+                <span className="flex items-center gap-1"><Truck size={14} />Shipping</span>
+                <span>
+                  {shippingLoading
+                    ? <span className="flex items-center gap-1 text-secondary-400"><Loader2 size={13} className="animate-spin" />Calculating...</span>
+                    : shippingCost === null ? <span className="text-secondary-400 text-xs">Pending</span>
+                    : resolvedShipping === 0 ? "Free" : formatPrice(resolvedShipping)}
+                </span>
+              </div>
+              {shippingCost === 0 && <p className="text-xs text-success-600 flex items-center gap-1"><Check size={14} />Free shipping applied!</p>}
+              <div className="flex justify-between text-lg font-bold text-secondary-900 pt-2 border-t border-secondary-200">
+                <span>Total</span>
+                <span>{shippingLoading ? <Loader2 size={16} className="animate-spin inline" /> : formatPrice(total)}</span>
+              </div>
             </div>
           </div>
         </div>

@@ -1,12 +1,22 @@
 "use client";
 import { useEffect } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { X, Plus, Minus, ShoppingBag, Trash2 } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { formatPrice } from "@/lib/supabase";
 
 export default function CartDrawer() {
   const { items, isOpen, closeCart, updateQuantity, removeFromCart, subtotal, itemCount } = useCart();
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const handleContinueShopping = () => {
+    if (pathname === "/checkout") {
+      router.push("/shop");
+    }
+    closeCart();
+  };
 
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "";
@@ -18,7 +28,7 @@ export default function CartDrawer() {
   return (
     <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-secondary-900/50 backdrop-blur-sm animate-fade-in" onClick={closeCart} />
-      <div className="absolute right-0 top-0 bottom-0 w-full max-w-md bg-white shadow-2xl flex flex-col animate-slide-in-right">
+      <div className="absolute right-0 top-0 bottom-0 w-full max-w-md bg-white shadow-2xl flex flex-col animate-slide-in-right overflow-hidden">
         <div className="flex items-center justify-between p-6 border-b border-secondary-100">
           <div className="flex items-center gap-2">
             <ShoppingBag size={24} className="text-secondary-900" />
@@ -40,10 +50,10 @@ export default function CartDrawer() {
                 <div key={`${item.product_id}-${item.variant_id}`} className="flex gap-4 pb-4 border-b border-secondary-100 last:border-0">
                   <img src={item.image_url} alt={item.title} className="w-20 h-20 object-cover rounded-lg bg-secondary-50 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="font-medium text-secondary-900 truncate">{item.title}</p>
-                        <p className="text-sm text-secondary-500">{item.variant_label}</p>
+                    <div className="flex items-start justify-between gap-2 min-w-0">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-secondary-900 break-words">{item.title}</p>
+                        <p className="text-sm text-secondary-500 break-words">{item.variant_label}</p>
                       </div>
                       <button onClick={() => removeFromCart(item.product_id, item.variant_id)} className="text-secondary-400 hover:text-error-500 transition-colors p-1" aria-label="Remove item"><Trash2 size={18} /></button>
                     </div>
@@ -66,7 +76,7 @@ export default function CartDrawer() {
               </div>
               <p className="text-sm text-secondary-500">Shipping and taxes calculated at checkout.</p>
               <Link href="/checkout" onClick={closeCart} className="btn-primary w-full">Proceed to Checkout</Link>
-              <button onClick={closeCart} className="w-full text-center text-sm font-medium text-secondary-600 hover:text-secondary-900 transition-colors">Continue Shopping</button>
+              <button onClick={handleContinueShopping} className="w-full text-center text-sm font-medium text-secondary-600 hover:text-secondary-900 transition-colors">Continue Shopping</button>
             </div>
           </>
         )}

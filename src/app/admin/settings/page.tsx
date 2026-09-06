@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Save, Loader2, Check, Store, Truck, CreditCard, Printer, Send, Mail, Share2 } from "lucide-react";
+import { Save, Loader2, Check, Store, CreditCard, Printer, Send, Mail, Share2 } from "lucide-react";
 import type { StoreSettings } from "@/types";
 
 type SocialKey = keyof StoreSettings["social_links"];
@@ -181,13 +181,7 @@ function Settings() {
           <label className="flex items-center gap-3 cursor-pointer"><input type="checkbox" checked={form.announcement_active || false} onChange={(e) => setForm({ ...form, announcement_active: e.target.checked })} className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500" /><span className="text-sm font-medium text-secondary-700">Show announcement bar</span></label>
         </div>
       </section>
-      <section className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6">
-        <h2 className="text-lg font-semibold text-secondary-900 flex items-center gap-2 mb-6"><Truck size={22} className="text-primary-500" />Shipping</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div><label className="label-text">Free Shipping Threshold ($)</label><input type="number" step="0.01" value={form.shipping_free_threshold || 75} onChange={(e) => setForm({ ...form, shipping_free_threshold: parseFloat(e.target.value) })} className="input-field" /><p className="text-xs text-secondary-400 mt-1">Orders above this amount get free shipping</p></div>
-          <div><label className="label-text">Default Shipping Cost ($)</label><input type="number" step="0.01" value={form.default_shipping_cost || 6.99} onChange={(e) => setForm({ ...form, default_shipping_cost: parseFloat(e.target.value) })} className="input-field" /></div>
-        </div>
-      </section>
+
       <section className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6">
         <h2 className="text-lg font-semibold text-secondary-900 mb-6">Integrations</h2>
         <div className="space-y-4">

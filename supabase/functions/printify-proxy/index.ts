@@ -352,6 +352,20 @@ Deno.serve(async (req: Request) => {
               updated_at: new Date().toISOString(),
             };
 
+            // Fetch static shipping profile for this blueprint/provider and
+            // store it so the checkout can calculate rates without a live API call.
+            if (detail.blueprint_id && detail.print_provider_id) {
+              try {
+                const shippingProfile = await printifyFetch(
+                  `/catalog/blueprints/${detail.blueprint_id}/print_providers/${detail.print_provider_id}/shipping.json`,
+                  token
+                );
+                payload.shipping_info = shippingProfile;
+              } catch {
+                // Non-fatal — shipping_info stays as previous value
+              }
+            }
+
             // Content fields are overwritten ONLY when the row is not
             // content-locked. New products are absent from lockedMap, so
             // isLocked is false and title is always supplied on first insert

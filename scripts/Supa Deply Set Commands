@@ -1,0 +1,6 @@
+Run on VM Terminal:
+supabase secrets set PRINTIFY_SHOP_ID=your_shop_id_here
+supabase secrets set PRINTIFY_API_TOKEN=your_api_key_here
+supabase secrets set STRIPE_SECRET_KEY=your_stripe_key_here
+supabase secrets set STRIPE_WEBHOOK_SECRET=your_webhook_secret_here
+supabase secrets set RESEND_API_KEY=your_resend_key_here

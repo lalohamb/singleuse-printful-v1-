@@ -49,6 +49,8 @@ export interface CartItem {
   variant_id: string;
   variant_label: string;
   printify_id: string | null;
+  blueprint_id: string | null;
+  print_provider_id: string | null;
 }
 
 export interface StoreSettings {
