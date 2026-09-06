@@ -64,6 +64,10 @@ export interface StoreSettings {
   our_why_object_position: string | null;
   hero_height_vh: number | null;
   hero_image_flip: boolean | null;
+  hero_image_scale: number | null;
+  hero_gradient_opacity: number | null;
+  hero_gradient_dir: string | null;
+  hero_image_fit: string | null;
   our_why_height_vh: number | null;
   hero_title: string | null;
   hero_subtitle: string | null;

@@ -53,6 +53,7 @@ function Settings() {
   const [loading, setLoading] = useState(true);
   const [heroPreviewH, setHeroPreviewH] = useState(400);
   const [ourWhyPreviewH, setOurWhyPreviewH] = useState(400);
+  const [showHeroPicker, setShowHeroPicker] = useState(false);
 
   const [stripeOk, setStripeOk] = useState<"checking" | "connected" | "warning" | "disconnected">("checking");
   const [mailerOk, setMailerOk] = useState<"checking" | "connected" | "warning" | "disconnected">("checking");
@@ -88,7 +89,7 @@ function Settings() {
 
   const handleSave = async () => {
     setSaving(true);
-    const { error } = await supabase.from("settings").update({ store_name: form.store_name, tagline: form.tagline, hero_title: form.hero_title, hero_subtitle: form.hero_subtitle, hero_image_url: form.hero_image_url, story_image_url: form.story_image_url, hero_object_position: form.hero_object_position, hero_height_vh: heroPreviewH, hero_image_flip: form.hero_image_flip, our_why_image_url: form.our_why_image_url, our_why_object_position: form.our_why_object_position, our_why_height_vh: ourWhyPreviewH, announcement: form.announcement, announcement_active: form.announcement_active, shipping_free_threshold: form.shipping_free_threshold, default_shipping_cost: form.default_shipping_cost, printify_shop_id: form.printify_shop_id, stripe_connected: form.stripe_connected, updated_at: new Date().toISOString() }).eq("id", settings?.id);
+    const { error } = await supabase.from("settings").update({ store_name: form.store_name, tagline: form.tagline, hero_title: form.hero_title, hero_subtitle: form.hero_subtitle, hero_image_url: form.hero_image_url, story_image_url: form.story_image_url, hero_object_position: form.hero_object_position, hero_height_vh: heroPreviewH, hero_image_flip: form.hero_image_flip, hero_image_scale: form.hero_image_scale ?? 100, hero_gradient_opacity: form.hero_gradient_opacity ?? 70, hero_gradient_dir: form.hero_gradient_dir ?? "left", hero_image_fit: form.hero_image_fit ?? "cover", our_why_image_url: form.our_why_image_url, our_why_object_position: form.our_why_object_position, our_why_height_vh: ourWhyPreviewH, announcement: form.announcement, announcement_active: form.announcement_active, shipping_free_threshold: form.shipping_free_threshold, default_shipping_cost: form.default_shipping_cost, printify_shop_id: form.printify_shop_id, stripe_connected: form.stripe_connected, updated_at: new Date().toISOString() }).eq("id", settings?.id);
     if (!error) { setSaved(true); setSaveError(null); setTimeout(() => setSaved(false), 2000); }
     else { setSaveError(error.message); }
     setSaving(false);
@@ -121,6 +122,8 @@ function Settings() {
           <div><label className="label-text">Hero Title</label><input value={form.hero_title || ""} onChange={(e) => setForm({ ...form, hero_title: e.target.value })} className="input-field" /></div>
           <div><label className="label-text">Hero Subtitle</label><textarea value={form.hero_subtitle || ""} onChange={(e) => setForm({ ...form, hero_subtitle: e.target.value })} className="input-field min-h-[80px]" /></div>
           <ImageUpload label="Hero Image URL" value={form.hero_image_url || ""} onChange={(url) => setForm({ ...form, hero_image_url: url })} folder="settings/hero" preview={false} />
+          <button type="button" onClick={() => setShowHeroPicker(true)} className="text-xs text-gold-600 hover:text-gold-700 underline">🖼 Pick from Active Products</button>
+          {showHeroPicker && <ProductImagePicker onSelect={(url) => { setForm({ ...form, hero_image_url: url }); setShowHeroPicker(false); }} onClose={() => setShowHeroPicker(false)} />}
           <div>
             <label className="label-text">Hero Image Position</label>
             {(() => {
@@ -128,6 +131,18 @@ function Settings() {
               const x = parseInt(parts[0]) || 0;
               const y = parseInt(parts[1]) || 0;
               const setPos = (nx: number, ny: number) => setForm({ ...form, hero_object_position: `${nx}px ${ny}px` });
+              const op = (form.hero_gradient_opacity ?? 70) / 100;
+              const dir = form.hero_gradient_dir ?? "left";
+              const gradMap: Record<string, string> = {
+                left:   `linear-gradient(to right, rgba(17,17,17,${op}) 0%, rgba(17,17,17,${op * 0.6}) 50%, transparent 100%)`,
+                right:  `linear-gradient(to left, rgba(17,17,17,${op}) 0%, rgba(17,17,17,${op * 0.6}) 50%, transparent 100%)`,
+                center: `linear-gradient(to bottom, rgba(17,17,17,${op * 0.6}) 0%, rgba(17,17,17,${op}) 50%, rgba(17,17,17,${op * 0.6}) 100%)`,
+                top:    `linear-gradient(to bottom, rgba(17,17,17,${op}) 0%, transparent 100%)`,
+                bottom: `linear-gradient(to top, rgba(17,17,17,${op}) 0%, transparent 100%)`,
+                full:   `rgba(17,17,17,${op})`,
+                none:   `transparent`,
+              };
+              const previewGradient = gradMap[dir] ?? "transparent";
               return (
                 <div className="space-y-3 mt-1">
                   {/* X slider above preview */}
@@ -139,8 +154,9 @@ function Settings() {
                   {form.hero_image_url && (
                     <div className="flex gap-2 items-stretch">
                       {/* live preview */}
-                      <div className="flex-1 relative rounded-lg bg-secondary-100 overflow-hidden" style={{ height: heroPreviewH * 4 }}>
-                        <img src={form.hero_image_url} alt="Hero preview" className="w-full h-full object-cover" style={{ objectPosition: form.hero_object_position || "center", transform: form.hero_image_flip ? "scaleX(-1)" : undefined }} />
+                      <div className="flex-1 relative rounded-lg bg-secondary-900 overflow-hidden" style={{ height: heroPreviewH * 4 }}>
+                        <img src={form.hero_image_url} alt="Hero preview" className={`absolute inset-0 w-full h-full ${form.hero_image_fit === "contain" ? "object-contain" : (form.hero_image_scale ?? 100) === 100 ? "object-cover" : "object-contain"}`} style={{ objectPosition: form.hero_object_position || "center", transform: form.hero_image_flip ? "scaleX(-1)" : undefined, scale: `${form.hero_image_scale ?? 100}%` }} />
+                        <div className="absolute inset-0" style={{ background: previewGradient }} />
                         <span className="absolute bottom-2 right-2 text-xs bg-black/50 text-white px-2 py-1 rounded">Live preview</span>
                       </div>
                       {/* Y vertical slider to the right */}
@@ -166,18 +182,60 @@ function Settings() {
                     </div>
                   )}
 
+                  {form.hero_image_url && (
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-secondary-500 w-24 flex-shrink-0">Zoom: {form.hero_image_scale ?? 100}%</span>
+                      <input type="range" min={10} max={100} value={form.hero_image_scale ?? 100} onChange={(e) => setForm({ ...form, hero_image_scale: parseInt(e.target.value) })} className="flex-1 accent-gold-500" />
+                    </div>
+                  )}
+
+                  {form.hero_image_url && (
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-secondary-500 w-24 flex-shrink-0">Overlay: {form.hero_gradient_opacity ?? 70}%</span>
+                      <input type="range" min={0} max={100} value={form.hero_gradient_opacity ?? 70} onChange={(e) => setForm({ ...form, hero_gradient_opacity: parseInt(e.target.value) })} className="flex-1 accent-gold-500" />
+                    </div>
+                  )}
+
+                  {form.hero_image_url && (
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-secondary-500 w-24 flex-shrink-0">Gradient</span>
+                      <div className="flex gap-1 flex-wrap">
+                        {(["left", "right", "center", "top", "bottom", "full", "none"] as const).map((d) => (
+                          <button key={d} type="button" onClick={() => setForm({ ...form, hero_gradient_dir: d })} className={`text-xs px-2 py-1 rounded border transition-colors capitalize ${(form.hero_gradient_dir ?? "left") === d ? "bg-gold-500 border-gold-500 text-white" : "border-secondary-300 text-secondary-500 hover:border-secondary-400"}`}>{d}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {form.hero_image_url && (
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-secondary-500 w-24 flex-shrink-0">Fit</span>
+                      <div className="flex gap-1">
+                        {(["cover", "contain"] as const).map((f) => (
+                          <button key={f} type="button" onClick={() => setForm({ ...form, hero_image_fit: f })} className={`text-xs px-2 py-1 rounded border transition-colors capitalize ${(form.hero_image_fit ?? "cover") === f ? "bg-gold-500 border-gold-500 text-white" : "border-secondary-300 text-secondary-500 hover:border-secondary-400"}`}>{f}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-secondary-400">Position: <code>{form.hero_object_position || "0px 0px"}</code></p>
                     <div className="flex items-center gap-3">
                       <button type="button" onClick={() => setForm({ ...form, hero_image_flip: !form.hero_image_flip })} className={`text-xs px-2 py-1 rounded border transition-colors ${form.hero_image_flip ? "bg-gold-500 border-gold-500 text-white" : "border-secondary-300 text-secondary-500 hover:border-secondary-400"}`}>⇄ Flip</button>
-                      <button type="button" onClick={() => setForm({ ...form, hero_object_position: "0px 0px" })} className="text-xs text-red-400 hover:text-red-600">Reset</button>
+                      <button type="button" onClick={() => { setForm({ ...form, hero_object_position: "center", hero_image_scale: 100, hero_image_flip: false, hero_gradient_opacity: 70, hero_gradient_dir: "left", hero_image_fit: "cover" }); setHeroPreviewH(70); }} className="text-xs text-red-400 hover:text-red-600">Reset</button>
                     </div>
                   </div>
                 </div>
               );
             })()}
           </div>
-          <ImageUpload label="&ldquo;Wear Your Story&rdquo; Background Image URL" value={form.story_image_url || ""} onChange={(url) => setForm({ ...form, story_image_url: url })} folder="settings/story" />
+        </div>
+      </section>
+
+      <section className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-secondary-900 mb-6">&ldquo;Wear Your Story&rdquo; Section</h2>
+        <div className="space-y-4">
+          <ImageUpload label="Background Image URL" value={form.story_image_url || ""} onChange={(url) => setForm({ ...form, story_image_url: url })} folder="settings/story" />
         </div>
       </section>
 
@@ -309,4 +367,35 @@ function Settings() {
 
 export default function AdminSettingsPage() {
   return <ProtectedAdmin><Settings /></ProtectedAdmin>;
+}
+
+function ProductImagePicker({ onSelect, onClose }: { onSelect: (url: string) => void; onClose: () => void }) {
+  const [products, setProducts] = useState<{ title: string; image_url: string | null }[]>([]);
+  const [search, setSearch] = useState("");
+  useEffect(() => {
+    supabase.from("products").select("title, image_url").eq("status", "active").then(({ data }) => {
+      if (data) setProducts(data as { title: string; image_url: string | null }[]);
+    });
+  }, []);
+  const filtered = products.filter((p) => p.title.toLowerCase().includes(search.toLowerCase()) && p.image_url);
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-4 border-b border-secondary-100">
+          <h3 className="font-semibold text-secondary-900">Pick a Product Image</h3>
+          <button onClick={onClose} className="text-secondary-400 hover:text-secondary-700 text-xl leading-none">&times;</button>
+        </div>
+        <div className="p-4 border-b border-secondary-100">
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products..." className="input-field" />
+        </div>
+        <div className="overflow-y-auto p-4 grid grid-cols-5 gap-2">
+          {filtered.map((p, i) => (
+            <button key={i} type="button" title={p.title} onClick={() => onSelect(p.image_url!)} className="aspect-square rounded-lg border-2 border-transparent hover:border-gold-500 transition-colors p-1">
+              <img src={p.image_url!} alt={p.title} className="w-full h-full object-cover rounded" />
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }

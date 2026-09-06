@@ -27,8 +27,21 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
         <div className="absolute inset-0 bg-secondary-900">
           {/* LINE BELOW TO SET HERO IMAGE BACKGROUND TO FULL PIC>> :style={{ objectPosition: "100% " }} <<;END 09-04-2026*/}
           {/* https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/object-position*/ } 
-          <img src={settings?.hero_image_url || "https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"} alt="Body and Sleeves apparel" className="w-full h-full object-cover" style={{ objectPosition: settings?.hero_object_position || "250px 25px", transform: settings?.hero_image_flip ? "scaleX(-1)" : undefined }} />
-          <div className="absolute inset-0 bg-gradient-to-r from-secondary-900/85 via-secondary-900/55 to-transparent" />
+          <img src={settings?.hero_image_url || "https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"} alt="Body and Sleeves apparel" className={`absolute inset-0 w-full h-full ${settings?.hero_image_fit === "contain" ? "object-contain" : (settings?.hero_image_scale ?? 100) === 100 ? "object-cover" : "object-contain"}`} style={{ objectPosition: settings?.hero_object_position || "center", transform: settings?.hero_image_flip ? "scaleX(-1)" : undefined, scale: `${settings?.hero_image_scale ?? 100}%` }} />
+          {(() => {
+            const op = (settings?.hero_gradient_opacity ?? 70) / 100;
+            const dir = settings?.hero_gradient_dir ?? "left";
+            if (dir === "none") return null;
+            const gradMap: Record<string, string> = {
+              left: `linear-gradient(to right, rgba(17,17,17,${op * 0.85}) 0%, rgba(17,17,17,${op * 0.55}) 50%, transparent 100%)`,
+              right: `linear-gradient(to left, rgba(17,17,17,${op * 0.85}) 0%, rgba(17,17,17,${op * 0.55}) 50%, transparent 100%)`,
+              center: `linear-gradient(to bottom, rgba(17,17,17,${op * 0.5}) 0%, rgba(17,17,17,${op * 0.85}) 50%, rgba(17,17,17,${op * 0.5}) 100%)`,
+              top: `linear-gradient(to bottom, rgba(17,17,17,${op * 0.85}) 0%, transparent 100%)`,
+              bottom: `linear-gradient(to top, rgba(17,17,17,${op * 0.85}) 0%, transparent 100%)`,
+              full: `rgba(17,17,17,${op * 0.85})`,
+            };
+            return <div className="absolute inset-0" style={{ background: gradMap[dir] }} />;
+          })()}
         </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
           <div className="max-w-2xl animate-slide-up">
