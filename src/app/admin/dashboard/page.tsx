@@ -1,30 +1,45 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Package, ShoppingBag, DollarSign, TrendingUp, Clock, CheckCircle } from "lucide-react";
+import { Package, ShoppingBag, DollarSign, TrendingUp, Clock, CheckCircle, PauseCircle, PlayCircle } from "lucide-react";
 import { supabase, formatPrice } from "@/lib/supabase";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
-import type { Order, Product } from "@/types";
+import type { Order, Product, StoreSettings } from "@/types";
 
 function Dashboard() {
   const [stats, setStats] = useState({ totalOrders: 0, totalRevenue: 0, pendingOrders: 0, totalProducts: 0 });
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [recentProducts, setRecentProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [paused, setPaused] = useState(false);
+  const [pauseLoading, setPauseLoading] = useState(false);
+  const [settingsId, setSettingsId] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
       supabase.from("orders").select("*").order("created_at", { ascending: false }).limit(5),
       supabase.from("products").select("*").order("created_at", { ascending: false }),
-    ]).then(([ordersRes, productsRes]) => {
+      supabase.from("settings").select("id, orders_paused").limit(1).maybeSingle(),
+    ]).then(([ordersRes, productsRes, settingsRes]) => {
       const orders = (ordersRes.data || []) as Order[];
       const products = (productsRes.data || []) as Product[];
+      const s = settingsRes.data as Pick<StoreSettings, "id" | "orders_paused"> | null;
       setRecentOrders(orders);
       setStats({ totalOrders: orders.length, totalRevenue: orders.filter((o) => ["paid","fulfilled","shipped","delivered"].includes(o.status)).reduce((sum, o) => sum + Number(o.total), 0), pendingOrders: orders.filter((o) => o.status === "pending").length, totalProducts: products.length });
       setRecentProducts(products.slice(0, 5));
+      if (s) { setSettingsId(s.id); setPaused(!!s.orders_paused); }
       setLoading(false);
     });
   }, []);
+
+  const togglePause = async () => {
+    if (!settingsId) return;
+    setPauseLoading(true);
+    const next = !paused;
+    await supabase.from("settings").update({ orders_paused: next }).eq("id", settingsId);
+    setPaused(next);
+    setPauseLoading(false);
+  };
 
   const statCards = [
     { label: "Total Revenue", value: formatPrice(stats.totalRevenue), icon: DollarSign, color: "bg-success-50 text-success-600" },
@@ -37,6 +52,18 @@ function Dashboard() {
 
   return (
     <div className="space-y-8">
+      <div className={`flex items-center justify-between rounded-xl p-4 border ${paused ? "bg-red-50 border-red-200" : "bg-success-50 border-success-200"}`}>
+        <div className="flex items-center gap-3">
+          {paused ? <PauseCircle size={22} className="text-red-500" /> : <PlayCircle size={22} className="text-success-600" />}
+          <div>
+            <p className={`font-semibold text-sm ${paused ? "text-red-700" : "text-success-700"}`}>{paused ? "Orders are paused" : "Orders are open"}</p>
+            <p className="text-xs text-secondary-500">{paused ? "Customers cannot checkout until you resume." : "Customers can place orders normally."}</p>
+          </div>
+        </div>
+        <button onClick={togglePause} disabled={pauseLoading} className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg border transition-colors ${paused ? "bg-success-600 border-success-600 text-white hover:bg-success-700" : "bg-red-500 border-red-500 text-white hover:bg-red-600"}`}>
+          {pauseLoading ? <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" /> : paused ? <><PlayCircle size={16} />Resume Orders</> : <><PauseCircle size={16} />Pause Orders</>}
+        </button>
+      </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((stat) => (
           <div key={stat.label} className="bg-white rounded-xl p-6 border border-secondary-100 shadow-sm">

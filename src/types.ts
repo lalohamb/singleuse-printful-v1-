@@ -73,6 +73,7 @@ export interface StoreSettings {
   hero_subtitle: string | null;
   announcement: string | null;
   announcement_active: boolean;
+  orders_paused: boolean;
   shipping_free_threshold: number;
   default_shipping_cost: number;
   printify_connected: boolean;

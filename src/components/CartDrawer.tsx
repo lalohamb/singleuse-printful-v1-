@@ -1,27 +1,34 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { X, Plus, Minus, ShoppingBag, Trash2 } from "lucide-react";
+import { X, Plus, Minus, ShoppingBag, Trash2, PauseCircle } from "lucide-react";
 import { useCart } from "@/lib/cart";
-import { formatPrice } from "@/lib/supabase";
+import { formatPrice, supabase } from "@/lib/supabase";
 
 export default function CartDrawer() {
   const { items, isOpen, closeCart, updateQuantity, removeFromCart, subtotal, itemCount } = useCart();
   const pathname = usePathname();
   const router = useRouter();
-
-  const handleContinueShopping = () => {
-    if (pathname === "/checkout") {
-      router.push("/shop");
-    }
-    closeCart();
-  };
+  const [ordersPaused, setOrdersPaused] = useState(false);
 
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      supabase.from("settings").select("orders_paused").limit(1).maybeSingle().then(({ data }) => {
+        if (data) setOrdersPaused(!!data.orders_paused);
+      });
+    }
+  }, [isOpen]);
+
+  const handleContinueShopping = () => {
+    if (pathname === "/checkout") router.push("/shop");
+    closeCart();
+  };
 
   if (!isOpen) return null;
 
@@ -74,8 +81,17 @@ export default function CartDrawer() {
                 <span className="text-secondary-600">Subtotal</span>
                 <span className="text-xl font-bold text-secondary-900">{formatPrice(subtotal)}</span>
               </div>
-              <p className="text-sm text-secondary-500">Shipping and taxes calculated at checkout.</p>
-              <Link href="/checkout" onClick={closeCart} className="btn-primary w-full">Proceed to Checkout</Link>
+              {ordersPaused ? (
+                <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg p-3">
+                  <PauseCircle size={20} className="text-red-500 flex-shrink-0" />
+                  <p className="text-sm text-red-700">Orders are temporarily paused. Please check back soon.</p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-secondary-500">Shipping and taxes calculated at checkout.</p>
+                  <Link href="/checkout" onClick={closeCart} className="btn-primary w-full">Proceed to Checkout</Link>
+                </>
+              )}
               <button onClick={handleContinueShopping} className="w-full text-center text-sm font-medium text-secondary-600 hover:text-secondary-900 transition-colors">Continue Shopping</button>
             </div>
           </>
