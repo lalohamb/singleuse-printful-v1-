@@ -23,11 +23,11 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
 
   return (
     <div>
-      <section className="relative h-[70vh] min-h-[500px] flex items-center overflow-hidden">
-        <div className="absolute inset-0">
+      <section className="relative flex items-center overflow-hidden" style={{ height: `${settings?.hero_height_vh ?? 70}vh`, minHeight: 500 }}>
+        <div className="absolute inset-0 bg-secondary-900">
           {/* LINE BELOW TO SET HERO IMAGE BACKGROUND TO FULL PIC>> :style={{ objectPosition: "100% " }} <<;END 09-04-2026*/}
           {/* https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/object-position*/ } 
-          <img src={settings?.hero_image_url || "https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"} alt="Body and Sleeves apparel" className="w-full h-full object-cover" style={{ objectPosition: settings?.hero_object_position || "250px 25px" }} />
+          <img src={settings?.hero_image_url || "https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"} alt="Body and Sleeves apparel" className="w-full h-full object-cover" style={{ objectPosition: settings?.hero_object_position || "250px 25px", transform: settings?.hero_image_flip ? "scaleX(-1)" : undefined }} />
           <div className="absolute inset-0 bg-gradient-to-r from-secondary-900/85 via-secondary-900/55 to-transparent" />
         </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
@@ -202,7 +202,7 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
               <p className="text-white/60 text-lg leading-relaxed mb-8">Body &amp; Sleeves was born from a desire to see our culture celebrated, not just represented. Every thread, every design, every drop is an act of love for Black culture, faith, and family.</p>
               <Link href="/about" className="btn-gold self-start">Read Our Story <ArrowRight size={18} className="ml-2" /></Link>
             </div>
-            <div className="relative min-h-[400px] bg-secondary-800">
+            <div className="relative min-h-[400px] bg-secondary-800" style={{ minHeight: settings?.our_why_height_vh ? `${settings.our_why_height_vh}px` : 400 }}>
               <img src={settings?.our_why_image_url || settings?.hero_image_url || "https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"} alt="Our story" className="absolute inset-0 w-full h-full object-cover opacity-80" style={{ objectPosition: settings?.our_why_object_position || "center" }} />
               <div className="absolute inset-0 bg-gradient-to-t from-secondary-900/60 to-transparent" />
             </div>
