@@ -23,7 +23,7 @@ function Products() {
 
   const fetchData = () => {
     Promise.all([
-      supabase.from("products").select("*").order("created_at", { ascending: false }),
+      supabase.from("products").select("*").order("title", { ascending: true }),
       supabase.from("categories").select("*").order("name"),
     ]).then(([pRes, cRes]) => { setProducts((pRes.data || []) as Product[]); setCategories((cRes.data || []) as Category[]); setLoading(false); });
   };
