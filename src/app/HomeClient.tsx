@@ -211,13 +211,21 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
           <div className="grid grid-cols-1 lg:grid-cols-2 rounded-2xl overflow-hidden shadow-2xl">
             <div className="bg-secondary-900 px-10 py-16 flex flex-col justify-center">
               <div className="kente-bar h-1 w-24 mb-8 rounded-full" />
-              <p className="text-gold-400 text-sm font-medium tracking-widest uppercase mb-4">Our Why</p>
-              <h2 className="text-3xl lg:text-5xl font-bold text-white leading-tight mb-6">&ldquo;We don&apos;t just sell clothes. We tell stories.&rdquo;</h2>
-              <p className="text-white/60 text-lg leading-relaxed mb-8">Body &amp; Sleeves was born from a desire to see our culture celebrated, not just represented. Every thread, every design, every drop is an act of love for Black culture, faith, and family.</p>
+              <p className="text-gold-400 text-sm font-medium tracking-widest uppercase mb-4">{settings?.our_why_label || "Our Why"}</p>
+              <h2 className="text-3xl lg:text-5xl font-bold text-white leading-tight mb-6">&ldquo;{settings?.our_why_quote || "We don\u2019t just sell clothes. We tell stories."}&rdquo;</h2>
+              <p className="text-white/60 text-lg leading-relaxed mb-8">{settings?.our_why_body || "Body & Sleeves was born from a desire to see our culture celebrated, not just represented. Every thread, every design, every drop is an act of love for Black culture, faith, and family."}</p>
               <Link href="/about" className="btn-gold self-start">Read Our Story <ArrowRight size={18} className="ml-2" /></Link>
             </div>
             <div className="relative min-h-[400px] bg-secondary-800" style={{ minHeight: settings?.our_why_height_vh ? `${settings.our_why_height_vh}px` : 400 }}>
-              <img src={settings?.our_why_image_url || settings?.hero_image_url || "https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"} alt="Our story" className="absolute inset-0 w-full h-full object-cover opacity-80" style={{ objectPosition: settings?.our_why_object_position || "center" }} />
+              {(() => {
+                const hasOwn = !!settings?.our_why_image_url;
+                const src = hasOwn ? settings!.our_why_image_url! : (settings?.hero_image_url || "https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940");
+                const scale = hasOwn ? (settings?.our_why_image_scale ?? 100) : 100;
+                const pos = hasOwn ? (settings?.our_why_object_position || "center") : "center";
+                const flip = hasOwn ? !!settings?.our_why_image_flip : false;
+                const fit = hasOwn ? (settings?.our_why_image_fit ?? "cover") : "cover";
+                return <img src={src} alt="Our story" className={`absolute inset-0 w-full h-full ${fit === "contain" ? "object-contain" : "object-cover"}`} style={{ objectPosition: pos, transform: flip ? "scaleX(-1)" : undefined, scale: `${scale}%` }} />;
+              })()}
               <div className="absolute inset-0 bg-gradient-to-t from-secondary-900/60 to-transparent" />
             </div>
           </div>
