@@ -27,6 +27,7 @@ export default function ProductDetailClient({ product, related }: { product: Pro
 
   const [selectedColor, setSelectedColor] = useState<string>(variants[0]?.color || "");
   // Sizes/styles available for the currently selected color.
+  const SIZE_ORDER = ["XS","S","M","L","XL","2XL","3XL","4XL","5XL"];
   const sizes = useMemo(() => {
     const seen = new Set<string>();
     const out: { id: string; label: string }[] = [];
@@ -35,7 +36,14 @@ export default function ProductDetailClient({ product, related }: { product: Pro
       const label = v.size || v.label;
       if (!seen.has(label)) { seen.add(label); out.push({ id: v.id, label }); }
     }
-    return out;
+    return out.sort((a, b) => {
+      const ai = SIZE_ORDER.indexOf(a.label.toUpperCase());
+      const bi = SIZE_ORDER.indexOf(b.label.toUpperCase());
+      if (ai === -1 && bi === -1) return a.label.localeCompare(b.label);
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
   }, [variants, selectedColor]);
 
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(variants[0] || null);
@@ -85,7 +93,7 @@ export default function ProductDetailClient({ product, related }: { product: Pro
           {product.featured && <span className="inline-block bg-gold-500 text-secondary-900 text-xs font-bold px-3 py-1 rounded-full mb-4">Featured</span>}
           <h1 className="text-3xl lg:text-4xl font-bold text-secondary-900">{product.title}</h1>
           <p className="text-2xl font-bold text-secondary-900 mt-4">{formatPrice(product.price)}</p>
-          <p className="text-secondary-600 mt-6 leading-relaxed">{product.description}</p>
+          <p className="text-secondary-600 mt-6 leading-relaxed whitespace-pre-wrap">{product.description}</p>
           {hasColorChoice && (
             <div className="mt-8">
               <label className="label-text">Color: <span className="font-normal text-secondary-500">{selectedColor}</span></label>
