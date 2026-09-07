@@ -5,6 +5,7 @@ import { ArrowRight, Truck, Shield, Sparkles, Heart, ChevronLeft, ChevronRight }
 import type { Product, StoreSettings, Category } from "@/types";
 import ProductCard from "@/components/ProductCard";
 import Reveal from "@/components/Reveal";
+import NewsletterSignup from "@/components/NewsletterSignup";
 import { formatPrice } from "@/lib/supabase";
 
 const AFFIRMATIONS = ["Empower Yourself", "Empower the Culture", "Wear Your Heritage", "Faith · Family · Culture", "Black-Owned & Made to Order"];
@@ -250,6 +251,8 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
           </div>
         </section>
       </Reveal>
+
+      <NewsletterSignup />
 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="relative rounded-2xl overflow-hidden bg-secondary-900 px-8 py-16 text-center">
