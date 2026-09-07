@@ -371,7 +371,7 @@ function Settings() {
                     <span className="text-[10px] text-secondary-500 mt-1">{form.story_image_scale ?? 100}%</span>
                   </div>
                   <div className="flex-1 relative rounded-lg bg-secondary-900 overflow-hidden" style={{ height: 200 }}>
-                    <img src={form.story_image_url} alt="Story preview" className={`absolute inset-0 w-full h-full ${form.story_image_fit === "contain" ? "object-contain" : "object-cover"}`} style={{ objectPosition: form.story_object_position || "center", transform: form.story_image_flip ? "scaleX(-1)" : undefined, scale: `${form.story_image_scale ?? 100}%` }} />
+                    {form.story_image_url && <img src={form.story_image_url} alt="Story preview" className={`absolute inset-0 w-full h-full ${form.story_image_fit === "contain" ? "object-contain" : "object-cover"}`} style={{ objectPosition: form.story_object_position || "center", transform: form.story_image_flip ? "scaleX(-1)" : undefined, scale: `${form.story_image_scale ?? 100}%` }} />}
                     <div className="absolute inset-0" style={{ background: previewGradient }} />
                     <span className="absolute bottom-2 right-2 text-xs bg-black/50 text-white px-2 py-1 rounded">Live preview</span>
                   </div>
