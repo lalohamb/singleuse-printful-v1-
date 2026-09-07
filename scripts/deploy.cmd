@@ -14,7 +14,7 @@ curl -s -o /dev/null -w "app HTTP %{http_code}\n" http://localhost:3000/
 '
 
 
-## pull on your droplet and deploy
+## pull on your droplet and deploy:
 cd /var/www/bodyandsleeves
 git pull --rebase
 npm run build
