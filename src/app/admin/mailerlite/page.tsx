@@ -94,6 +94,51 @@ function EditSubscriberModal({ subscriber, groups, onClose, onDone }: { subscrib
   );
 }
 
+function CreateCampaignModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () => void; onDone: () => void }) {
+  const [form, setForm] = useState({ name: "", subject: "", from_name: "Body and Sleeves", from_email: "Hello.BodyandSleeves@gmail.com", html: "", group: "", send_now: false });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault(); setLoading(true); setError(null);
+    const res = await post({ action: "create_campaign", ...form, groups: form.group ? [form.group] : [] });
+    if (res.error || res.message || res.errors) setError(res.message || res.error || JSON.stringify(res.errors));
+    else { setDone(true); setTimeout(() => { onDone(); onClose(); }, 1200); }
+    setLoading(false);
+  };
+
+  return (
+    <Modal title="Create Campaign" onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div><label className="label-text">Campaign Name</label><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-field" placeholder="e.g. July Newsletter" /></div>
+        <div><label className="label-text">Subject Line</label><input required value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} className="input-field" placeholder="e.g. New arrivals just dropped 🔥" /></div>
+        <div className="grid grid-cols-2 gap-3">
+          <div><label className="label-text">From Name</label><input required value={form.from_name} onChange={(e) => setForm({ ...form, from_name: e.target.value })} className="input-field" /></div>
+          <div><label className="label-text">From Email</label><input required type="email" value={form.from_email} onChange={(e) => setForm({ ...form, from_email: e.target.value })} className="input-field" /></div>
+        </div>
+        <div><label className="label-text">Send To Group</label>
+          <select value={form.group} onChange={(e) => setForm({ ...form, group: e.target.value })} className="input-field">
+            <option value="">All subscribers</option>
+            {groups.map((g) => <option key={g.id} value={g.id}>{g.name} ({g.active_subscribers_count})</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="label-text">Email Body (HTML)</label>
+          <textarea required value={form.html} onChange={(e) => setForm({ ...form, html: e.target.value })} className="input-field min-h-[180px] font-mono text-xs" placeholder="<h1>Hello!</h1><p>Check out our latest collection...</p>" />
+          <p className="text-xs text-secondary-400 mt-1">Tip: paste plain text or basic HTML. For rich designs use MailerLite&apos;s editor.</p>
+        </div>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={form.send_now} onChange={(e) => setForm({ ...form, send_now: e.target.checked })} className="w-4 h-4 rounded text-gold-500" />
+          <span className="text-sm text-secondary-700">Send immediately (uncheck to save as draft)</span>
+        </label>
+        {error && <ErrorMsg msg={error} />}
+        <SubmitBtn loading={loading} done={done} label={form.send_now ? "Send Campaign" : "Save as Draft"} />
+      </form>
+    </Modal>
+  );
+}
+
 function GroupModal({ group, onClose, onDone }: { group?: Group; onClose: () => void; onDone: () => void }) {
   const [name, setName] = useState(group?.name || "");
   const [loading, setLoading] = useState(false);
@@ -166,7 +211,7 @@ function MailerLiteDashboard() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [cursor, setCursor] = useState("");
-  const [modal, setModal] = useState<"add_sub" | "edit_sub" | "add_group" | "edit_group" | null>(null);
+  const [modal, setModal] = useState<"add_sub" | "edit_sub" | "add_group" | "edit_group" | "create_campaign" | null>(null);
   const [selectedSub, setSelectedSub] = useState<Subscriber | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -285,6 +330,9 @@ function MailerLiteDashboard() {
             )}
             {tab === "groups" && (
               <button onClick={() => { setSelectedGroup(null); setModal("add_group"); }} className="btn-primary py-2 text-sm flex items-center gap-1"><Plus size={15} />New Group</button>
+            )}
+            {tab === "campaigns" && (
+              <button onClick={() => setModal("create_campaign")} className="btn-primary py-2 text-sm flex items-center gap-1"><Plus size={15} />New Campaign</button>
             )}
           </div>
         </div>
@@ -433,6 +481,7 @@ function MailerLiteDashboard() {
       {modal === "edit_sub" && selectedSub && <EditSubscriberModal subscriber={selectedSub} groups={groups} onClose={() => setModal(null)} onDone={fetchAll} />}
       {modal === "add_group" && <GroupModal onClose={() => setModal(null)} onDone={fetchAll} />}
       {modal === "edit_group" && selectedGroup && <GroupModal group={selectedGroup} onClose={() => setModal(null)} onDone={fetchAll} />}
+      {modal === "create_campaign" && <CreateCampaignModal groups={groups} onClose={() => setModal(null)} onDone={fetchAll} />}
     </div>
   );
 }

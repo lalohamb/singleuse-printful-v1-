@@ -133,6 +133,42 @@ export async function POST(req: NextRequest) {
       const res = await fetch(`${BASE}/groups/${body.id}`, { method: "DELETE", headers: headers() });
       return NextResponse.json({ success: res.ok }, { status: res.status });
     }
+    if (action === "create_campaign") {
+      // Step 1: create the campaign
+      const createRes = await fetch(`${BASE}/campaigns`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({
+          name: body.name,
+          type: "regular",
+          emails: [{
+            subject: body.subject,
+            from_name: body.from_name,
+            from: body.from_email,
+            content: body.html,
+          }],
+          groups: body.groups || [],
+        }),
+      });
+      const campaign = await createRes.json();
+      if (!createRes.ok) return NextResponse.json(campaign, { status: createRes.status });
+      const campaignId = campaign.data?.id;
+      if (!campaignId) return NextResponse.json({ error: "Campaign created but no ID returned" }, { status: 500 });
+      // Step 2: schedule/send immediately or as draft
+      if (body.send_now) {
+        const sendRes = await fetch(`${BASE}/campaigns/${campaignId}/schedule`, {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify({ delivery: "instant" }),
+        });
+        return NextResponse.json(await sendRes.json(), { status: sendRes.status });
+      }
+      return NextResponse.json(campaign, { status: 201 });
+    }
+    if (action === "delete_campaign") {
+      const res = await fetch(`${BASE}/campaigns/${body.id}`, { method: "DELETE", headers: headers() });
+      return NextResponse.json({ success: res.ok }, { status: res.status });
+    }
     if (action === "assign_group") {
       const res = await fetch(`${BASE}/subscribers/${body.subscriber_id}/groups/${body.group_id}`, {
         method: "POST", headers: headers(),
