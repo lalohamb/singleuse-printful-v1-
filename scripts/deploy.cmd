@@ -12,3 +12,10 @@ pm2 restart bodyandsleeves --update-env >/dev/null 2>&1 && echo restarted
 sleep 3
 curl -s -o /dev/null -w "app HTTP %{http_code}\n" http://localhost:3000/
 '
+
+
+## pull on your droplet and deploy
+cd /var/www/bodyandsleeves
+git pull --rebase
+npm run build
+pm2 restart bodyandsleeves
