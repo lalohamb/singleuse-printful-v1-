@@ -264,8 +264,27 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="relative rounded-2xl overflow-hidden bg-secondary-900 px-8 py-16 text-center">
-          <div className="absolute inset-0 opacity-20">
-            <img src={settings?.story_image_url || "https://images.pexels.com/photos/29646005/pexels-photo-29646005.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"} alt="" className="w-full h-full object-cover" />
+          <div className="absolute inset-0">
+            {(() => {
+              const src = settings?.story_image_url || "https://images.pexels.com/photos/29646005/pexels-photo-29646005.jpeg?auto=compress&cs=tinysrgb&h=650&w=940";
+              const op = (settings?.story_gradient_opacity ?? 40) / 100;
+              const dir = settings?.story_gradient_dir ?? "full";
+              const gradMap: Record<string, string> = {
+                left:   `linear-gradient(to right, rgba(17,17,17,${op * 0.85}) 0%, rgba(17,17,17,${op * 0.55}) 50%, transparent 100%)`,
+                right:  `linear-gradient(to left, rgba(17,17,17,${op * 0.85}) 0%, rgba(17,17,17,${op * 0.55}) 50%, transparent 100%)`,
+                center: `linear-gradient(to bottom, rgba(17,17,17,${op * 0.5}) 0%, rgba(17,17,17,${op * 0.85}) 50%, rgba(17,17,17,${op * 0.5}) 100%)`,
+                top:    `linear-gradient(to bottom, rgba(17,17,17,${op * 0.85}) 0%, transparent 100%)`,
+                bottom: `linear-gradient(to top, rgba(17,17,17,${op * 0.85}) 0%, transparent 100%)`,
+                full:   `rgba(17,17,17,${op * 0.85})`,
+                none:   `transparent`,
+              };
+              return (
+                <>
+                  <img src={src} alt="" className={`w-full h-full ${settings?.story_image_fit === "contain" ? "object-contain" : "object-cover"}`} style={{ objectPosition: settings?.story_object_position || "center", transform: settings?.story_image_flip ? "scaleX(-1)" : undefined, scale: `${settings?.story_image_scale ?? 100}%` }} />
+                  {dir !== "none" && <div className="absolute inset-0" style={{ background: gradMap[dir] }} />}
+                </>
+              );
+            })()}
           </div>
           <div className="relative">
             <h2 className="text-3xl lg:text-5xl font-bold text-white mb-4">Wear Your Story</h2>

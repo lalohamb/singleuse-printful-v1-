@@ -59,6 +59,12 @@ export interface StoreSettings {
   tagline: string;
   hero_image_url: string | null;
   story_image_url: string | null;
+  story_object_position: string | null;
+  story_image_scale: number | null;
+  story_image_flip: boolean | null;
+  story_image_fit: string | null;
+  story_gradient_opacity: number | null;
+  story_gradient_dir: string | null;
   hero_object_position: string | null;
   our_why_image_url: string | null;
   our_why_object_position: string | null;
