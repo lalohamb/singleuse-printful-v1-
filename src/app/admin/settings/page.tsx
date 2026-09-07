@@ -118,6 +118,13 @@ function Settings() {
         </div>
       </section>
       <section className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-secondary-900 mb-6">Announcement Bar</h2>
+        <div className="space-y-4">
+          <div><label className="label-text">Announcement Text</label><input value={form.announcement || ""} onChange={(e) => setForm({ ...form, announcement: e.target.value })} className="input-field" placeholder="Free shipping on orders over $75!" /></div>
+          <label className="flex items-center gap-3 cursor-pointer"><input type="checkbox" checked={form.announcement_active || false} onChange={(e) => setForm({ ...form, announcement_active: e.target.checked })} className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500" /><span className="text-sm font-medium text-secondary-700">Show announcement bar</span></label>
+        </div>
+      </section>
+      <section className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6">
         <h2 className="text-lg font-semibold text-secondary-900 mb-6">Homepage Hero</h2>
         <div className="space-y-4">
           <div><label className="label-text">Hero Title</label><input value={form.hero_title || ""} onChange={(e) => setForm({ ...form, hero_title: e.target.value })} className="input-field" /></div>
@@ -407,116 +414,6 @@ function Settings() {
           })()}
         </div>
       </section>
-
-      <section className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6">
-        <h2 className="text-lg font-semibold text-secondary-900 mb-6">Our Why Section</h2>
-        <div className="space-y-4">
-          <div><label className="label-text">Label (above quote)</label><input value={form.our_why_label || ""} onChange={(e) => setForm({ ...form, our_why_label: e.target.value })} className="input-field" placeholder="Our Why" /></div>
-          <div><label className="label-text">Quote</label><input value={form.our_why_quote || ""} onChange={(e) => setForm({ ...form, our_why_quote: e.target.value })} className="input-field" placeholder="We don't just sell clothes. We tell stories." /></div>
-          <div><label className="label-text">Body Text</label><textarea value={form.our_why_body || ""} onChange={(e) => setForm({ ...form, our_why_body: e.target.value })} className="input-field min-h-[80px]" placeholder="Body & Sleeves was born from..." /></div>
-          <ImageUpload label="Image URL" value={form.our_why_image_url || ""} onChange={(url) => setForm({ ...form, our_why_image_url: url })} folder="settings/our-why" preview={false} />
-          <button type="button" onClick={() => setShowOurWhyPicker(true)} className="btn-outline py-2 text-sm">📷 Pick from Product Library</button>
-          {showOurWhyPicker && <ProductImagePicker onSelect={(url) => { setForm({ ...form, our_why_image_url: url }); setShowOurWhyPicker(false); }} onClose={() => setShowOurWhyPicker(false)} />}
-          <div>
-            <label className="label-text">Image Position</label>
-            {(() => {
-              const parts = (form.our_why_object_position || "0px 0px").replace(/px/g, "").split(" ");
-              const x = parseInt(parts[0]) || 0;
-              const y = parseInt(parts[1]) || 0;
-              const setPos = (nx: number, ny: number) => setForm({ ...form, our_why_object_position: `${nx}px ${ny}px` });
-              const op = (form.our_why_gradient_opacity ?? 70) / 100;
-              const dir = form.our_why_gradient_dir ?? "left";
-              const gradMap: Record<string, string> = {
-                left:   `linear-gradient(to right, rgba(17,17,17,${op}) 0%, rgba(17,17,17,${op * 0.6}) 50%, transparent 100%)`,
-                right:  `linear-gradient(to left, rgba(17,17,17,${op}) 0%, rgba(17,17,17,${op * 0.6}) 50%, transparent 100%)`,
-                center: `linear-gradient(to bottom, rgba(17,17,17,${op * 0.6}) 0%, rgba(17,17,17,${op}) 50%, rgba(17,17,17,${op * 0.6}) 100%)`,
-                top:    `linear-gradient(to bottom, rgba(17,17,17,${op}) 0%, transparent 100%)`,
-                bottom: `linear-gradient(to top, rgba(17,17,17,${op}) 0%, transparent 100%)`,
-                full:   `rgba(17,17,17,${op})`,
-                none:   `transparent`,
-              };
-              const previewGradient = gradMap[dir] ?? "transparent";
-              return (
-                <div className="space-y-3 mt-1">
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-secondary-500 w-16 flex-shrink-0">X: {x}px</span>
-                    <input type="range" min={-1000} max={1000} value={x} onChange={(e) => setPos(parseInt(e.target.value), y)} className="flex-1 accent-gold-500" />
-                  </div>
-                  {form.our_why_image_url && (
-                    <div className="flex gap-2 items-stretch">
-                      <div className="flex flex-col items-center gap-1 w-10 flex-shrink-0">
-                        <span className="text-[10px] text-secondary-400">▲</span>
-                        <input type="range" min={200} max={800} value={ourWhyPreviewH} onChange={(e) => setOurWhyPreviewH(parseInt(e.target.value))} className="flex-1 accent-gold-500" style={{ writingMode: "vertical-lr", direction: "rtl", width: 28, cursor: "ns-resize" }} />
-                        <span className="text-[10px] text-secondary-400">▼</span>
-                        <span className="text-[10px] text-secondary-500 mt-1">{ourWhyPreviewH}px</span>
-                      </div>
-                      <div className="flex-1 relative rounded-lg bg-secondary-900 overflow-hidden" style={{ height: ourWhyPreviewH / 2 }}>
-                        <img src={form.our_why_image_url} alt="Our Why preview" className={`absolute inset-0 w-full h-full ${form.our_why_image_fit === "contain" ? "object-contain" : (form.our_why_image_scale ?? 100) === 100 ? "object-cover" : "object-contain"}`} style={{ objectPosition: form.our_why_object_position || "center", transform: form.our_why_image_flip ? "scaleX(-1)" : undefined, scale: `${form.our_why_image_scale ?? 100}%` }} />
-                        <div className="absolute inset-0" style={{ background: previewGradient }} />
-                        <span className="absolute bottom-2 right-2 text-xs bg-black/50 text-white px-2 py-1 rounded">Live preview</span>
-                      </div>
-                      <div className="flex flex-col items-center gap-1 w-10 flex-shrink-0">
-                        <span className="text-[10px] text-secondary-400">▲</span>
-                        <input type="range" min={-1000} max={1000} value={y} onChange={(e) => setPos(x, parseInt(e.target.value))} className="flex-1 accent-gold-500" style={{ writingMode: "vertical-lr", direction: "rtl", width: 28, cursor: "ns-resize" }} />
-                        <span className="text-[10px] text-secondary-400">▼</span>
-                        <span className="text-[10px] text-secondary-500 mt-1">{y}px</span>
-                      </div>
-                    </div>
-                  )}
-                  {form.our_why_image_url && (
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-secondary-500 w-24 flex-shrink-0">Zoom: {form.our_why_image_scale ?? 100}%</span>
-                      <input type="range" min={10} max={100} value={form.our_why_image_scale ?? 100} onChange={(e) => setForm({ ...form, our_why_image_scale: parseInt(e.target.value) })} className="flex-1 accent-gold-500" />
-                    </div>
-                  )}
-                  {form.our_why_image_url && (
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-secondary-500 w-24 flex-shrink-0">Overlay: {form.our_why_gradient_opacity ?? 70}%</span>
-                      <input type="range" min={0} max={100} value={form.our_why_gradient_opacity ?? 70} onChange={(e) => setForm({ ...form, our_why_gradient_opacity: parseInt(e.target.value) })} className="flex-1 accent-gold-500" />
-                    </div>
-                  )}
-                  {form.our_why_image_url && (
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-secondary-500 w-24 flex-shrink-0">Gradient</span>
-                      <div className="flex gap-1 flex-wrap">
-                        {(["left", "right", "center", "top", "bottom", "full", "none"] as const).map((d) => (
-                          <button key={d} type="button" onClick={() => setForm({ ...form, our_why_gradient_dir: d })} className={`text-xs px-2 py-1 rounded border transition-colors capitalize ${(form.our_why_gradient_dir ?? "left") === d ? "bg-gold-500 border-gold-500 text-white" : "border-secondary-300 text-secondary-500 hover:border-secondary-400"}`}>{d}</button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {form.our_why_image_url && (
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-secondary-500 w-24 flex-shrink-0">Fit</span>
-                      <div className="flex gap-1">
-                        {(["cover", "contain"] as const).map((f) => (
-                          <button key={f} type="button" onClick={() => setForm({ ...form, our_why_image_fit: f })} className={`text-xs px-2 py-1 rounded border transition-colors capitalize ${(form.our_why_image_fit ?? "cover") === f ? "bg-gold-500 border-gold-500 text-white" : "border-secondary-300 text-secondary-500 hover:border-secondary-400"}`}>{f}</button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-secondary-400">Position: <code>{form.our_why_object_position || "0px 0px"}</code></p>
-                    <div className="flex items-center gap-3">
-                      <button type="button" onClick={() => setForm({ ...form, our_why_image_flip: !form.our_why_image_flip })} className={`text-xs px-2 py-1 rounded border transition-colors ${form.our_why_image_flip ? "bg-gold-500 border-gold-500 text-white" : "border-secondary-300 text-secondary-500 hover:border-secondary-400"}`}>⇄ Flip</button>
-                      <button type="button" onClick={() => setForm({ ...form, our_why_object_position: "0px 0px", our_why_image_scale: 100, our_why_image_flip: false, our_why_gradient_opacity: 70, our_why_gradient_dir: "left", our_why_image_fit: "cover" })} className="btn-outline py-2 text-sm">Reset</button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6">
-        <h2 className="text-lg font-semibold text-secondary-900 mb-6">Announcement Bar</h2>
-        <div className="space-y-4">
-          <div><label className="label-text">Announcement Text</label><input value={form.announcement || ""} onChange={(e) => setForm({ ...form, announcement: e.target.value })} className="input-field" placeholder="Free shipping on orders over $75!" /></div>
-          <label className="flex items-center gap-3 cursor-pointer"><input type="checkbox" checked={form.announcement_active || false} onChange={(e) => setForm({ ...form, announcement_active: e.target.checked })} className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500" /><span className="text-sm font-medium text-secondary-700">Show announcement bar</span></label>
-        </div>
-      </section>
-
       <section className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6">
         <h2 className="text-lg font-semibold text-secondary-900 mb-6">Integrations</h2>
         <div className="space-y-4">
