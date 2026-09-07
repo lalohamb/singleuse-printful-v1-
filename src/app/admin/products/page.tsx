@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus, Edit2, Trash2, Search, X, Loader2, RefreshCw, Star, EyeOff, Lock, CheckCircle, AlertTriangle } from "lucide-react";
+import { Plus, Edit2, Trash2, Search, X, Loader2, RefreshCw, Star, EyeOff, Package, Lock, CheckCircle, AlertTriangle } from "lucide-react";
 import { supabase, formatPrice } from "@/lib/supabase";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
 import { ACTIVE_FLAGS } from "@/lib/productFlags";
