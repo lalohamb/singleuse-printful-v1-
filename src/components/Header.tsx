@@ -36,9 +36,11 @@ export default function Header() {
                 <Menu size={24} />
               </button>
               <Link href="/" className="flex items-center gap-2">
-                <span className="font-display text-2xl lg:text-3xl font-bold text-secondary-900 tracking-tight">
-                  Body<span className="text-gold-500">&</span>Sleeves
-                </span>
+                {settings?.logo_url ? (
+                  <img src={settings.logo_url} alt={settings.store_name || "Body & Sleeves"} style={{ height: `${settings.logo_size ?? 40}px`, width: "auto" }} />
+                ) : (
+                  <img src="/logo.png" alt="Body & Sleeves" style={{ height: `${settings?.logo_size ?? 40}px`, width: "auto" }} />
+                )}
               </Link>
             </div>
             <nav className="hidden lg:flex items-center gap-8">

@@ -65,6 +65,8 @@ export interface StoreSettings {
   story_image_fit: string | null;
   story_gradient_opacity: number | null;
   story_gradient_dir: string | null;
+  logo_url: string | null;
+  logo_size: number | null;
   hero_object_position: string | null;
   our_why_image_url: string | null;
   our_why_object_position: string | null;

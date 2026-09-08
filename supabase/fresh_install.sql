@@ -210,6 +210,8 @@ CREATE TABLE IF NOT EXISTS settings (
   story_image_fit         text        DEFAULT 'cover',
   story_gradient_opacity  numeric     DEFAULT 40,
   story_gradient_dir      text        DEFAULT 'full',
+  logo_url                text,
+  logo_size               numeric     DEFAULT 40,
   our_why_image_url       text,
   our_why_object_position text        DEFAULT '0px 0px',
   our_why_height_vh       numeric     DEFAULT 60,
