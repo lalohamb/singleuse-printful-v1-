@@ -6,6 +6,7 @@ import type { Product, StoreSettings, Category } from "@/types";
 import ProductCard from "@/components/ProductCard";
 import Reveal from "@/components/Reveal";
 import NewsletterSignup from "@/components/NewsletterSignup";
+import PromoBanner from "@/components/PromoBanner";
 import { formatPrice } from "@/lib/supabase";
 
 const AFFIRMATIONS = ["Empower Yourself", "Empower the Culture", "Wear Your Heritage", "Faith · Family · Culture", "Black-Owned & Made to Order"];
@@ -24,6 +25,7 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
 
   return (
     <div>
+      <PromoBanner settings={settings} />
       <section className="relative flex items-center overflow-hidden" style={{ height: `${settings?.hero_height_vh ?? 70}vh`, minHeight: 500 }}>
         <div className="absolute inset-0 bg-secondary-900">
           {/* LINE BELOW TO SET HERO IMAGE BACKGROUND TO FULL PIC>> :style={{ objectPosition: "100% " }} <<;END 09-04-2026*/}
@@ -241,11 +243,11 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
               <h2 className="text-3xl lg:text-4xl font-bold text-secondary-900">What the Culture is Saying</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {[
+              {(settings?.testimonials ?? [
                 { quote: "I wore my shirt to a family reunion and got so many compliments. This brand truly gets us.", name: "Jasmine T.", location: "Atlanta, GA", product: "Culture First Tee" },
                 { quote: "The quality is unmatched. Soft, true to size, and the design is everything. Will be ordering again.", name: "Marcus W.", location: "Houston, TX", product: "Faith Over Fear Hoodie" },
                 { quote: "Finally a brand that celebrates who we are. Every piece feels intentional and powerful.", name: "Aaliyah R.", location: "Chicago, IL", product: "Heritage Collection" },
-              ].map((r) => (
+              ]).map((r) => (
                 <div key={r.name} className="bg-white rounded-2xl p-8 shadow-sm border border-secondary-100 flex flex-col">
                   <div className="flex gap-1 mb-4">{[...Array(5)].map((_, i) => <span key={i} className="text-gold-400 text-lg">★</span>)}</div>
                   <p className="text-secondary-700 leading-relaxed flex-1 mb-6">&ldquo;{r.quote}&rdquo;</p>

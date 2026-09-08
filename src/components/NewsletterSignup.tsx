@@ -37,12 +37,12 @@ export default function NewsletterSignup({ variant = "section" }: { variant?: "s
         {state === "done" ? (
           <p className="flex items-center gap-2 text-success-400 text-sm font-medium"><Check size={16} />You&apos;re in! Welcome to the culture.</p>
         ) : (
-          <form onSubmit={handleSubmit} className="flex gap-2">
+          <form onSubmit={handleSubmit} className="flex gap-2 max-w-sm">
             <input
               required type="email" value={email}
               onChange={(e) => { setEmail(e.target.value); setState("idle"); }}
               placeholder="your@email.com"
-              className="flex-1 bg-secondary-800 border border-secondary-700 text-white placeholder-secondary-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gold-500"
+              className="flex-1 min-w-0 bg-secondary-800 border border-secondary-700 text-white placeholder-secondary-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gold-500"
             />
             <button disabled={state === "loading"} className="bg-gold-500 hover:bg-gold-400 text-secondary-900 font-semibold px-4 py-2 rounded-lg text-sm transition-colors disabled:opacity-60 flex items-center gap-1">
               {state === "loading" ? <Loader2 size={15} className="animate-spin" /> : <ArrowRight size={15} />}

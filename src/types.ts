@@ -67,6 +67,13 @@ export interface StoreSettings {
   story_gradient_dir: string | null;
   logo_url: string | null;
   logo_size: number | null;
+  promo_banner_active: boolean;
+  promo_banner_title: string | null;
+  promo_banner_body: string | null;
+  promo_banner_cta_label: string | null;
+  promo_banner_cta_url: string | null;
+  promo_banner_bg_color: string | null;
+  testimonials: { quote: string; name: string; location: string; product: string }[] | null;
   hero_object_position: string | null;
   our_why_image_url: string | null;
   our_why_object_position: string | null;

@@ -16,6 +16,12 @@ const SOCIAL_META: { key: SocialKey; label: string; placeholder: string }[] = [
   { key: "email",     label: "Email",      placeholder: "mailto:hello@yourdomain.com" },
 ];
 
+const DEFAULT_TESTIMONIALS: NonNullable<StoreSettings["testimonials"]> = [
+  { quote: "I wore my shirt to a family reunion and got so many compliments. This brand truly gets us.", name: "Jasmine T.", location: "Atlanta, GA", product: "Culture First Tee" },
+  { quote: "The quality is unmatched. Soft, true to size, and the design is everything. Will be ordering again.", name: "Marcus W.", location: "Houston, TX", product: "Faith Over Fear Hoodie" },
+  { quote: "Finally a brand that celebrates who we are. Every piece feels intentional and powerful.", name: "Aaliyah R.", location: "Chicago, IL", product: "Heritage Collection" },
+];
+
 const DEFAULT_SOCIAL: StoreSettings["social_links"] = {
   instagram: { url: "https://instagram.com/body_and_sleeves", enabled: true },
   tiktok:    { url: "https://tiktok.com/@bodyandsleeves",      enabled: true },
@@ -90,7 +96,7 @@ function Settings() {
 
   const handleSave = async () => {
     setSaving(true);
-    const { error } = await supabase.from("settings").update({ store_name: form.store_name, tagline: form.tagline, logo_url: form.logo_url, logo_size: form.logo_size ?? 40, hero_title: form.hero_title, hero_subtitle: form.hero_subtitle, hero_image_url: form.hero_image_url, story_image_url: form.story_image_url, story_object_position: form.story_object_position, story_image_scale: form.story_image_scale ?? 100, story_image_flip: form.story_image_flip, story_image_fit: form.story_image_fit ?? "cover", story_gradient_opacity: form.story_gradient_opacity ?? 40, story_gradient_dir: form.story_gradient_dir ?? "full", hero_object_position: form.hero_object_position, hero_height_vh: heroPreviewH, hero_image_flip: form.hero_image_flip, hero_image_scale: form.hero_image_scale ?? 100, hero_gradient_opacity: form.hero_gradient_opacity ?? 70, hero_gradient_dir: form.hero_gradient_dir ?? "left", hero_image_fit: form.hero_image_fit ?? "cover", our_why_image_url: form.our_why_image_url, our_why_object_position: form.our_why_object_position, our_why_height_vh: ourWhyPreviewH, our_why_label: form.our_why_label, our_why_quote: form.our_why_quote, our_why_body: form.our_why_body, our_why_image_scale: form.our_why_image_scale ?? 100, our_why_image_flip: form.our_why_image_flip, our_why_image_fit: form.our_why_image_fit ?? "cover", our_why_gradient_opacity: form.our_why_gradient_opacity ?? 70, our_why_gradient_dir: form.our_why_gradient_dir ?? "left", announcement: form.announcement, announcement_active: form.announcement_active, shipping_free_threshold: form.shipping_free_threshold, default_shipping_cost: form.default_shipping_cost, printify_shop_id: form.printify_shop_id, stripe_connected: form.stripe_connected, updated_at: new Date().toISOString() }).eq("id", settings?.id);
+    const { error } = await supabase.from("settings").update({ store_name: form.store_name, tagline: form.tagline, logo_url: form.logo_url, logo_size: form.logo_size ?? 40, hero_title: form.hero_title, hero_subtitle: form.hero_subtitle, hero_image_url: form.hero_image_url, story_image_url: form.story_image_url, story_object_position: form.story_object_position, story_image_scale: form.story_image_scale ?? 100, story_image_flip: form.story_image_flip, story_image_fit: form.story_image_fit ?? "cover", story_gradient_opacity: form.story_gradient_opacity ?? 40, story_gradient_dir: form.story_gradient_dir ?? "full", hero_object_position: form.hero_object_position, hero_height_vh: heroPreviewH, hero_image_flip: form.hero_image_flip, hero_image_scale: form.hero_image_scale ?? 100, hero_gradient_opacity: form.hero_gradient_opacity ?? 70, hero_gradient_dir: form.hero_gradient_dir ?? "left", hero_image_fit: form.hero_image_fit ?? "cover", our_why_image_url: form.our_why_image_url, our_why_object_position: form.our_why_object_position, our_why_height_vh: ourWhyPreviewH, our_why_label: form.our_why_label, our_why_quote: form.our_why_quote, our_why_body: form.our_why_body, our_why_image_scale: form.our_why_image_scale ?? 100, our_why_image_flip: form.our_why_image_flip, our_why_image_fit: form.our_why_image_fit ?? "cover", our_why_gradient_opacity: form.our_why_gradient_opacity ?? 70, our_why_gradient_dir: form.our_why_gradient_dir ?? "left", announcement: form.announcement, announcement_active: form.announcement_active, promo_banner_active: form.promo_banner_active ?? false, promo_banner_title: form.promo_banner_title, promo_banner_body: form.promo_banner_body, promo_banner_cta_label: form.promo_banner_cta_label, promo_banner_cta_url: form.promo_banner_cta_url, promo_banner_bg_color: form.promo_banner_bg_color, shipping_free_threshold: form.shipping_free_threshold, default_shipping_cost: form.default_shipping_cost, printify_shop_id: form.printify_shop_id, stripe_connected: form.stripe_connected, testimonials: form.testimonials ?? DEFAULT_TESTIMONIALS, updated_at: new Date().toISOString() }).eq("id", settings?.id);
     if (!error) { setSaved(true); setSaveError(null); setTimeout(() => setSaved(false), 2000); }
     else { setSaveError(error.message); }
     setSaving(false);
@@ -132,6 +138,33 @@ function Settings() {
         <div className="space-y-4">
           <div><label className="label-text">Announcement Text</label><input value={form.announcement || ""} onChange={(e) => setForm({ ...form, announcement: e.target.value })} className="input-field" placeholder="Free shipping on orders over $75!" /></div>
           <label className="flex items-center gap-3 cursor-pointer"><input type="checkbox" checked={form.announcement_active || false} onChange={(e) => setForm({ ...form, announcement_active: e.target.checked })} className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500" /><span className="text-sm font-medium text-secondary-700">Show announcement bar</span></label>
+
+          <div className="border-t border-secondary-100 pt-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-secondary-800">Promotional Drop Banner</p>
+                <p className="text-xs text-secondary-400 mt-0.5">Drops from the top on homepage load. Shown max 2× per session. User can dismiss.</p>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={form.promo_banner_active || false} onChange={(e) => setForm({ ...form, promo_banner_active: e.target.checked })} className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500" />
+                <span className="text-sm font-medium text-secondary-700">Active</span>
+              </label>
+            </div>
+            <div><label className="label-text">Headline</label><input value={form.promo_banner_title || ""} onChange={(e) => setForm({ ...form, promo_banner_title: e.target.value })} className="input-field" placeholder="🔥 Limited Drop — 20% Off This Weekend Only" /></div>
+            <div><label className="label-text">Body Text</label><input value={form.promo_banner_body || ""} onChange={(e) => setForm({ ...form, promo_banner_body: e.target.value })} className="input-field" placeholder="Use code CULTURE20 at checkout. Ends Sunday." /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className="label-text">CTA Button Label</label><input value={form.promo_banner_cta_label || ""} onChange={(e) => setForm({ ...form, promo_banner_cta_label: e.target.value })} className="input-field" placeholder="Shop the Drop" /></div>
+              <div><label className="label-text">CTA URL</label><input value={form.promo_banner_cta_url || ""} onChange={(e) => setForm({ ...form, promo_banner_cta_url: e.target.value })} className="input-field" placeholder="/shop" /></div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex-1"><label className="label-text">Banner Background Color</label><input type="color" value={form.promo_banner_bg_color || "#1a1a1a"} onChange={(e) => setForm({ ...form, promo_banner_bg_color: e.target.value })} className="mt-1 h-10 w-full rounded border border-secondary-200 cursor-pointer" /></div>
+              <div className="flex-shrink-0 rounded-lg overflow-hidden border border-secondary-100" style={{ backgroundColor: form.promo_banner_bg_color || "#1a1a1a", minWidth: 160, padding: "10px 16px" }}>
+                <p className="text-white font-bold text-xs truncate">{form.promo_banner_title || "Headline preview"}</p>
+                {form.promo_banner_body && <p className="text-white/70 text-[10px] mt-0.5 truncate">{form.promo_banner_body}</p>}
+                {form.promo_banner_cta_label && <span className="inline-block mt-1.5 px-3 py-0.5 rounded-full bg-white text-secondary-900 text-[10px] font-semibold">{form.promo_banner_cta_label}</span>}
+              </div>
+            </div>
+          </div>
         </div>
       </section>
       <section className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6">
@@ -424,6 +457,24 @@ function Settings() {
           })()}
         </div>
       </section>
+      <section className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-secondary-900 mb-6">Customer Love</h2>
+        <p className="text-sm text-secondary-500 mb-6">Edit the three testimonials shown in the &ldquo;What the Culture is Saying&rdquo; section.</p>
+        <div className="space-y-6">
+          {(form.testimonials ?? DEFAULT_TESTIMONIALS).map((t, i) => (
+            <div key={i} className="space-y-3 p-4 bg-secondary-50 rounded-lg">
+              <p className="text-xs font-semibold text-secondary-500 uppercase tracking-wide">Review {i + 1}</p>
+              <div><label className="label-text">Quote</label><textarea value={t.quote} onChange={(e) => { const next = [...(form.testimonials ?? DEFAULT_TESTIMONIALS)]; next[i] = { ...next[i], quote: e.target.value }; setForm({ ...form, testimonials: next }); }} className="input-field min-h-[80px]" /></div>
+              <div className="grid grid-cols-3 gap-3">
+                <div><label className="label-text">Name</label><input value={t.name} onChange={(e) => { const next = [...(form.testimonials ?? DEFAULT_TESTIMONIALS)]; next[i] = { ...next[i], name: e.target.value }; setForm({ ...form, testimonials: next }); }} className="input-field" /></div>
+                <div><label className="label-text">Location</label><input value={t.location} onChange={(e) => { const next = [...(form.testimonials ?? DEFAULT_TESTIMONIALS)]; next[i] = { ...next[i], location: e.target.value }; setForm({ ...form, testimonials: next }); }} className="input-field" /></div>
+                <div><label className="label-text">Product</label><input value={t.product} onChange={(e) => { const next = [...(form.testimonials ?? DEFAULT_TESTIMONIALS)]; next[i] = { ...next[i], product: e.target.value }; setForm({ ...form, testimonials: next }); }} className="input-field" /></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <section className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6">
         <h2 className="text-lg font-semibold text-secondary-900 mb-6">Integrations</h2>
         <div className="space-y-4">
