@@ -64,6 +64,7 @@ Deno.serve(async (req: Request) => {
           .update({
             status: "paid",
             stripe_payment_intent_id: paymentIntentId,
+            livemode: event.livemode,
             updated_at: new Date().toISOString(),
           })
           .eq("stripe_session_id", session.id);

@@ -141,6 +141,7 @@ export interface Order {
   tracking_number: string | null;
   tracking_url: string | null;
   items: CartItem[];
+  livemode: boolean;
   created_at: string;
   updated_at: string;
 }

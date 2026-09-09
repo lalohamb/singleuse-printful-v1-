@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Search, Eye, X, Package, Truck, RefreshCw, CheckCircle, AlertTriangle } from "lucide-react";
+import { Search, Eye, X, Package, Truck, RefreshCw, CheckCircle, AlertTriangle, Trash2, Loader2 } from "lucide-react";
 import { supabase, formatPrice } from "@/lib/supabase";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
 import type { Order } from "@/types";
@@ -17,7 +17,9 @@ function Orders() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [modeFilter, setModeFilter] = useState("all");
   const [selected, setSelected] = useState<Order | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const fetchOrders = () => {
     setLoading(true);
@@ -38,8 +40,19 @@ function Orders() {
 
   const filtered = orders.filter((o) => {
     const matchesSearch = o.shipping_name.toLowerCase().includes(search.toLowerCase()) || o.email.toLowerCase().includes(search.toLowerCase()) || o.id.toLowerCase().includes(search.toLowerCase());
-    return matchesSearch && (statusFilter === "all" || o.status === statusFilter);
+    const matchesStatus = statusFilter === "all" || o.status === statusFilter;
+    const matchesMode = modeFilter === "all" || (modeFilter === "live" ? o.livemode : !o.livemode);
+    return matchesSearch && matchesStatus && matchesMode;
   });
+
+  const deleteOrder = async (id: string) => {
+    if (!confirm("Delete this test order from the database?")) return;
+    setDeleting(id);
+    await supabase.from("orders").delete().eq("id", id);
+    setOrders((prev) => prev.filter((o) => o.id !== id));
+    if (selected?.id === id) setSelected(null);
+    setDeleting(null);
+  };
 
   const updateStatus = async (id: string, status: string): Promise<boolean> => {
     if (status === "cancelled") {
@@ -84,6 +97,11 @@ function Orders() {
           <option value="all">All Status</option>
           {["pending","paid","fulfilled","partially-fulfilled","shipped","delivered","cancelled"].map((s) => <option key={s} value={s}>{s.split("-").map(w => w.charAt(0).toUpperCase()+w.slice(1)).join(" ")}</option>)}
         </select>
+        <select value={modeFilter} onChange={(e) => setModeFilter(e.target.value)} className="input-field py-2 w-auto">
+          <option value="all">Live + Test</option>
+          <option value="live">Live only</option>
+          <option value="test">Test only</option>
+        </select>
         <button onClick={fetchOrders} disabled={loading} className="flex items-center gap-2 text-sm text-secondary-500 hover:text-secondary-900 transition-colors">
           <RefreshCw size={15} className={loading ? "animate-spin" : ""} />Refresh
         </button>
@@ -101,6 +119,7 @@ function Orders() {
                   <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700 hidden lg:table-cell">Date</th>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700">Total</th>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700">Status</th>
+                  <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700 hidden sm:table-cell">Mode</th>
                   <th className="text-right px-4 py-3 text-sm font-semibold text-secondary-700">Actions</th>
                 </tr>
               </thead>
@@ -112,7 +131,21 @@ function Orders() {
                     <td className="px-4 py-3 text-sm text-secondary-600 hidden lg:table-cell">{new Date(order.created_at).toLocaleDateString()}</td>
                     <td className="px-4 py-3 font-medium text-secondary-900">{formatPrice(Number(order.total))}</td>
                     <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded-full ${statusColors[order.status] || "bg-secondary-100 text-secondary-500"}`}>{order.status}</span></td>
-                    <td className="px-4 py-3 text-right"><button onClick={(e) => { e.stopPropagation(); setSelected(order); }} className="p-2 text-secondary-500 hover:text-secondary-900 hover:bg-secondary-100 rounded-lg transition-colors"><Eye size={16} /></button></td>
+                    <td className="px-4 py-3 hidden sm:table-cell">
+                      {order.livemode
+                        ? <span className="text-xs px-2 py-1 rounded-full bg-success-50 text-success-700 font-medium">Live</span>
+                        : <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700 font-medium">Test</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button onClick={(e) => { e.stopPropagation(); setSelected(order); }} className="p-2 text-secondary-500 hover:text-secondary-900 hover:bg-secondary-100 rounded-lg transition-colors"><Eye size={16} /></button>
+                        {!order.livemode && (
+                          <button onClick={(e) => { e.stopPropagation(); deleteOrder(order.id); }} disabled={deleting === order.id} className="p-2 text-error-400 hover:text-error-600 hover:bg-error-50 rounded-lg transition-colors disabled:opacity-40">
+                            {deleting === order.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                          </button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
