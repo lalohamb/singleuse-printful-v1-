@@ -108,7 +108,7 @@ Deno.serve(async (req: Request) => {
                 <p>We'll send you another email when your order ships.</p>
                 <p></p>
                 <p>If you have any questions, feel free to reply to this email </p>
-                <p>or contact us at <a href="mailto:info@bodyandsleeves.com">info@bodyandsleeves.com</a></p>
+                <p>or contact us at <a href="mailto:info@bodyandsleeves.com?subject=Regarding Order #${session.id.slice(-8).toUpperCase()}">info@bodyandsleeves.com</a></p>
                 <p>Thanks for supporting our small business!</p>
                 <p>— Body & Sleeves</p>
               </div>`,
