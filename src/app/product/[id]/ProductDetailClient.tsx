@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, Minus, Plus, ShoppingBag, Check, Truck, RefreshCw } from "lucide-react";
 import { formatPrice } from "@/lib/supabase";
@@ -76,14 +77,14 @@ export default function ProductDetailClient({ product, related }: { product: Pro
       </button>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
         <div>
-          <div className="aspect-[3/4] rounded-2xl overflow-hidden bg-secondary-50 mb-4">
-            <img src={mainImage || product.image_url || ""} alt={product.title} className="w-full h-full object-cover transition-opacity duration-300" />
+          <div className="aspect-[3/4] rounded-2xl overflow-hidden bg-secondary-50 mb-4 relative">
+            <Image src={mainImage || product.image_url || "/logo.png"} alt={product.title} fill sizes="(max-width: 1024px) 100vw, 50vw" className="object-cover transition-opacity duration-300" priority />
           </div>
           {images.length > 1 && (
             <div className="flex gap-3 flex-wrap">
               {images.map((img, i) => (
-                <button key={i} onClick={() => setMainImage(img)} className={`w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${mainImage === img ? "border-secondary-900" : "border-transparent opacity-60 hover:opacity-100"}`}>
-                  <img src={img} alt="" className="w-full h-full object-cover" />
+                <button key={i} onClick={() => setMainImage(img)} className={`w-20 h-20 rounded-lg overflow-hidden border-2 transition-all relative ${mainImage === img ? "border-secondary-900" : "border-transparent opacity-60 hover:opacity-100"}`}>
+                  <Image src={img} alt="" fill sizes="80px" className="object-cover" />
                 </button>
               ))}
             </div>
@@ -103,7 +104,7 @@ export default function ProductDetailClient({ product, related }: { product: Pro
                   const active = selectedColor === c;
                   return (
                     <button key={c} onClick={() => pickColor(c)} title={c} aria-label={c} className={`relative rounded-lg border-2 transition-all ${active ? "border-secondary-900" : "border-secondary-200 hover:border-secondary-400"} ${img ? "w-14 h-14 overflow-hidden" : "px-3 py-2 text-sm font-medium"}`}>
-                    {img ? <img src={img} alt={c} className="w-full h-full object-cover" /> : c}
+                    {img ? <Image src={img} alt={c} fill sizes="56px" className="object-cover" /> : c}
                     </button>
                   );
                 })}

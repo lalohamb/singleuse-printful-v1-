@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { Product } from "@/types";
 import { formatPrice } from "@/lib/supabase";
 import { ACTIVE_FLAGS } from "@/lib/productFlags";
@@ -8,7 +9,7 @@ export default function ProductCard({ product }: { product: Product }) {
   return (
     <Link href={`/product/${product.id}`} className="group card overflow-hidden block">
       <div className="relative aspect-[3/4] overflow-hidden bg-secondary-50">
-        <img src={product.image_url || ""} alt={product.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+        <Image src={product.image_url || "/logo.png"} alt={product.title} fill sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw" className="object-cover transition-transform duration-500 group-hover:scale-105" />
         {badges.length > 0 && (
           <div className="absolute top-3 left-3 flex flex-col gap-1 items-start">
             {badges.map((f) => <span key={f.key as string} className={`text-xs font-bold px-3 py-1 rounded-full ${f.badgeClass}`}>{f.badge}</span>)}
