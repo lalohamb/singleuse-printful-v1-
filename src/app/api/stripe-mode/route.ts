@@ -30,7 +30,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
   }
 
-  const envPath = path.resolve(process.cwd(), ".env.local");
   const keys = getKeysFromEnvFile(mode as "live" | "test");
   if (!keys) {
     return NextResponse.json({ error: `.env.${mode} not found or missing Stripe keys` }, { status: 500 });
@@ -38,12 +37,18 @@ export async function POST(req: NextRequest) {
   const log: string[] = [];
 
   try {
-    // 1. Patch .env.local — replace only the two Stripe lines
-    let env = fs.readFileSync(envPath, "utf8");
-    env = env.replace(/^STRIPE_SECRET_KEY=.*/m, `STRIPE_SECRET_KEY=${keys.STRIPE_SECRET_KEY}`);
-    env = env.replace(/^STRIPE_WEBHOOK_SECRET=.*/m, `STRIPE_WEBHOOK_SECRET=${keys.STRIPE_WEBHOOK_SECRET}`);
-    fs.writeFileSync(envPath, env, "utf8");
-    log.push(`✅ .env.local updated with ${mode} keys`);
+    // On local (no PM2): patch .env.local so next dev picks up the new keys
+    const pm2Check = ["/usr/bin/pm2", "/usr/local/bin/pm2", "/root/.nvm/versions/node/v22/bin/pm2"].find(p => fs.existsSync(p));
+    if (!pm2Check) {
+      const envPath = path.resolve(process.cwd(), ".env.local");
+      if (fs.existsSync(envPath)) {
+        let env = fs.readFileSync(envPath, "utf8");
+        env = env.replace(/^STRIPE_SECRET_KEY=.*/m, `STRIPE_SECRET_KEY=${keys.STRIPE_SECRET_KEY}`);
+        env = env.replace(/^STRIPE_WEBHOOK_SECRET=.*/m, `STRIPE_WEBHOOK_SECRET=${keys.STRIPE_WEBHOOK_SECRET}`);
+        fs.writeFileSync(envPath, env, "utf8");
+        log.push(`✅ .env.local updated with ${mode} keys`);
+      }
+    }
 
     // 2. Push secrets to Supabase edge functions
     const secretsCmd = [
