@@ -259,7 +259,14 @@ function OrderDetailModal({ order, onClose, onUpdateStatus }: { order: Order; on
             <div className="space-y-3">
               {(Array.isArray(order.items) ? order.items : []).map((item, i) => (
                 <div key={i} className="flex items-center gap-3 pb-3 border-b border-secondary-50 last:border-0">
-                  <img src={item.image_url || "/logo.png"} alt={item.title} className="w-14 h-14 rounded-lg object-cover bg-secondary-100" onError={(e) => { (e.target as HTMLImageElement).src = "/logo.png"; }} />
+                  <img src={item.image_url || "/logo.png"} alt={item.title} className="w-14 h-14 rounded-lg object-cover bg-secondary-100" onError={async (e) => {
+                    const el = e.target as HTMLImageElement;
+                    if (item.product_id) {
+                      const { data } = await supabase.from("products").select("image_url").eq("id", item.product_id).maybeSingle();
+                      if (data?.image_url) { el.src = data.image_url; return; }
+                    }
+                    el.src = "/logo.png";
+                  }} />
                   <div className="flex-1 min-w-0"><p className="font-medium text-sm text-secondary-900">{item.title}</p><p className="text-xs text-secondary-500">{item.variant_label} - Qty: {item.quantity}</p></div>
                   <span className="font-semibold text-sm text-secondary-900">{formatPrice(item.price * item.quantity)}</span>
                 </div>
