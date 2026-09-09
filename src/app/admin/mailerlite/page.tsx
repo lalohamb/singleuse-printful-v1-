@@ -62,8 +62,8 @@ function AddSubscriberModal({ groups, onClose, onDone }: { groups: Group[]; onCl
   );
 }
 
-function EditSubscriberModal({ subscriber, groups, onClose, onDone }: { subscriber: Subscriber; groups: Group[]; onClose: () => void; onDone: () => void }) {
-  const [status, setStatus] = useState(subscriber.status);
+function EditSubscriberModal({ subscriber, groups, onClose, onDone }: { subscriber: Subscriber; groups: Group[]; onClose: () => void; onDone: (patch?: Partial<Subscriber>) => void }) {
+  const [status, setStatus] = useState(subscriber.type || subscriber.status);
   const [name, setName] = useState(subscriber.fields?.find((f: any) => f.key === "name")?.value || "");
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
@@ -73,7 +73,7 @@ function EditSubscriberModal({ subscriber, groups, onClose, onDone }: { subscrib
     setLoading(true); setError(null);
     const res = await post({ action: "update_subscriber", id: subscriber.id, status, fields: { name } });
     if (res.error) setError(res.error);
-    else { setDone(true); setTimeout(() => { onDone(); onClose(); }, 1000); }
+    else { setDone(true); setTimeout(() => { onDone({ type: status, status, fields: subscriber.fields?.map(f => f.key === "name" ? { ...f, value: name } : f) }); onClose(); }, 800); }
     setLoading(false);
   };
 
@@ -254,7 +254,7 @@ function MailerLiteDashboard() {
   const unsubscribeSub = async (id: string) => {
     setDeleting(id);
     await post({ action: "unsubscribe", id });
-    setSubscribers((p) => p.map((s) => s.id === id ? { ...s, status: "unsubscribed" } : s));
+    setSubscribers((p) => p.map((s) => s.id === id ? { ...s, type: "unsubscribed", status: "unsubscribed" } : s));
     setDeleting(null);
   };
 
@@ -358,7 +358,7 @@ function MailerLiteDashboard() {
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1">
                             <button onClick={() => { setSelectedSub(sub); setModal("edit_sub"); }} className="p-1.5 text-secondary-400 hover:text-primary-600 transition-colors" title="Edit"><Edit2 size={15} /></button>
-                            <button onClick={() => unsubscribeSub(sub.id)} disabled={deleting === sub.id || sub.status === "unsubscribed"} className="p-1.5 text-secondary-400 hover:text-warning-600 transition-colors disabled:opacity-30" title="Unsubscribe"><UserMinus size={15} /></button>
+                            <button onClick={() => unsubscribeSub(sub.id)} disabled={deleting === sub.id || sub.type === "unsubscribed" || sub.status === "unsubscribed"} className="p-1.5 text-secondary-400 hover:text-warning-600 transition-colors disabled:opacity-30" title="Unsubscribe"><UserMinus size={15} /></button>
                             <button onClick={() => deleteSub(sub.id)} disabled={deleting === sub.id} className="p-1.5 text-secondary-400 hover:text-error-600 transition-colors" title="Delete">
                               {deleting === sub.id ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
                             </button>
@@ -475,7 +475,7 @@ function MailerLiteDashboard() {
       </div>
 
       {modal === "add_sub" && <AddSubscriberModal groups={groups} onClose={() => setModal(null)} onDone={fetchAll} />}
-      {modal === "edit_sub" && selectedSub && <EditSubscriberModal subscriber={selectedSub} groups={groups} onClose={() => setModal(null)} onDone={fetchAll} />}
+      {modal === "edit_sub" && selectedSub && <EditSubscriberModal subscriber={selectedSub} groups={groups} onClose={() => setModal(null)} onDone={(patch) => { if (patch) setSubscribers((p) => p.map((s) => s.id === selectedSub.id ? { ...s, ...patch } : s)); else fetchAll(); }} />}
       {modal === "add_group" && <GroupModal onClose={() => setModal(null)} onDone={fetchAll} />}
       {modal === "edit_group" && selectedGroup && <GroupModal group={selectedGroup} onClose={() => setModal(null)} onDone={fetchAll} />}
       {modal === "create_campaign" && <CreateCampaignModal groups={groups} onClose={() => setModal(null)} onDone={fetchAll} />}
