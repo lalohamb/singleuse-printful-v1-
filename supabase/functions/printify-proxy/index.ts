@@ -368,6 +368,23 @@ Deno.serve(async (req: Request) => {
               }
             }
 
+            // Detect personalization options from Printify
+            let is_personalizable = false;
+            let personalization_label: string | null = null;
+            try {
+              const personalizationOptions = await printifyFetch(
+                `/shops/${shopId}/products/${detail.id}/personalization_options.json`,
+                token
+              );
+              const fields = Array.isArray(personalizationOptions) ? personalizationOptions : (personalizationOptions?.data || []);
+              if (fields.length > 0) {
+                is_personalizable = true;
+                personalization_label = fields[0].label || null;
+              }
+            } catch {
+              // Non-fatal — personalization stays as previous value
+            }
+
             // Commerce fields are always refreshed from Printify.
             const payload: Record<string, unknown> = {
               printify_id: String(detail.id),
@@ -377,6 +394,8 @@ Deno.serve(async (req: Request) => {
               status: detail.visible ? "active" : "draft",
               blueprint_id: String(detail.blueprint_id || ""),
               print_provider_id: String(detail.print_provider_id || ""),
+              is_personalizable,
+              personalization_label,
               updated_at: new Date().toISOString(),
             };
 

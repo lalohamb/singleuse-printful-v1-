@@ -81,6 +81,13 @@ export default function ProductDetailClient({ product, related }: { product: Pro
         <div>
           <div className="aspect-[3/4] rounded-2xl overflow-hidden bg-secondary-50 mb-4 relative">
             <Image src={mainImage || product.image_url || "/logo.png"} alt={product.title} fill sizes="(max-width: 1024px) 100vw, 50vw" className="object-cover transition-opacity duration-300" priority />
+            {product.is_personalizable && personalizationText.trim() && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <span className="bg-black/50 text-white text-xl font-bold px-5 py-3 rounded-xl tracking-wide text-center max-w-[80%] break-words backdrop-blur-sm">
+                  {personalizationText}
+                </span>
+              </div>
+            )}
           </div>
           {images.length > 1 && (
             <div className="flex gap-3 flex-wrap">
