@@ -49,3 +49,10 @@ pm2 restart bodyandsleeves --update-env
 
 ##'git reset --hard origin/main' forces the droplet to exactly match GitHub,
 ##overwriting any local divergence.
+
+====================================
+pm2 delete bodyandsleeves
+cd /var/www/bodyandsleeves
+pm2 start npm --name bodyandsleeves -- start
+pm2 save
+
