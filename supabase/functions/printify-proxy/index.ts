@@ -368,21 +368,21 @@ Deno.serve(async (req: Request) => {
               }
             }
 
-            // Detect personalization options from Printify
-            let is_personalizable = false;
-            let personalization_label: string | null = null;
+            // Detect personalization options from Printify.
+            // Only write these fields if the API responds — never overwrite with false on error.
+            let personalizationPayload: Record<string, unknown> = {};
             try {
               const personalizationOptions = await printifyFetch(
                 `/shops/${shopId}/products/${detail.id}/personalization_options.json`,
                 token
               );
               const fields = Array.isArray(personalizationOptions) ? personalizationOptions : (personalizationOptions?.data || []);
-              if (fields.length > 0) {
-                is_personalizable = true;
-                personalization_label = fields[0].label || null;
-              }
+              personalizationPayload = {
+                is_personalizable: fields.length > 0,
+                personalization_label: fields.length > 0 ? (fields[0].label || null) : null,
+              };
             } catch {
-              // Non-fatal — personalization stays as previous value
+              // Non-fatal — skip personalization fields so existing DB values are preserved
             }
 
             // Commerce fields are always refreshed from Printify.
@@ -394,8 +394,7 @@ Deno.serve(async (req: Request) => {
               status: detail.visible ? "active" : "draft",
               blueprint_id: String(detail.blueprint_id || ""),
               print_provider_id: String(detail.print_provider_id || ""),
-              is_personalizable,
-              personalization_label,
+              ...personalizationPayload,
               updated_at: new Date().toISOString(),
             };
 
