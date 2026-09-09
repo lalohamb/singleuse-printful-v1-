@@ -6,16 +6,23 @@ import path from "path";
 
 const execAsync = promisify(exec);
 
-const KEYS = {
-  live: {
-    STRIPE_SECRET_KEY: "STRIPE_LIVE_SECRET_KEY_REDACTED",
-    STRIPE_WEBHOOK_SECRET: "whsec_08V5JvZ6KocRdBB2PDoj6xrxaJEKfmXG",
-  },
-  test: {
-    STRIPE_SECRET_KEY: "STRIPE_SECRET_KEY_REDACTED",
-    STRIPE_WEBHOOK_SECRET: "whsec_j0pXblTz4FdVBON9vKEkA2ZpTtGrvgud",
-  },
-};
+function parseEnvFile(filePath: string): Record<string, string> {
+  if (!fs.existsSync(filePath)) return {};
+  return fs.readFileSync(filePath, "utf8")
+    .split("\n")
+    .reduce((acc, line) => {
+      const match = line.match(/^([^#=]+)=(.*)$/);
+      if (match) acc[match[1].trim()] = match[2].trim();
+      return acc;
+    }, {} as Record<string, string>);
+}
+
+function getKeysFromEnvFile(mode: "live" | "test") {
+  const file = path.resolve(process.cwd(), mode === "live" ? ".env.live" : ".env.test");
+  const env = parseEnvFile(file);
+  if (!env.STRIPE_SECRET_KEY || !env.STRIPE_WEBHOOK_SECRET) return null;
+  return { STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET: env.STRIPE_WEBHOOK_SECRET };
+}
 
 export async function POST(req: NextRequest) {
   const { mode } = await req.json() as { mode: string };
@@ -24,7 +31,10 @@ export async function POST(req: NextRequest) {
   }
 
   const envPath = path.resolve(process.cwd(), ".env.local");
-  const keys = KEYS[mode as "live" | "test"];
+  const keys = getKeysFromEnvFile(mode as "live" | "test");
+  if (!keys) {
+    return NextResponse.json({ error: `.env.${mode} not found or missing Stripe keys` }, { status: 500 });
+  }
   const log: string[] = [];
 
   try {

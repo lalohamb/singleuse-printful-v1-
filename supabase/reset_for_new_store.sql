@@ -1,0 +1,112 @@
+-- =============================================================================
+-- Body & Sleeves — New Store Reset
+-- Clears all transactional + content data, restores application defaults.
+-- Admins are NOT deleted — you stay logged in.
+-- Run in Supabase SQL Editor.
+-- =============================================================================
+
+-- ── 1. ORDERS (all of them) ───────────────────────────────────────────────────
+TRUNCATE TABLE orders RESTART IDENTITY CASCADE;
+
+-- ── 2. PRODUCTS ───────────────────────────────────────────────────────────────
+TRUNCATE TABLE products RESTART IDENTITY CASCADE;
+
+-- ── 3. CATEGORIES — clear and re-seed defaults ────────────────────────────────
+TRUNCATE TABLE categories RESTART IDENTITY CASCADE;
+
+INSERT INTO categories (name, slug, description) VALUES
+  ('T-Shirts',    't-shirts',    'Premium tees with culturally inspired designs'),
+  ('Hoodies',     'hoodies',     'Comfortable hoodies for every season'),
+  ('Hats',        'hats',        'Caps and headwear to complete your look'),
+  ('Sweatpants',  'sweatpants',  'Matching bottoms for your streetwear sets'),
+  ('Accessories', 'accessories', 'Tote bags, stickers, and more')
+ON CONFLICT (slug) DO NOTHING;
+
+-- ── 4. POLICIES — reset content, keep rows ────────────────────────────────────
+UPDATE policies SET content = '', updated_at = now();
+
+-- ── 5. SETTINGS — reset to application defaults ───────────────────────────────
+UPDATE settings SET
+  store_name              = 'Body & Sleeves',
+  tagline                 = 'Black-Owned. Made to Order.',
+  hero_title              = 'Empower Yourself. Empower the Culture.',
+  hero_subtitle           = 'Apparel celebrating Black culture, faith, and family. Every design made with intention, printed on demand, shipped to your door.',
+  hero_image_url          = 'https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
+  hero_object_position    = '0px 0px',
+  hero_height_vh          = 80,
+  hero_image_flip         = false,
+  hero_image_scale        = 1,
+  hero_gradient_opacity   = 0.4,
+  hero_gradient_dir       = 'to right',
+  hero_image_fit          = 'cover',
+  story_image_url         = null,
+  story_object_position   = '0px 0px',
+  story_image_scale       = 100,
+  story_image_flip        = false,
+  story_image_fit         = 'cover',
+  story_gradient_opacity  = 40,
+  story_gradient_dir      = 'full',
+  logo_url                = null,
+  logo_size               = 40,
+  our_why_image_url       = null,
+  our_why_object_position = '0px 0px',
+  our_why_height_vh       = 60,
+  our_why_label           = null,
+  our_why_quote           = null,
+  our_why_body            = null,
+  our_why_image_scale     = 1,
+  our_why_image_flip      = false,
+  our_why_image_fit       = 'cover',
+  our_why_gradient_opacity = 0.4,
+  our_why_gradient_dir    = 'to right',
+  announcement            = 'Made to order. Made with love. — Free shipping on orders over $75',
+  announcement_active     = true,
+  orders_paused           = false,
+  shipping_free_threshold = 75,
+  default_shipping_cost   = 6.99,
+  printify_connected      = false,
+  printify_shop_id        = null,
+  stripe_connected        = false,
+  promo_banner_active     = false,
+  promo_banner_title      = null,
+  promo_banner_body       = null,
+  promo_banner_cta_label  = null,
+  promo_banner_cta_url    = null,
+  promo_banner_bg_color   = '#1a1a1a',
+  testimonials            = '[
+    {"quote":"I wore my shirt to a family reunion and got so many compliments. This brand truly gets us.","name":"Jasmine T.","location":"Atlanta, GA","product":"Culture First Tee"},
+    {"quote":"The quality is unmatched. Soft, true to size, and the design is everything. Will be ordering again.","name":"Marcus W.","location":"Houston, TX","product":"Faith Over Fear Hoodie"},
+    {"quote":"Finally a brand that celebrates who we are. Every piece feels intentional and powerful.","name":"Aaliyah R.","location":"Chicago, IL","product":"Heritage Collection"}
+  ]'::jsonb,
+  social_links            = '{
+    "instagram": {"url": "https://instagram.com/body_and_sleeves", "enabled": true},
+    "tiktok":    {"url": "https://tiktok.com/@bodyandsleeves",      "enabled": true},
+    "facebook":  {"url": "https://facebook.com/bodyandsleeves",     "enabled": true},
+    "youtube":   {"url": "https://youtube.com/@bodyandsleeves",     "enabled": true},
+    "pinterest": {"url": "https://pinterest.com/bodyandsleeves",    "enabled": true},
+    "snapchat":  {"url": "https://snapchat.com/add/bodyandsleeves", "enabled": true},
+    "threads":   {"url": "https://threads.net/@bodyandsleeves",     "enabled": true},
+    "email":     {"url": "mailto:Hello.BodyandSleeves@gmail.com",   "enabled": true}
+  }'::jsonb,
+  updated_at              = now()
+WHERE id = (SELECT id FROM settings LIMIT 1);
+
+-- ── 6. SEO SETTINGS — reset to defaults ──────────────────────────────────────
+UPDATE seo_settings SET
+  site_url                 = 'https://bodyandsleeves.com',
+  default_og_image         = null,
+  sitemap_enabled          = true,
+  robots_noindex_admin     = true,
+  jsonld_enabled           = true,
+  canonical_enabled        = true,
+  meta_title_suffix        = '| Body & Sleeves',
+  twitter_handle           = '@body_and_sleeves',
+  google_site_verification = null,
+  updated_at               = now()
+WHERE id = '00000000-0000-0000-0000-000000000001';
+
+-- ── DONE ──────────────────────────────────────────────────────────────────────
+-- Tables cleared : orders, products, categories (re-seeded), policies (blanked)
+-- Tables reset   : settings, seo_settings
+-- Tables kept    : admins (you stay logged in)
+-- =============================================================================
