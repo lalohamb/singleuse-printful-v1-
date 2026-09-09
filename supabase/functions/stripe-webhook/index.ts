@@ -98,6 +98,7 @@ Deno.serve(async (req: Request) => {
                 <span style="display:block;padding-left:${item.image_url ? "116px" : "0"}">
                   <strong>${item.title}</strong><br/>
                   <span style="color:#666;font-size:13px">${item.variant_label} &times; ${item.quantity}</span>
+                  ${item.personalization_text ? `<span style="color:#7c3aed;font-size:12px;display:block;margin-top:2px">✏️ ${item.personalization_text}</span>` : ""}
                 </span>
               </td>
               <td style="padding:12px 0;vertical-align:top;text-align:right;white-space:nowrap">$${(item.price * item.quantity).toFixed(2)}</td>
@@ -144,6 +145,7 @@ Deno.serve(async (req: Request) => {
                 product_id: item.printify_id || undefined,
                 variant_id: parseInt(item.variant_id) || undefined,
                 quantity: item.quantity,
+                ...(item.personalization_text ? { print_details: [{ print_on_side: "front", text: item.personalization_text }] } : {}),
               })),
               shipping_method: 1,
               send_shipping_notification: false,
