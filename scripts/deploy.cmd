@@ -19,3 +19,8 @@ cd /var/www/bodyandsleeves
 git pull --rebase
 npm run build
 pm2 restart bodyandsleeves
+
+## git pull --rebase on prod
+git pull --rebase
+npm run build
+pm2 restart bodyandsleeves --update-env
