@@ -121,7 +121,12 @@ function GoLiveChecklist({ isLive, onSwitched }: { isLive: boolean; onSwitched: 
       });
       const data = await r.json();
       if (!r.ok) { setSwitchError(data.error || "Switch failed"); setSwitchLog(data.log || null); }
-      else { setSwitchLog(data.log); onSwitched(); }
+      else {
+        setSwitchLog(data.log + "\n\n⏳ Waiting for server restart...");
+        // Wait for PM2 to restart before re-fetching mode
+        await new Promise(res => setTimeout(res, 12_000));
+        onSwitched();
+      }
     } catch (e: any) {
       setSwitchError(e.message);
     }

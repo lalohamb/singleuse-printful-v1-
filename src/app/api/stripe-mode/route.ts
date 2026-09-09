@@ -52,18 +52,59 @@ export async function POST(req: NextRequest) {
     );
     log.push(`✅ Edge functions redeployed\n${(s2 + e2).trim()}`);
 
-    // 4. Rebuild + restart so Next.js picks up the new .env.local
-    const pm2Exists = fs.existsSync("/usr/bin/pm2") || fs.existsSync("/usr/local/bin/pm2");
-    if (pm2Exists) {
-      const pm2Bin = fs.existsSync("/usr/bin/pm2") ? "/usr/bin/pm2" : "/usr/local/bin/pm2";
+    // 4. Write ecosystem.config.js with updated env, then pm2 reload from it
+    const pm2Bin = ["/usr/bin/pm2", "/usr/local/bin/pm2", "/root/.nvm/versions/node/v22/bin/pm2"]
+      .find(p => fs.existsSync(p));
+
+    if (pm2Bin) {
       const appDir = process.cwd();
-      // Run build then restart in a detached shell so the process survives
+      const ecosystemPath = path.join(appDir, "ecosystem.config.js");
+
+      // Seed from current process.env so we don't lose other vars
+      let existingEnv: Record<string, string> = {};
+      const envKeysToPreserve = [
+        "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "PRINTIFY_SHOP_ID", "NEXT_PUBLIC_PRINTIFY_SHOP_ID", "PRINTIFY_API_TOKEN",
+        "RESEND_API_KEY", "MAILER_LITE_API_KEY",
+      ];
+      for (const k of envKeysToPreserve) {
+        if (process.env[k]) existingEnv[k] = process.env[k]!;
+      }
+      if (fs.existsSync(ecosystemPath)) {
+        // Extract current env block via regex — avoids eval
+        const content = fs.readFileSync(ecosystemPath, "utf8");
+        const m = content.match(/env\s*:\s*(\{[\s\S]*?\})/m);
+        if (m) {
+          try { existingEnv = JSON.parse(m[1].replace(/'/g, '"')); } catch {}
+        }
+      }
+
+      const mergedEnv = { ...existingEnv, ...keys };
+      const envLines = Object.entries(mergedEnv)
+        .map(([k, v]) => `    ${k}: '${v}'`)
+        .join(",\n");
+
+      const ecosystem = `module.exports = {
+  apps: [{
+    name: 'bodyandsleeves',
+    script: 'npm',
+    args: 'start',
+    cwd: '${appDir}',
+    env: {
+${envLines}
+    }
+  }]
+};
+`;
+      fs.writeFileSync(ecosystemPath, ecosystem, "utf8");
+      log.push(`✅ ecosystem.config.js written with ${mode} keys`);
+
       spawn(
         "/bin/bash",
-        ["-c", `cd ${appDir} && npm run build && ${pm2Bin} restart bodyandsleeves --update-env`],
+        ["-c", `${pm2Bin} restart ${ecosystemPath} --update-env`],
         { detached: true, stdio: "ignore" }
       ).unref();
-      log.push("✅ Rebuild + pm2 restart triggered (detached). Wait ~60s then refresh.");
+      log.push("✅ PM2 restart triggered. Wait ~10s then refresh.");
     } else {
       log.push("ℹ️ Running locally — restart your dev server to pick up the new keys.");
     }
