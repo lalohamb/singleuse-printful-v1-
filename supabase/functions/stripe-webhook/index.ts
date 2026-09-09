@@ -106,6 +106,10 @@ Deno.serve(async (req: Request) => {
                 <hr/>
                 <p><strong>Total: $${((session.amount_total ?? 0) / 100).toFixed(2)}</strong></p>
                 <p>We'll send you another email when your order ships.</p>
+                <p></p>
+                <p>If you have any questions, feel free to reply to this email </p>
+                <p>or contact us at <a href="mailto:info@bodyandsleeves.com">info@bodyandsleeves.com</a></p>
+                <p>Thanks for supporting our small business!</p>
                 <p>— Body & Sleeves</p>
               </div>`,
             }),
