@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Minus, Plus, ShoppingBag, Check, Truck, RefreshCw } from "lucide-react";
+import { ChevronLeft, Minus, Plus, ShoppingBag, Check, Truck, RefreshCw, Pencil } from "lucide-react";
 import { formatPrice } from "@/lib/supabase";
 import { useCart } from "@/lib/cart";
 import type { Product, ProductVariant } from "@/types";
@@ -50,6 +50,7 @@ export default function ProductDetailClient({ product, related }: { product: Pro
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(variants[0] || null);
   const [mainImage, setMainImage] = useState<string>(colorImage(variants[0]?.color || "") || images[0] || product.image_url || "");
   const [quantity, setQuantity] = useState(1);
+  const [personalizationText, setPersonalizationText] = useState("");
   const [added, setAdded] = useState(false);
 
   const pickColor = (c: string) => {
@@ -65,7 +66,8 @@ export default function ProductDetailClient({ product, related }: { product: Pro
 
   const handleAddToCart = () => {
     if (!selectedVariant) return;
-    addToCart(product, selectedVariant, quantity);
+    if (product.is_personalizable && !personalizationText.trim()) return;
+    addToCart(product, selectedVariant, quantity, personalizationText.trim() || undefined);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
@@ -124,13 +126,27 @@ export default function ProductDetailClient({ product, related }: { product: Pro
               </div>
             </div>
           )}
+          {product.is_personalizable && (
+            <div className="mt-6">
+              <label className="label-text flex items-center gap-1.5"><Pencil size={14} />{product.personalization_label || "Personalization"} <span className="text-error-500">*</span></label>
+              <input
+                type="text"
+                value={personalizationText}
+                onChange={(e) => setPersonalizationText(e.target.value)}
+                placeholder="Enter your custom text..."
+                maxLength={100}
+                className="input-field mt-1"
+              />
+              <p className="text-xs text-secondary-400 mt-1">{personalizationText.length}/100 characters</p>
+            </div>
+          )}
           <div className="mt-8 flex flex-col sm:flex-row gap-4">
             <div className="flex items-center border border-secondary-200 rounded-lg">
               <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="p-3 text-secondary-600 hover:text-secondary-900" aria-label="Decrease quantity"><Minus size={18} /></button>
               <span className="px-4 font-medium min-w-[3rem] text-center">{quantity}</span>
               <button onClick={() => setQuantity(quantity + 1)} className="p-3 text-secondary-600 hover:text-secondary-900" aria-label="Increase quantity"><Plus size={18} /></button>
             </div>
-            <button onClick={handleAddToCart} disabled={!selectedVariant} className="btn-primary flex-1">
+            <button onClick={handleAddToCart} disabled={!selectedVariant || (product.is_personalizable && !personalizationText.trim())} className="btn-primary flex-1">
               {added ? <><Check size={20} className="mr-2" />Added to Cart</> : <><ShoppingBag size={20} className="mr-2" />Add to Cart</>}
             </button>
           </div>

@@ -283,6 +283,8 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
     is_new_arrival: product?.is_new_arrival || false, is_trending: product?.is_trending || false,
     is_bestseller: product?.is_bestseller || false, is_on_sale: product?.is_on_sale || false,
     content_locked: product?.content_locked || false,
+    is_personalizable: product?.is_personalizable || false,
+    personalization_label: product?.personalization_label || "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -304,6 +306,8 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
       is_new_arrival: form.is_new_arrival, is_trending: form.is_trending,
       is_bestseller: form.is_bestseller, is_on_sale: form.is_on_sale,
       content_locked: form.content_locked || textChanged,
+      is_personalizable: form.is_personalizable,
+      personalization_label: form.personalization_label || null,
       images: form.image_url ? [form.image_url] : [], updated_at: new Date().toISOString(),
     };
     const result = product ? await supabase.from("products").update(payload).eq("id", product.id) : await supabase.from("products").insert({ ...payload, variants: [{ id: "S", label: "Small", color: "Default" }] });
@@ -349,6 +353,19 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
               <button type="button" onClick={() => setForm({ ...form, content_locked: false })} className="underline font-medium flex-shrink-0">Unlock</button>
             </div>
           )}
+          <div className="border-t border-secondary-100 pt-4">
+            <label className="flex items-center gap-2 cursor-pointer mb-3">
+              <input type="checkbox" checked={form.is_personalizable} onChange={(e) => setForm({ ...form, is_personalizable: e.target.checked })} className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500" />
+              <span className="text-sm font-medium text-secondary-700">Allow personalization (custom text)</span>
+            </label>
+            {form.is_personalizable && (
+              <div>
+                <label className="label-text">Personalization prompt label</label>
+                <input value={form.personalization_label} onChange={(e) => setForm({ ...form, personalization_label: e.target.value })} className="input-field" placeholder="e.g. Name to print, Custom message..." />
+                <p className="text-xs text-secondary-400 mt-1">This label appears above the text input on the product page.</p>
+              </div>
+            )}
+          </div>
           {error && <div className="bg-error-50 border border-error-100 text-error-700 rounded-lg p-3 text-sm">{error}</div>}
         </div>
         <div className="flex gap-3 p-6 border-t border-secondary-100 sticky bottom-0 bg-white rounded-b-2xl">

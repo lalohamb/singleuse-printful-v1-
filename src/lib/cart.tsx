@@ -13,8 +13,8 @@ type CartAction =
 function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
     case "ADD": {
-      const existing = state.items.find(i => i.product_id === action.item.product_id && i.variant_id === action.item.variant_id);
-      if (existing) return { ...state, items: state.items.map(i => i.product_id === action.item.product_id && i.variant_id === action.item.variant_id ? { ...i, quantity: i.quantity + action.item.quantity } : i), isOpen: true };
+      const existing = state.items.find(i => i.product_id === action.item.product_id && i.variant_id === action.item.variant_id && i.personalization_text === action.item.personalization_text);
+      if (existing) return { ...state, items: state.items.map(i => i.product_id === action.item.product_id && i.variant_id === action.item.variant_id && i.personalization_text === action.item.personalization_text ? { ...i, quantity: i.quantity + action.item.quantity } : i), isOpen: true };
       return { ...state, items: [...state.items, action.item], isOpen: true };
     }
     case "REMOVE": return { ...state, items: state.items.filter(i => !(i.product_id === action.product_id && i.variant_id === action.variant_id)) };
@@ -31,7 +31,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
 }
 
 interface CartContextValue extends CartState {
-  addToCart: (product: Product, variant: ProductVariant, quantity: number) => void;
+  addToCart: (product: Product, variant: ProductVariant, quantity: number, personalization_text?: string) => void;
   removeFromCart: (product_id: string, variant_id: string) => void;
   updateQuantity: (product_id: string, variant_id: string, quantity: number) => void;
   clearCart: () => void;
@@ -64,7 +64,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const value: CartContextValue = {
     ...state,
-    addToCart: (product, variant, quantity) => dispatch({ type: "ADD", item: { product_id: product.id, title: product.title, price: product.price, image_url: product.image_url || "", quantity, variant_id: variant.id, variant_label: variant.label, printify_id: product.printify_id, blueprint_id: product.blueprint_id, print_provider_id: product.print_provider_id } }),
+    addToCart: (product, variant, quantity, personalization_text) => dispatch({ type: "ADD", item: { product_id: product.id, title: product.title, price: product.price, image_url: product.image_url || "", quantity, variant_id: variant.id, variant_label: variant.label, printify_id: product.printify_id, blueprint_id: product.blueprint_id, print_provider_id: product.print_provider_id, personalization_text: personalization_text || undefined } }),
     removeFromCart: (product_id, variant_id) => dispatch({ type: "REMOVE", product_id, variant_id }),
     updateQuantity: (product_id, variant_id, quantity) => dispatch({ type: "UPDATE_QTY", product_id, variant_id, quantity }),
     clearCart: () => dispatch({ type: "CLEAR" }),

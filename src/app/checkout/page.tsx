@@ -113,6 +113,7 @@ export default function CheckoutPage() {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm text-secondary-900 truncate">{item.title}</p>
                     <p className="text-xs text-secondary-500">{item.variant_label}</p>
+                    {item.personalization_text && <p className="text-xs text-primary-600 font-medium">✏️ {item.personalization_text}</p>}
                     <p className="text-xs text-secondary-500">Qty: {item.quantity}</p>
                   </div>
                   <span className="font-semibold text-sm text-secondary-900">{formatPrice(item.price * item.quantity)}</span>

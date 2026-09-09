@@ -24,6 +24,8 @@ export interface Product {
   is_bestseller: boolean;
   is_on_sale: boolean;
   content_locked: boolean;
+  is_personalizable: boolean;
+  personalization_label: string | null;
   print_provider_id: string | null;
   blueprint_id: string | null;
   variants: ProductVariant[];
@@ -51,6 +53,7 @@ export interface CartItem {
   printify_id: string | null;
   blueprint_id: string | null;
   print_provider_id: string | null;
+  personalization_text?: string;
 }
 
 export interface StoreSettings {

@@ -61,6 +61,7 @@ export default function CartDrawer() {
                       <div className="min-w-0 flex-1">
                         <p className="font-medium text-secondary-900 break-words">{item.title}</p>
                         <p className="text-sm text-secondary-500 break-words">{item.variant_label}</p>
+                        {item.personalization_text && <p className="text-xs text-primary-600 font-medium mt-0.5">✏️ {item.personalization_text}</p>}
                       </div>
                       <button onClick={() => removeFromCart(item.product_id, item.variant_id)} className="text-secondary-400 hover:text-error-500 transition-colors p-1" aria-label="Remove item"><Trash2 size={18} /></button>
                     </div>
