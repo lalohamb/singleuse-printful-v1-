@@ -66,7 +66,7 @@ export async function getShippingQuote({
 }
 export async function createStripeCheckout(payload: {
   items: Array<{
-    product_id: string; title: string; price: number; image_url: string;
+    product_id: string; title: string; price: number; image_url?: string;
     quantity: number; variant_id: string; variant_label: string; printify_id: string | null;
   }>;
   shipping_address: { line1: string; line2?: string; city: string; state: string; zip: string; country: string };
