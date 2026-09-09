@@ -96,7 +96,13 @@ Deno.serve(async (req: Request) => {
         shipping_cost: String(shipping_cost || 0),
         subtotal: String(subtotal),
         total: String(total),
-        items: JSON.stringify(items),
+        items: JSON.stringify(items.map((item: any) => ({
+          printify_id: item.printify_id,
+          variant_id: item.variant_id,
+          quantity: item.quantity,
+          title: item.title?.slice(0, 60),
+          price: item.price,
+        }))),
       },
       shipping_address_collection: {
         allowed_countries: ["US", "CA", "GB", "AU"],
