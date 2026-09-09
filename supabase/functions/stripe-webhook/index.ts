@@ -101,7 +101,7 @@ Deno.serve(async (req: Request) => {
         const { data: settingsData } = await supabase.from("settings").select("printify_shop_id").limit(1).maybeSingle();
         const printifyShopId = settingsData?.printify_shop_id || Deno.env.get("PRINTIFY_SHOP_ID");
 
-        if (printifyToken && printifyShopId && session.metadata?.items) {
+        if (printifyToken && printifyShopId && session.metadata?.items && event.livemode) {
           try {
             const items = JSON.parse(session.metadata.items);
             const shippingAddress = JSON.parse(session.metadata.shipping_address || "{}");
