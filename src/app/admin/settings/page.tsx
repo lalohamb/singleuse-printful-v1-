@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Save, Loader2, Check, Store, CreditCard, Printer, Send, Mail, Share2 } from "lucide-react";
+import { Save, Loader2, Check, Store, CreditCard, Printer, Send, Mail, Share2, AlertTriangle, Eye, EyeOff } from "lucide-react";
 import type { StoreSettings } from "@/types";
 
 type SocialKey = keyof StoreSettings["social_links"];
@@ -47,6 +47,89 @@ function StatusBadge({ status }: { status: "checking" | "connected" | "warning" 
   return <span className={`text-xs px-3 py-1 rounded-full ${map[status]}`}>{labels[status]}</span>;
 }
 
+const WEBHOOK_URL = "https://SUPABASE_PROJECT_REF_REDACTED.supabase.co/functions/v1/stripe-webhook";
+
+function StripeConfigSection({ stripeOk }: { stripeOk: "checking" | "connected" | "warning" | "disconnected" }) {
+  const [secretKey, setSecretKey] = useState("");
+  const [showKey, setShowKey] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [result, setResult] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const isLiveKey = secretKey.startsWith("sk_live");
+  const isTestKey = secretKey.startsWith("sk_test");
+
+  const handleSave = async () => {
+    if (!secretKey) return;
+    setSaving(true); setResult(null);
+    try {
+      const res = await fetch("/api/stripe-admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "register_webhook", secret_key: secretKey, webhook_url: WEBHOOK_URL }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setResult({
+        type: "success",
+        msg: `Webhook registered! Copy this signing secret and set it as STRIPE_WEBHOOK_SECRET in your Supabase secrets: ${data.signing_secret}`,
+      });
+    } catch (e: any) {
+      setResult({ type: "error", msg: e.message });
+    }
+    setSaving(false);
+  };
+
+  return (
+    <div className="border border-secondary-100 rounded-lg overflow-hidden">
+      <div className="flex items-center justify-between p-4 bg-secondary-50">
+        <div className="flex items-center gap-3">
+          <CreditCard size={22} className={stripeOk === "connected" ? "text-success-500" : stripeOk === "warning" ? "text-warning-500" : "text-secondary-400"} />
+          <div>
+            <p className="font-medium text-secondary-900">Stripe</p>
+            <p className="text-sm text-secondary-500">Payment processing</p>
+          </div>
+        </div>
+        <StatusBadge status={stripeOk} />
+      </div>
+      <div className="p-4 space-y-3">
+        <div>
+          <label className="label-text">Secret Key</label>
+          <div className="relative">
+            <input
+              type={showKey ? "text" : "password"}
+              value={secretKey}
+              onChange={(e) => { setSecretKey(e.target.value); setResult(null); }}
+              placeholder="sk_test_... or sk_live_..."
+              className="input-field pr-10"
+            />
+            <button type="button" onClick={() => setShowKey((s) => !s)} className="absolute right-3 top-2.5 text-secondary-400 hover:text-secondary-700">
+              {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+          {secretKey && (
+            <p className={`text-xs mt-1 flex items-center gap-1 ${isLiveKey ? "text-success-600" : isTestKey ? "text-amber-600" : "text-error-600"}`}>
+              {isLiveKey ? "✓ Live key — real payments" : isTestKey ? "⚠ Test key — no real money" : "✗ Invalid key format"}
+            </p>
+          )}
+        </div>
+        <p className="text-xs text-secondary-500">Entering a key will register the webhook endpoint automatically. The signing secret will be shown — copy it and run: <code className="bg-secondary-100 px-1 rounded">npx supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_... --project-ref SUPABASE_PROJECT_REF_REDACTED</code></p>
+        {result && (
+          <div className={`rounded-lg p-3 text-xs ${result.type === "success" ? "bg-success-50 border border-success-200 text-success-800" : "bg-error-50 border border-error-100 text-error-700"}`}>
+            {result.type === "success" && <p className="font-semibold mb-1">✓ Webhook registered successfully</p>}
+            <p className="break-all">{result.msg}</p>
+          </div>
+        )}
+        <button
+          onClick={handleSave}
+          disabled={saving || (!isLiveKey && !isTestKey)}
+          className="btn-primary py-2 text-sm"
+        >
+          {saving ? <><Loader2 size={15} className="mr-2 animate-spin" />Registering...</> : "Save Key & Register Webhook"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Settings() {
   const [settings, setSettings] = useState<StoreSettings | null>(null);
   const [form, setForm] = useState<Partial<StoreSettings>>({});
@@ -70,7 +153,8 @@ function Settings() {
     supabase.from("settings").select("*").limit(1).maybeSingle().then(({ data }) => {
       if (data) {
         setSettings(data as StoreSettings);
-        setForm(data as StoreSettings);
+        const envShopId = process.env.NEXT_PUBLIC_PRINTIFY_SHOP_ID;
+        setForm({ ...data as StoreSettings, printify_shop_id: (data as StoreSettings).printify_shop_id || envShopId || "" });
         if (data.social_links) setSocial(data.social_links as StoreSettings["social_links"]);
         if (data.hero_height_vh) setHeroPreviewH(data.hero_height_vh);
         if (data.our_why_height_vh) setOurWhyPreviewH(data.our_why_height_vh);
@@ -483,10 +567,7 @@ function Settings() {
               <span className={`text-xs px-3 py-1 rounded-full ${settings?.printify_connected ? "bg-success-50 text-success-600" : "bg-secondary-100 text-secondary-500"}`}>{settings?.printify_connected ? "Connected" : "Not Connected"}</span>
             </div>
           <div><label className="label-text">Printify Shop ID</label><input value={form.printify_shop_id || ""} onChange={(e) => setForm({ ...form, printify_shop_id: e.target.value })} className="input-field" placeholder="e.g. 12345678" /><p className="text-xs text-secondary-400 mt-1">Find this in your Printify dashboard URL or via the API</p></div>
-          <div className="flex items-center justify-between p-4 bg-secondary-50 rounded-lg">
-              <div className="flex items-center gap-3"><CreditCard size={22} className={stripeOk === "connected" ? "text-success-500" : stripeOk === "warning" ? "text-warning-500" : "text-secondary-400"} /><div><p className="font-medium text-secondary-900">Stripe</p><p className="text-sm text-secondary-500">Payment processing</p></div></div>
-              <StatusBadge status={stripeOk} />
-            </div>
+          <StripeConfigSection stripeOk={stripeOk} />
           <div className="flex items-center justify-between p-4 bg-secondary-50 rounded-lg">
               <div className="flex items-center gap-3"><Send size={22} className={mailerOk === "connected" ? "text-success-500" : mailerOk === "warning" ? "text-warning-500" : "text-secondary-400"} /><div><p className="font-medium text-secondary-900">MailerLite</p><p className="text-sm text-secondary-500">Email marketing</p></div></div>
               <StatusBadge status={mailerOk} />

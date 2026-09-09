@@ -14,10 +14,15 @@ function CheckoutSuccessContent() {
 
   useEffect(() => {
     if (!sessionId) { setLoading(false); return; }
-    supabase.from("orders").select("*").eq("stripe_session_id", sessionId).maybeSingle().then(({ data }) => {
-      if (data) setOrder(data as Order);
-      setLoading(false);
-    });
+    let attempts = 0;
+    const poll = async () => {
+      const { data } = await supabase.from("orders").select("*").eq("stripe_session_id", sessionId).maybeSingle();
+      if (data) { setOrder(data as Order); setLoading(false); return; }
+      attempts++;
+      if (attempts < 6) setTimeout(poll, 1500);
+      else setLoading(false);
+    };
+    poll();
   }, [sessionId]);
 
   if (loading) return <div className="max-w-2xl mx-auto px-4 py-20 text-center"><div className="inline-block animate-spin rounded-full h-8 w-8 border-2 border-secondary-300 border-t-secondary-900" /></div>;

@@ -21,6 +21,7 @@ function Products() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [activating, setActivating] = useState<string | null>(null);
   const [togglingStatus, setTogglingStatus] = useState<string | null>(null);
+  const [webhookInfoDismissed, setWebhookInfoDismissed] = useState(false);
 
   const fetchData = () => {
     Promise.all([
@@ -80,14 +81,14 @@ function Products() {
     setSyncing(true); setSyncMsg(null);
     try {
       const { data: settingsData } = await supabase.from("settings").select("printify_shop_id").limit(1).maybeSingle();
-      const shopId = settingsData?.printify_shop_id;
+      const shopId = settingsData?.printify_shop_id || process.env.NEXT_PUBLIC_PRINTIFY_SHOP_ID;
       if (!shopId) { setSyncMsg("No Printify Shop ID set. Add it in Admin → Settings."); setSyncing(false); return; }
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
       const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
       const res = await fetch(`${supabaseUrl}/functions/v1/printify-proxy/sync?shop_id=${shopId}`, { method: "POST", headers: { Authorization: `Bearer ${anonKey}`, "Content-Type": "application/json" } });
       if (!res.ok) { const err = await res.json().catch(() => ({ error: "Sync failed" })); throw new Error(err.error || "Sync failed"); }
       const data = await res.json();
-      setSyncMsg(`Synced ${data.synced || 0} products from Printify!`);
+      setSyncMsg(`Synced ${data.synced || 0} products from Printify${data.deleted ? ` · ${data.deleted} removed` : ""}.`);
       fetchData();
     } catch (err) { setSyncMsg(err instanceof Error ? err.message : "Sync failed"); }
     finally { setSyncing(false); }
@@ -95,6 +96,19 @@ function Products() {
 
   return (
     <div className="space-y-6">
+      
+      {syncMsg && <div className="bg-primary-50 border border-primary-100 text-primary-700 rounded-lg p-3 text-sm">{syncMsg}</div>}
+      {!webhookInfoDismissed && products.some((p) => p.printify_id) && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start justify-between gap-3">
+          <div className="flex items-start gap-2 text-sm text-amber-800">
+            <AlertTriangle size={16} className="flex-shrink-0 mt-0.5 text-amber-500" />
+            <span>
+              <strong>Printify publish flow:</strong> When you click "Publish" on a product in Printify, it fires a webhook → this site confirms back → product becomes active. If a product is stuck at <em>"Publishing"</em> in Printify, the webhook confirmation failed — redeploy the <code className="bg-amber-100 px-1 rounded">printify-webhook</code> edge function and try publishing again.
+            </span>
+          </div>
+          <button onClick={() => setWebhookInfoDismissed(true)} className="flex-shrink-0 text-amber-500 hover:text-amber-700"><X size={16} /></button>
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="relative flex-1 max-w-xs"><Search size={18} className="absolute left-3 top-2.5 text-secondary-400" /><input type="text" placeholder="Search products..." value={search} onChange={(e) => setSearch(e.target.value)} className="input-field pl-10 py-2" /></div>
         <div className="flex items-center gap-3">
@@ -102,12 +116,15 @@ function Products() {
           <button onClick={() => { setEditing(null); setShowModal(true); }} className="btn-primary py-2"><Plus size={18} className="mr-2" />Add Product</button>
         </div>
       </div>
-      {syncMsg && <div className="bg-primary-50 border border-primary-100 text-primary-700 rounded-lg p-3 text-sm">{syncMsg}</div>}
-
       {/* Tab switcher */}
       <div className="flex gap-1 bg-secondary-100 p-1 rounded-lg w-fit">
         <button onClick={() => setTab("active")} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === "active" ? "bg-white text-secondary-900 shadow-sm" : "text-secondary-500 hover:text-secondary-700"}`}>
           Active <span className="ml-1.5 text-xs bg-success-100 text-success-700 px-1.5 py-0.5 rounded-full">{activeFiltered.length}</span>
+          {activeFiltered.filter(p => !p.printify_id).length > 0 && (
+            <span className="ml-1 text-xs bg-gold-500/20 text-gold-600 px-1.5 py-0.5 rounded-full" title="Includes manually added products not linked to Printify">
+              {activeFiltered.filter(p => !p.printify_id).length} manual
+            </span>
+          )}
         </button>
         <button onClick={() => setTab("inactive")} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === "inactive" ? "bg-white text-secondary-900 shadow-sm" : "text-secondary-500 hover:text-secondary-700"}`}>
           Inactive &amp; Unsynced <span className="ml-1.5 text-xs bg-secondary-200 text-secondary-600 px-1.5 py-0.5 rounded-full">{inactiveFiltered.length}</span>
@@ -155,7 +172,17 @@ function Products() {
                         <td className="px-4 py-3"><div className="flex items-center gap-3"><img src={p.image_url || ""} alt={p.title} className="w-12 h-12 rounded-lg object-cover bg-secondary-100 flex-shrink-0" /><div className="min-w-0 max-w-[240px]"><p className="font-medium text-secondary-900 truncate flex items-center gap-1">{p.content_locked && <Lock size={12} className="text-warning-500 flex-shrink-0" aria-label="Content locked" />}{p.title}</p>{p.printify_id && <p className="text-xs text-secondary-400 truncate">Printify: {p.printify_id}</p>}</div></div></td>
                         <td className="px-4 py-3 text-sm text-secondary-600 hidden md:table-cell">{categories.find((c) => c.id === p.category_id)?.name || "Uncategorized"}</td>
                         <td className="px-4 py-3 font-medium text-secondary-900">{formatPrice(p.price)}</td>
-                        <td className="px-4 py-3 hidden lg:table-cell"><span className={`text-xs px-2 py-1 rounded-full ${p.status === "active" ? "bg-success-50 text-success-600" : p.status === "draft" ? "bg-warning-50 text-warning-600" : "bg-secondary-100 text-secondary-500"}`}>{p.status}</span></td>
+                        <td className="px-4 py-3 hidden lg:table-cell">
+  <span className={`text-xs px-2 py-1 rounded-full ${p.status === "active" ? "bg-success-50 text-success-600" : p.status === "draft" ? "bg-warning-50 text-warning-600" : "bg-secondary-100 text-secondary-500"}`}>
+    {p.status}
+  </span>
+  {p.status === "active" && p.printify_id && (
+    <span title="Active via Printify sync — published through webhook handshake or visible=true on Printify" className="ml-1.5 text-[10px] text-secondary-400 cursor-help">via Printify</span>
+  )}
+  {p.status === "active" && !p.printify_id && (
+    <span title="Manually added product — not linked to Printify" className="ml-1.5 text-[10px] text-gold-500 cursor-help">via Manual</span>
+  )}
+</td>
                         <td className="px-4 py-3 hidden lg:table-cell"><div className="flex flex-wrap gap-1">{ACTIVE_FLAGS.filter((f) => f.key !== "featured" && (p as unknown as Record<string, boolean>)[f.key as string]).map((f) => <span key={f.key as string} className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${f.badgeClass}`}>{f.badge}</span>)}</div></td>
                         <td className="px-4 py-3"><button onClick={() => handleToggleFeatured(p)} className="p-1.5 rounded-lg hover:bg-secondary-100 transition-colors"><Star size={18} className={p.featured ? "fill-gold-500 text-gold-500" : "text-secondary-300"} /></button></td>
                         <td className="px-4 py-3"><div className="flex items-center justify-end gap-1"><button onClick={() => handleSetDraft(p.id)} disabled={togglingStatus === p.id} title="Set to Draft" className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-warning-600 bg-warning-50 hover:bg-warning-100 border border-warning-200 rounded-lg transition-colors disabled:opacity-40">{togglingStatus === p.id ? <Loader2 size={13} className="animate-spin" /> : <EyeOff size={13} />}Draft</button><button onClick={() => { setEditing(p); setShowModal(true); }} className="p-2 text-secondary-500 hover:text-secondary-900 hover:bg-secondary-100 rounded-lg transition-colors"><Edit2 size={16} /></button><button onClick={() => handleDelete(p.id)} className="p-2 text-secondary-500 hover:text-error-500 hover:bg-error-50 rounded-lg transition-colors"><Trash2 size={16} /></button></div></td>

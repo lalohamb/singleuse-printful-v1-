@@ -28,7 +28,12 @@ function getPrintifyToken(): string | null {
 }
 
 async function printifyFetch(path: string, token: string, options: RequestInit = {}): Promise<any> {
-  const res = await fetch(`${PRINTIFY_API_BASE}${path}`, {
+  // SSRF guard — only allow requests to the Printify API
+  const fullUrl = `${PRINTIFY_API_BASE}${path}`;
+  if (!fullUrl.startsWith(PRINTIFY_API_BASE)) {
+    throw new Error("Invalid Printify path");
+  }
+  const res = await fetch(fullUrl, {
     ...options,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -37,8 +42,16 @@ async function printifyFetch(path: string, token: string, options: RequestInit =
     },
   });
   const text = await res.text();
-  let body;
-  try { body = JSON.parse(text); } catch { body = text; }
+  let body: unknown;
+  try {
+    const parsed = JSON.parse(text);
+    // Deserialization guard — only accept plain objects or arrays
+    if (parsed !== null && typeof parsed === "object") {
+      body = parsed;
+    } else {
+      body = text;
+    }
+  } catch { body = text; }
   if (!res.ok) {
     throw new Error(`Printify API error ${res.status}: ${typeof body === "string" ? body : JSON.stringify(body)}`);
   }
@@ -161,6 +174,18 @@ Deno.serve(async (req: Request) => {
       return jsonResponse(order);
     }
 
+    // POST /orders/:id/cancel — cancel an order in Printify
+    if (req.method === "POST" && segments[0] === "orders" && segments[1] === "cancel") {
+      const { shop_id, printify_order_id } = await req.json();
+      if (!shop_id || !printify_order_id) return errorResponse("shop_id and printify_order_id required", 400);
+      const result = await printifyFetch(
+        `/shops/${shop_id}/orders/${printify_order_id}/cancellation.json`,
+        token,
+        { method: "POST" }
+      );
+      return jsonResponse(result);
+    }
+
     // GET /shipping — calculate shipping options
     if (req.method === "GET" && segments[0] === "shipping") {
       const shopId = url.searchParams.get("shop_id");
@@ -227,7 +252,9 @@ Deno.serve(async (req: Request) => {
       if (!shopId) return errorResponse("shop_id query parameter is required", 400);
 
       const synced: string[] = [];
+      const printifyIds = new Set<string>(); // all IDs seen from Printify listing
       const errors: Array<{ id: string; error: string }> = [];
+      const shippingCache = new Map<string, unknown>(); // "blueprintId:providerId" -> profile
       let page = 1;
       let lastPage = 1;
 
@@ -250,6 +277,7 @@ Deno.serve(async (req: Request) => {
         lastPage = Number(listing.last_page) || 1;
 
         for (const p of listing.data || []) {
+          printifyIds.add(String(p.id));
           try {
             const detail = await printifyFetch(
               `/shops/${shopId}/products/${p.id}.json`,
@@ -354,13 +382,18 @@ Deno.serve(async (req: Request) => {
 
             // Fetch static shipping profile for this blueprint/provider and
             // store it so the checkout can calculate rates without a live API call.
+            // Cache by blueprint:provider to avoid redundant API calls across products.
             if (detail.blueprint_id && detail.print_provider_id) {
+              const cacheKey = `${detail.blueprint_id}:${detail.print_provider_id}`;
               try {
-                const shippingProfile = await printifyFetch(
-                  `/catalog/blueprints/${detail.blueprint_id}/print_providers/${detail.print_provider_id}/shipping.json`,
-                  token
-                );
-                payload.shipping_info = shippingProfile;
+                if (!shippingCache.has(cacheKey)) {
+                  const shippingProfile = await printifyFetch(
+                    `/catalog/blueprints/${detail.blueprint_id}/print_providers/${detail.print_provider_id}/shipping.json`,
+                    token
+                  );
+                  shippingCache.set(cacheKey, shippingProfile);
+                }
+                payload.shipping_info = shippingCache.get(cacheKey);
               } catch {
                 // Non-fatal — shipping_info stays as previous value
               }
@@ -408,11 +441,61 @@ Deno.serve(async (req: Request) => {
         })
         .neq("id", "00000000-0000-0000-0000-000000000000");
 
+      // Remove any DB products whose printify_id is no longer in Printify.
+      const { data: dbRows } = await supabase
+        .from("products")
+        .select("id, printify_id")
+        .not("printify_id", "is", null);
+
+      const staleIds = (dbRows || [])
+        .filter((r: any) => !printifyIds.has(String(r.printify_id)))
+        .map((r: any) => r.id);
+
+      let deleted = 0;
+      if (staleIds.length) {
+        const { error: delError } = await supabase.from("products").delete().in("id", staleIds);
+        if (!delError) deleted = staleIds.length;
+      }
+
       return jsonResponse({
         synced: synced.length,
+        deleted,
         errors: errors.length,
         error_details: errors.slice(0, 10),
       });
+    }
+
+    // POST /cleanup — delete DB products whose printify_id is no longer in Printify
+    if (req.method === "POST" && segments[0] === "cleanup") {
+      const shopId = url.searchParams.get("shop_id");
+      if (!shopId) return errorResponse("shop_id query parameter is required", 400);
+
+      // Collect all current Printify product IDs
+      const liveIds = new Set<string>();
+      let page = 1, lastPage = 1;
+      do {
+        const listing = await printifyFetch(`/shops/${shopId}/products.json?limit=50&page=${page}`, token);
+        lastPage = Number(listing.last_page) || 1;
+        for (const p of listing.data || []) liveIds.add(String(p.id));
+        page++;
+      } while (page <= lastPage);
+
+      // Fetch all DB rows that have a printify_id
+      const { data: dbRows } = await supabase
+        .from("products")
+        .select("id, printify_id")
+        .not("printify_id", "is", null);
+
+      const staleIds = (dbRows || [])
+        .filter((r: any) => !liveIds.has(String(r.printify_id)))
+        .map((r: any) => r.id);
+
+      if (!staleIds.length) return jsonResponse({ deleted: 0, message: "Nothing to clean up" });
+
+      const { error } = await supabase.from("products").delete().in("id", staleIds);
+      if (error) return errorResponse(error.message);
+
+      return jsonResponse({ deleted: staleIds.length });
     }
 
     return errorResponse("Not found", 404);

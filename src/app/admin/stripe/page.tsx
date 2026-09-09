@@ -101,13 +101,205 @@ function RefundModal({ charge, onClose, onRefunded }: { charge: Charge; onClose:
   );
 }
 
+const WEBHOOK_URL = "https://SUPABASE_PROJECT_REF_REDACTED.supabase.co/functions/v1/stripe-webhook";
+
+function GoLiveChecklist({ isLive, onSwitched }: { isLive: boolean; onSwitched: () => void }) {
+  const [open, setOpen] = useState(!isLive);
+  const [copiedStep, setCopiedStep] = useState<number | null>(null);
+  const [switching, setSwitching] = useState(false);
+  const [switchLog, setSwitchLog] = useState<string | null>(null);
+  const [switchError, setSwitchError] = useState<string | null>(null);
+
+  const switchMode = async () => {
+    setSwitching(true); setSwitchLog(null); setSwitchError(null);
+    const target = isLive ? "test" : "live";
+    try {
+      const r = await fetch("/api/stripe-mode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: target }),
+      });
+      const data = await r.json();
+      if (!r.ok) { setSwitchError(data.error || "Switch failed"); setSwitchLog(data.log || null); }
+      else { setSwitchLog(data.log); onSwitched(); }
+    } catch (e: any) {
+      setSwitchError(e.message);
+    }
+    setSwitching(false);
+  };
+
+  const copy = (text: string, step: number) => {
+    navigator.clipboard.writeText(text);
+    setCopiedStep(step);
+    setTimeout(() => setCopiedStep(null), 2000);
+  };
+
+  const liveSteps = [
+    {
+      label: "Get your live Secret key from Stripe",
+      detail: "Go to Stripe Dashboard → Developers → API keys → copy the live Secret key (starts with sk_live_)",
+      link: { href: "https://dashboard.stripe.com/apikeys", label: "Open Stripe API Keys →" },
+    },
+    {
+      label: "Update .env.local with the live key",
+      code: "STRIPE_SECRET_KEY=sk_live_...",
+      detail: "Replace the existing sk_test_ value in your .env.local file.",
+    },
+    {
+      label: "Set the live key as a Supabase secret",
+      code: "npx supabase secrets set STRIPE_SECRET_KEY=sk_live_... --project-ref SUPABASE_PROJECT_REF_REDACTED",
+    },
+    {
+      label: "Register the webhook in Stripe (live mode)",
+      detail: `Go to Stripe Dashboard → Developers → Webhooks → Add endpoint → URL: ${WEBHOOK_URL} → Enable: checkout.session.completed, payment_intent.payment_failed`,
+      link: { href: "https://dashboard.stripe.com/webhooks", label: "Open Stripe Webhooks →" },
+    },
+    {
+      label: "Set the webhook signing secret",
+      code: "npx supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_... --project-ref SUPABASE_PROJECT_REF_REDACTED",
+      detail: "Copy the Signing secret from the webhook you just created (starts with whsec_).",
+    },
+    {
+      label: "Redeploy edge functions",
+      code: "npx supabase functions deploy stripe-webhook stripe-checkout --project-ref SUPABASE_PROJECT_REF_REDACTED",
+    },
+  ];
+
+  const testSteps = [
+    {
+      label: "Get your test Secret key from Stripe",
+      detail: "Go to Stripe Dashboard → toggle \"Test mode\" on → Developers → API keys → copy the test Secret key (starts with sk_test_)",
+      link: { href: "https://dashboard.stripe.com/test/apikeys", label: "Open Stripe Test API Keys →" },
+    },
+    {
+      label: "Update .env.local with the test key",
+      code: "STRIPE_SECRET_KEY=sk_test_...",
+      detail: "Replace the sk_live_ value in your .env.local file.",
+    },
+    {
+      label: "Set the test key as a Supabase secret",
+      code: "npx supabase secrets set STRIPE_SECRET_KEY=sk_test_... --project-ref SUPABASE_PROJECT_REF_REDACTED",
+    },
+    {
+      label: "Register a webhook in Stripe (test mode)",
+      detail: `In Stripe test mode: Developers → Webhooks → Add endpoint → URL: ${WEBHOOK_URL} → Enable: checkout.session.completed, payment_intent.payment_failed`,
+      link: { href: "https://dashboard.stripe.com/test/webhooks", label: "Open Stripe Test Webhooks →" },
+    },
+    {
+      label: "Set the test webhook signing secret",
+      code: "npx supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_... --project-ref SUPABASE_PROJECT_REF_REDACTED",
+      detail: "Copy the Signing secret from the test webhook you just created.",
+    },
+    {
+      label: "Redeploy edge functions",
+      code: "npx supabase functions deploy stripe-webhook stripe-checkout --project-ref SUPABASE_PROJECT_REF_REDACTED",
+    },
+  ];
+
+  const steps = isLive ? testSteps : liveSteps;
+  const accentBorder = isLive ? "border-success-200" : "border-amber-200";
+  const accentText = isLive ? "text-success-700" : "text-amber-700";
+  const accentBg = isLive ? "bg-success-50" : "bg-amber-50";
+  const stepBorder = isLive ? "border-success-100" : "border-amber-100";
+  const badgeBg = isLive ? "bg-success-100 text-success-700" : "bg-amber-100 text-amber-700";
+
+  return (
+    <div className={`rounded-xl border ${accentBg} ${accentBorder}`}>
+      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between p-4 text-left">
+        <div className="flex items-center gap-3">
+          <AlertCircle size={18} className={isLive ? "text-success-500" : "text-amber-500"} />
+          <div>
+            <p className={`text-sm font-semibold ${isLive ? "text-success-800" : "text-amber-800"}`}>
+              Stripe is in <strong>{isLive ? "LIVE" : "TEST"}</strong> mode
+            </p>
+            <p className={`text-xs ${accentText}`}>
+              {isLive ? "Real payments are being processed." : "No real money is being processed — complete the checklist below before launching."}
+            </p>
+          </div>
+        </div>
+        <span className={`text-xs font-medium flex-shrink-0 ${accentText}`}>
+          {open ? "Hide" : isLive ? "Switch to Test Mode" : "Go Live checklist"}
+        </span>
+      </button>
+
+      {open && (
+        <div className={`border-t ${accentBorder} px-4 pb-4 pt-3 space-y-3`}>
+
+          {/* One-click switch button */}
+          <div className={`rounded-lg p-3 border ${accentBorder} bg-white flex items-center justify-between gap-4`}>
+            <div>
+              <p className="text-sm font-semibold text-secondary-900">
+                {isLive ? "Switch to Test / Sandbox mode" : "Switch to Live mode"}
+              </p>
+              <p className="text-xs text-secondary-500 mt-0.5">
+                Updates Supabase secrets and redeploys edge functions automatically.
+              </p>
+            </div>
+            <button
+              onClick={switchMode}
+              disabled={switching}
+              className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-colors ${
+                switching ? "bg-secondary-400 cursor-not-allowed" :
+                isLive ? "bg-amber-500 hover:bg-amber-600" : "bg-success-600 hover:bg-success-700"
+              }`}
+            >
+              {switching
+                ? <><Loader2 size={15} className="animate-spin" />Switching...</>
+                : isLive ? "→ Switch to Test" : "→ Switch to Live"
+              }
+            </button>
+          </div>
+
+          {/* Log output */}
+          {(switchLog || switchError) && (
+            <div className={`rounded-lg p-3 text-xs font-mono whitespace-pre-wrap border ${
+              switchError ? "bg-error-50 border-error-200 text-error-700" : "bg-secondary-900 border-secondary-700 text-green-400"
+            }`}>
+              {switchError && <p className="font-semibold mb-1">Error: {switchError}</p>}
+              {switchLog}
+            </div>
+          )}
+
+          <p className={`text-xs font-semibold uppercase tracking-wide ${accentText}`}>
+            {isLive ? "Manual steps (if needed)" : "Manual steps (if needed)"}
+          </p>
+          {steps.map((step, i) => (
+            <div key={i} className={`bg-white rounded-lg border ${stepBorder} p-3 space-y-1.5`}>
+              <p className="text-sm font-medium text-secondary-900">
+                <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full ${badgeBg} text-xs font-bold mr-2`}>{i + 1}</span>
+                {step.label}
+              </p>
+              {step.detail && <p className="text-xs text-secondary-500 ml-7">{step.detail}</p>}
+              {step.link && (
+                <a href={step.link.href} target="_blank" rel="noopener noreferrer" className="ml-7 inline-flex items-center gap-1 text-xs text-primary-600 hover:underline">
+                  {step.link.label} <ExternalLink size={11} />
+                </a>
+              )}
+              {step.code && (
+                <div className="ml-7 flex items-center gap-2">
+                  <code className="flex-1 text-xs bg-secondary-50 border border-secondary-200 rounded px-2 py-1.5 text-secondary-700 break-all">{step.code}</code>
+                  <button onClick={() => copy(step.code!, i)} className="flex-shrink-0 text-xs px-2 py-1.5 rounded border border-secondary-200 text-secondary-500 hover:text-secondary-900 hover:border-secondary-400 transition-colors">
+                    {copiedStep === i ? <Check size={13} className="text-success-500" /> : "Copy"}
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StripeDashboard() {
   const [balance, setBalance] = useState<Balance | null>(null);
   const [charges, setCharges] = useState<Charge[]>([]);
   const [payouts, setPayouts] = useState<Payout[]>([]);
+  const [orderMap, setOrderMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refundTarget, setRefundTarget] = useState<Charge | null>(null);
+  const [isLive, setIsLive] = useState(false);
 
   const fetchAll = async () => {
     setLoading(true); setError(null);
@@ -120,8 +312,27 @@ function StripeDashboard() {
       const [balData, chargesData, payoutsData] = await Promise.all([balRes.json(), chargesRes.json(), payoutsRes.json()]);
       if (!balRes.ok) throw new Error(balData.error);
       setBalance(balData);
-      setCharges(chargesData.data || []);
+      setIsLive(!!balData.livemode);
+      const chargeList: Charge[] = chargesData.data || [];
+      setCharges(chargeList);
       setPayouts(payoutsData.data || []);
+
+      // Match charges to order IDs via payment_intent
+      const piIds = chargeList.map((c) => c.payment_intent).filter(Boolean) as string[];
+      if (piIds.length) {
+        const { createClient } = await import("@supabase/supabase-js");
+        const sb = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+        const { data: orders } = await sb
+          .from("orders")
+          .select("id, stripe_payment_intent_id")
+          .in("stripe_payment_intent_id", piIds);
+        const map: Record<string, string> = {};
+        for (const o of orders || []) map[o.stripe_payment_intent_id] = o.id;
+        setOrderMap(map);
+      }
     } catch (e: any) {
       setError(e.message);
     }
@@ -130,6 +341,17 @@ function StripeDashboard() {
 
   useEffect(() => { fetchAll(); }, []);
 
+  const [chargeSearch, setChargeSearch] = useState("");
+  const [chargeStatus, setChargeStatus] = useState("all");
+
+  const filteredCharges = charges.filter((c) => {
+    const matchSearch = !chargeSearch ||
+      (c.billing_details.name || "").toLowerCase().includes(chargeSearch.toLowerCase()) ||
+      (c.billing_details.email || "").toLowerCase().includes(chargeSearch.toLowerCase()) ||
+      (c.payment_intent && orderMap[c.payment_intent] ? orderMap[c.payment_intent].slice(-8).toUpperCase().includes(chargeSearch.toUpperCase()) : false);
+    const matchStatus = chargeStatus === "all" || (chargeStatus === "refunded" ? c.refunded : c.status === chargeStatus);
+    return matchSearch && matchStatus;
+  });
   const available = balance?.available.reduce((s, b) => s + b.amount, 0) ?? 0;
   const pending = balance?.pending.reduce((s, b) => s + b.amount, 0) ?? 0;
   const totalVolume = charges.filter((c) => c.status === "succeeded").reduce((s, c) => s + c.amount, 0);
@@ -148,6 +370,9 @@ function StripeDashboard() {
 
   return (
     <div className="space-y-8">
+      {/* Go Live checklist */}
+      <GoLiveChecklist isLive={isLive} onSwitched={fetchAll} />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <a href="https://dashboard.stripe.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 font-medium">
@@ -176,8 +401,21 @@ function StripeDashboard() {
 
       {/* Recent Charges */}
       <div className="bg-white rounded-xl border border-secondary-100 shadow-sm overflow-hidden">
-        <div className="p-5 border-b border-secondary-100">
-          <h2 className="font-semibold text-secondary-900">Recent Charges</h2>
+        <div className="p-5 border-b border-secondary-100 flex flex-wrap items-center gap-3">
+          <h2 className="font-semibold text-secondary-900 flex-1">Recent Charges</h2>
+          <input
+            value={chargeSearch}
+            onChange={(e) => setChargeSearch(e.target.value)}
+            placeholder="Search order, name, email…"
+            className="input-field py-1.5 text-sm w-52"
+          />
+          <select value={chargeStatus} onChange={(e) => setChargeStatus(e.target.value)} className="input-field py-1.5 text-sm w-auto">
+            <option value="all">All Status</option>
+            <option value="succeeded">Succeeded</option>
+            <option value="pending">Pending</option>
+            <option value="failed">Failed</option>
+            <option value="refunded">Refunded</option>
+          </select>
         </div>
         {charges.length === 0 ? (
           <div className="p-10 text-center text-secondary-400"><CreditCard size={36} className="mx-auto mb-2 text-secondary-200" />No charges yet</div>
@@ -186,14 +424,21 @@ function StripeDashboard() {
             <table className="w-full">
               <thead className="bg-secondary-50 border-b border-secondary-100">
                 <tr>
-                  {["Customer", "Amount", "Status", "Date", "Actions"].map((h) => (
+                  {["Order #", "Customer", "Amount", "Status", "Date", "Actions"].map((h) => (
                     <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-secondary-600 uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-secondary-50">
-                {charges.map((charge) => (
+                {filteredCharges.length === 0 ? (
+                  <tr><td colSpan={6} className="px-4 py-10 text-center text-secondary-400 text-sm">No charges match your filters</td></tr>
+                ) : filteredCharges.map((charge) => (
                   <tr key={charge.id} className="hover:bg-secondary-50 transition-colors">
+                    <td className="px-4 py-3">
+                      {charge.payment_intent && orderMap[charge.payment_intent]
+                        ? <span className="text-xs font-mono font-semibold text-secondary-900">#{orderMap[charge.payment_intent].slice(-8).toUpperCase()}</span>
+                        : <span className="text-xs text-secondary-300">—</span>}
+                    </td>
                     <td className="px-4 py-3">
                       <p className="text-sm font-medium text-secondary-900">{charge.billing_details.name || "—"}</p>
                       <p className="text-xs text-secondary-500">{charge.billing_details.email || "—"}</p>

@@ -74,7 +74,7 @@ Deno.serve(async (req: Request) => {
           const customerEmail = session.metadata.email;
           const orderItems = session.metadata?.items ? JSON.parse(session.metadata.items) : [];
           const itemsHtml = orderItems.map((item: any) =>
-            `<tr><td style="padding:8px 0">${item.title} (${item.variant_label}) x${item.quantity}</td><td style="padding:8px 0;text-align:right">$${(item.price * item.quantity / 100).toFixed(2)}</td></tr>`
+            `<tr><td style="padding:8px 0">${item.title} (${item.variant_label}) x${item.quantity}</td><td style="padding:8px 0;text-align:right">$${(item.price * item.quantity).toFixed(2)}</td></tr>`
           ).join("");
           await fetch("https://api.resend.com/emails", {
             method: "POST",
@@ -115,7 +115,7 @@ Deno.serve(async (req: Request) => {
                 quantity: item.quantity,
               })),
               shipping_method: 1,
-              send_shipping_notification: true,
+              send_shipping_notification: false,
               address_to: {
                 first_name: session.metadata.shipping_name?.split(" ")[0] || "",
                 last_name: session.metadata.shipping_name?.split(" ").slice(1).join(" ") || "",

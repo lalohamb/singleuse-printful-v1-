@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Package, ShoppingBag, DollarSign, TrendingUp, Clock, CheckCircle, PauseCircle, PlayCircle } from "lucide-react";
+import { Package, ShoppingBag, DollarSign, TrendingUp, Clock, CheckCircle, PauseCircle, PlayCircle, CreditCard } from "lucide-react";
 import { supabase, formatPrice } from "@/lib/supabase";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
 import type { Order, Product, StoreSettings } from "@/types";
@@ -14,6 +14,7 @@ function Dashboard() {
   const [paused, setPaused] = useState(false);
   const [pauseLoading, setPauseLoading] = useState(false);
   const [settingsId, setSettingsId] = useState<string | null>(null);
+  const [stripeLive, setStripeLive] = useState<boolean | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -29,6 +30,7 @@ function Dashboard() {
       setRecentProducts(products.slice(0, 5));
       if (s) { setSettingsId(s.id); setPaused(!!s.orders_paused); }
       setLoading(false);
+      fetch("/api/stripe-admin?action=balance").then(r => r.ok ? r.json() : null).then(d => { if (d) setStripeLive(!!d.livemode); });
     });
   }, []);
 
@@ -52,6 +54,14 @@ function Dashboard() {
 
   return (
     <div className="space-y-8">
+      {stripeLive !== null && (
+        <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold w-fit border ${
+          stripeLive ? "bg-success-50 border-success-200 text-success-700" : "bg-amber-50 border-amber-200 text-amber-700"
+        }`}>
+          <CreditCard size={14} />
+          Stripe: {stripeLive ? "LIVE" : "TEST / Sandbox"}
+        </div>
+      )}
       <div className={`flex items-center justify-between rounded-xl p-4 border ${paused ? "bg-red-50 border-red-200" : "bg-success-50 border-success-200"}`}>
         <div className="flex items-center gap-3">
           {paused ? <PauseCircle size={22} className="text-red-500" /> : <PlayCircle size={22} className="text-success-600" />}
