@@ -14,7 +14,7 @@ export default function NewsletterSignup({ variant = "section" }: { variant?: "s
       const res = await fetch("/api/mailerlite", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "add_subscriber", email }),
+        body: JSON.stringify({ action: "add_subscriber", email, groups: ["182701481182365511"] }),
       });
       const data = await res.json();
       if (!res.ok || data.error || data.message) {

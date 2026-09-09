@@ -69,6 +69,17 @@ Deno.serve(async (req: Request) => {
           })
           .eq("stripe_session_id", session.id);
 
+        // Add customer to MailerLite
+        const mailerLiteKey = Deno.env.get("MAILER_LITE_API_KEY");
+        if (mailerLiteKey && session.metadata?.email) {
+          const mlName = session.metadata.shipping_name?.split(" ")[0] || "";
+          await fetch("https://api.mailerlite.com/api/v2/groups/182701481182365511/subscribers", {
+            method: "POST",
+            headers: { "X-MailerLite-ApiKey": mailerLiteKey, "Content-Type": "application/json" },
+            body: JSON.stringify({ email: session.metadata.email, name: mlName }),
+          }).catch((e: Error) => console.error("MailerLite sync error:", e.message));
+        }
+
         // Send order confirmation email via Resend
         const resendKey = Deno.env.get("RESEND_API_KEY");
         if (resendKey && session.metadata?.email) {

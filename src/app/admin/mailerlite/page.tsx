@@ -3,9 +3,9 @@ import { useEffect, useState } from "react";
 import { Users, Mail, BarChart2, RefreshCw, Plus, Trash2, X, Loader2, Check, AlertCircle, ExternalLink, FolderOpen, Search, Edit2, UserMinus, Zap, FileText, ChevronLeft, ChevronRight } from "lucide-react";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
 
-interface Subscriber { id: string; email: string; status: string; created_at: string; fields?: { name?: string; last_name?: string } }
-interface Group { id: string; name: string; active_subscribers_count: number }
-interface Campaign { id: string; name: string; status: string; created_at: string; emails?: { stats?: { open_rate?: { float: number }; click_rate?: { float: number }; sent?: number; unsubscribed?: number } }[] }
+interface Subscriber { id: string; email: string; status: string; type: string; date_created: string; fields?: { key: string; value: string }[] }
+interface Group { id: string; name: string; total: number; active: number }
+interface Campaign { id: string; name: string; status: string; date_created: string; opened: number; clicked: number; sent: number; unsubscribed: number; open_rate: number; click_rate: number }
 interface Automation { id: string; name: string; enabled: boolean; steps_count: number }
 interface Form { id: string; name: string; type: string; conversions_count: number }
 interface Account { account: { name: string; email: string }; statistics?: { total_subscribers: number; open_rate: { float: number }; click_rate: { float: number } } }
@@ -64,7 +64,7 @@ function AddSubscriberModal({ groups, onClose, onDone }: { groups: Group[]; onCl
 
 function EditSubscriberModal({ subscriber, groups, onClose, onDone }: { subscriber: Subscriber; groups: Group[]; onClose: () => void; onDone: () => void }) {
   const [status, setStatus] = useState(subscriber.status);
-  const [name, setName] = useState(subscriber.fields?.name || "");
+  const [name, setName] = useState(subscriber.fields?.find((f: any) => f.key === "name")?.value || "");
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -120,7 +120,7 @@ function CreateCampaignModal({ groups, onClose, onDone }: { groups: Group[]; onC
         <div><label className="label-text">Send To Group</label>
           <select value={form.group} onChange={(e) => setForm({ ...form, group: e.target.value })} className="input-field">
             <option value="">All subscribers</option>
-            {groups.map((g) => <option key={g.id} value={g.id}>{g.name} ({g.active_subscribers_count})</option>)}
+            {groups.map((g) => <option key={g.id} value={g.id}>{g.name} ({g.active ?? g.total ?? 0})</option>)}
           </select>
         </div>
         <div>
@@ -225,11 +225,11 @@ function MailerLiteDashboard() {
       ]);
       if (statsData.error) throw new Error(statsData.error);
       setAccount(statsData.account);
-      setGroups(statsData.groups?.data || []);
-      setCampaigns(statsData.campaigns?.data || []);
-      setAutomations(statsData.automations?.data || []);
-      setForms(statsData.forms?.data || []);
-      setSubscribers(subsData.data || []);
+      setGroups(statsData.groups || []);
+      setCampaigns(statsData.campaigns || []);
+      setAutomations([]);
+      setForms([]);
+      setSubscribers(Array.isArray(subsData) ? subsData : (subsData.data || []));
       setSubMeta(subsData.meta || null);
     } catch (e: any) { setError(e.message); }
     setLoading(false);
@@ -237,7 +237,7 @@ function MailerLiteDashboard() {
 
   const fetchSubscribers = async (cur = "", q = search, f = statusFilter) => {
     const data = await api("subscribers", `&limit=25${cur ? `&cursor=${cur}` : ""}${q ? `&search=${q}` : ""}${f ? `&filter=${f}` : ""}`);
-    setSubscribers(data.data || []);
+    setSubscribers(Array.isArray(data) ? data : (data.data || []));
     setSubMeta(data.meta || null);
     setCursor(cur);
   };
@@ -265,8 +265,8 @@ function MailerLiteDashboard() {
     setDeleting(null);
   };
 
-  const totalSubs = account?.statistics?.total_subscribers ?? subMeta?.total ?? 0;
-  const activeSubs = subscribers.filter((s) => s.status === "active").length;
+  const totalSubs = account?.statistics?.total_subscribers ?? subMeta?.total ?? subscribers.length;
+  const activeSubs = subscribers.filter((s) => s.type === "active" || s.status === "active").length;
 
   if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-2 border-secondary-300 border-t-secondary-900" /></div>;
 
@@ -352,9 +352,9 @@ function MailerLiteDashboard() {
                     {subscribers.map((sub) => (
                       <tr key={sub.id} className="hover:bg-secondary-50 transition-colors">
                         <td className="px-4 py-3 text-sm font-medium text-secondary-900">{sub.email}</td>
-                        <td className="px-4 py-3 text-sm text-secondary-500">{sub.fields?.name || "—"}</td>
-                        <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded-full ${statusBadge[sub.status] || "bg-secondary-100 text-secondary-500"}`}>{sub.status}</span></td>
-                        <td className="px-4 py-3 text-sm text-secondary-500">{new Date(sub.created_at).toLocaleDateString()}</td>
+                        <td className="px-4 py-3 text-sm text-secondary-500">{sub.fields?.find((f: any) => f.key === "name")?.value || "—"}</td>
+                        <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded-full ${statusBadge[sub.type] || statusBadge[sub.status] || "bg-secondary-100 text-secondary-500"}`}>{sub.type || sub.status}</span></td>
+                        <td className="px-4 py-3 text-sm text-secondary-500">{sub.date_created ? new Date(sub.date_created).toLocaleDateString() : "—"}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1">
                             <button onClick={() => { setSelectedSub(sub); setModal("edit_sub"); }} className="p-1.5 text-secondary-400 hover:text-primary-600 transition-colors" title="Edit"><Edit2 size={15} /></button>
@@ -393,7 +393,7 @@ function MailerLiteDashboard() {
                 <div key={group.id} className="flex items-center justify-between px-5 py-4 hover:bg-secondary-50 transition-colors">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-lg bg-primary-50 flex items-center justify-center"><FolderOpen size={18} className="text-primary-500" /></div>
-                    <div><p className="font-medium text-secondary-900">{group.name}</p><p className="text-xs text-secondary-500">{group.active_subscribers_count ?? 0} active subscribers</p></div>
+                    <div><p className="font-medium text-secondary-900">{group.name}</p><p className="text-xs text-secondary-500">{group.active ?? group.total ?? 0} active subscribers</p></div>
                   </div>
                   <div className="flex items-center gap-1">
                     <button onClick={() => { setSelectedGroup(group); setModal("edit_group"); }} className="p-1.5 text-secondary-400 hover:text-primary-600 transition-colors"><Edit2 size={15} /></button>
@@ -418,20 +418,17 @@ function MailerLiteDashboard() {
                   <tr>{["Campaign", "Status", "Sent", "Open Rate", "Click Rate", "Unsubs", "Created"].map((h) => <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-secondary-600 uppercase tracking-wide">{h}</th>)}</tr>
                 </thead>
                 <tbody className="divide-y divide-secondary-50">
-                  {campaigns.map((c) => {
-                    const stats = c.emails?.[0]?.stats;
-                    return (
+                  {campaigns.map((c) => (
                       <tr key={c.id} className="hover:bg-secondary-50 transition-colors">
                         <td className="px-4 py-3 text-sm font-medium text-secondary-900 max-w-[200px] truncate">{c.name}</td>
                         <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded-full ${statusBadge[c.status] || "bg-secondary-100 text-secondary-500"}`}>{c.status}</span></td>
-                        <td className="px-4 py-3 text-sm text-secondary-600">{stats?.sent ?? "—"}</td>
-                        <td className="px-4 py-3 text-sm text-secondary-600">{stats?.open_rate ? `${(stats.open_rate.float * 100).toFixed(1)}%` : "—"}</td>
-                        <td className="px-4 py-3 text-sm text-secondary-600">{stats?.click_rate ? `${(stats.click_rate.float * 100).toFixed(1)}%` : "—"}</td>
-                        <td className="px-4 py-3 text-sm text-secondary-600">{stats?.unsubscribed ?? "—"}</td>
-                        <td className="px-4 py-3 text-sm text-secondary-500">{new Date(c.created_at).toLocaleDateString()}</td>
+                        <td className="px-4 py-3 text-sm text-secondary-600">{c.sent ?? "—"}</td>
+                        <td className="px-4 py-3 text-sm text-secondary-600">{c.open_rate ? `${c.open_rate}%` : "—"}</td>
+                        <td className="px-4 py-3 text-sm text-secondary-600">{c.click_rate ? `${c.click_rate}%` : "—"}</td>
+                        <td className="px-4 py-3 text-sm text-secondary-600">{c.unsubscribed ?? "—"}</td>
+                        <td className="px-4 py-3 text-sm text-secondary-500">{c.date_created ? new Date(c.date_created).toLocaleDateString() : "—"}</td>
                       </tr>
-                    );
-                  })}
+                  ))}
                 </tbody>
               </table>
             </div>

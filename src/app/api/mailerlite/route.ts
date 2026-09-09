@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const BASE = "https://connect.mailerlite.com/api";
+const BASE = "https://api.mailerlite.com/api/v2";
 const key = process.env.MAILER_LITE_API_KEY;
 
 function headers() {
-  return { Authorization: `Bearer ${key}`, "Content-Type": "application/json", Accept: "application/json" };
+  return { "X-MailerLite-ApiKey": key!, "Content-Type": "application/json", Accept: "application/json" };
+}
+
+// Classic API returns 64-bit integer IDs that lose precision in JS.
+// Parse raw text and stringify all numeric IDs before JSON.parse.
+async function safeJson(res: Response) {
+  const text = await res.text();
+  const safe = text.replace(/"id":\s*(\d{15,})/g, '"id":"$1"');
+  try { return JSON.parse(safe); } catch { return JSON.parse(text); }
 }
 
 export async function GET(req: NextRequest) {
@@ -15,63 +23,59 @@ export async function GET(req: NextRequest) {
   try {
     if (action === "account") {
       const res = await fetch(`${BASE}/me`, { headers: headers() });
-      return NextResponse.json(await res.json(), { status: res.status });
+      return NextResponse.json(await safeJson(res), { status: res.status });
     }
     if (action === "stats") {
-      const [accountRes, groupsRes, campaignsRes, automationsRes, formsRes] = await Promise.all([
+      const [accountRes, groupsRes, campaignsRes] = await Promise.all([
         fetch(`${BASE}/me`, { headers: headers() }),
         fetch(`${BASE}/groups?limit=25`, { headers: headers() }),
-        fetch(`${BASE}/campaigns?limit=25&sort=-created_at`, { headers: headers() }),
-        fetch(`${BASE}/automations?limit=10`, { headers: headers() }),
-        fetch(`${BASE}/forms/popup?limit=10`, { headers: headers() }),
+        fetch(`${BASE}/campaigns?limit=25`, { headers: headers() }),
       ]);
-      const [accountData, groupsData, campaignsData, automationsData, formsData] = await Promise.all([
-        accountRes.json(), groupsRes.json(), campaignsRes.json(), automationsRes.json(), formsRes.json(),
+      const [accountData, groupsData, campaignsData] = await Promise.all([
+        safeJson(accountRes), safeJson(groupsRes), safeJson(campaignsRes),
       ]);
-      return NextResponse.json({ account: accountData, groups: groupsData, campaigns: campaignsData, automations: automationsData, forms: formsData });
+      return NextResponse.json({ account: accountData, groups: groupsData, campaigns: campaignsData, automations: [], forms: [] });
     }
     if (action === "subscribers") {
       const limit = searchParams.get("limit") || "25";
-      const cursor = searchParams.get("cursor") || "";
       const search = searchParams.get("search") || "";
       const filter = searchParams.get("filter") || "";
       let url = `${BASE}/subscribers?limit=${limit}`;
-      if (cursor) url += `&cursor=${cursor}`;
-      if (search) url += `&filter[email]=${encodeURIComponent(search)}`;
-      if (filter) url += `&filter[status]=${filter}`;
+      if (search) url += `&query=${encodeURIComponent(search)}`;
+      if (filter) url += `&type=${filter}`;
       const res = await fetch(url, { headers: headers() });
-      return NextResponse.json(await res.json(), { status: res.status });
+      return NextResponse.json(await safeJson(res), { status: res.status });
     }
     if (action === "subscriber") {
       const id = searchParams.get("id");
       const res = await fetch(`${BASE}/subscribers/${id}`, { headers: headers() });
-      return NextResponse.json(await res.json(), { status: res.status });
+      return NextResponse.json(await safeJson(res), { status: res.status });
     }
     if (action === "groups") {
       const res = await fetch(`${BASE}/groups?limit=25`, { headers: headers() });
-      return NextResponse.json(await res.json(), { status: res.status });
+      return NextResponse.json(await safeJson(res), { status: res.status });
     }
     if (action === "group_subscribers") {
       const id = searchParams.get("id");
       const res = await fetch(`${BASE}/groups/${id}/subscribers?limit=25`, { headers: headers() });
-      return NextResponse.json(await res.json(), { status: res.status });
+      return NextResponse.json(await safeJson(res), { status: res.status });
     }
     if (action === "campaigns") {
-      const res = await fetch(`${BASE}/campaigns?limit=25&sort=-created_at`, { headers: headers() });
-      return NextResponse.json(await res.json(), { status: res.status });
+      const res = await fetch(`${BASE}/campaigns?limit=25`, { headers: headers() });
+      return NextResponse.json(await safeJson(res), { status: res.status });
     }
     if (action === "campaign") {
       const id = searchParams.get("id");
       const res = await fetch(`${BASE}/campaigns/${id}`, { headers: headers() });
-      return NextResponse.json(await res.json(), { status: res.status });
+      return NextResponse.json(await safeJson(res), { status: res.status });
     }
     if (action === "automations") {
-      const res = await fetch(`${BASE}/automations?limit=25`, { headers: headers() });
-      return NextResponse.json(await res.json(), { status: res.status });
+      // Classic API does not have automations — return empty
+      return NextResponse.json([]);
     }
     if (action === "forms") {
-      const res = await fetch(`${BASE}/forms/popup?limit=25`, { headers: headers() });
-      return NextResponse.json(await res.json(), { status: res.status });
+      // Classic API does not have forms — return empty
+      return NextResponse.json([]);
     }
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   } catch (err: any) {
@@ -89,29 +93,27 @@ export async function POST(req: NextRequest) {
       const res = await fetch(`${BASE}/subscribers`, {
         method: "POST",
         headers: headers(),
-        body: JSON.stringify({ email: body.email, fields: { name: body.name || "" }, groups: body.groups || [], status: "active" }),
+        body: JSON.stringify({ email: body.email, name: body.name || "", groups: body.groups || [] }),
       });
-      return NextResponse.json(await res.json(), { status: res.status });
+      return NextResponse.json(await safeJson(res), { status: res.status });
     }
     if (action === "update_subscriber") {
       const res = await fetch(`${BASE}/subscribers/${body.id}`, {
         method: "PUT",
         headers: headers(),
-        body: JSON.stringify({ fields: body.fields, status: body.status, groups: body.groups }),
+        body: JSON.stringify({ name: body.fields?.name, type: body.status }),
       });
-      return NextResponse.json(await res.json(), { status: res.status });
+      return NextResponse.json(await safeJson(res), { status: res.status });
     }
     if (action === "delete_subscriber") {
       const res = await fetch(`${BASE}/subscribers/${body.id}`, { method: "DELETE", headers: headers() });
-      return NextResponse.json({ success: res.ok }, { status: res.status });
+      return NextResponse.json({ success: res.ok || res.status === 204 });
     }
     if (action === "unsubscribe") {
-      const res = await fetch(`${BASE}/subscribers/${body.id}`, {
-        method: "PUT",
-        headers: headers(),
-        body: JSON.stringify({ status: "unsubscribed" }),
+      const res = await fetch(`${BASE}/subscribers/${body.id}/unsubscribe`, {
+        method: "POST", headers: headers(),
       });
-      return NextResponse.json(await res.json(), { status: res.status });
+      return NextResponse.json(await safeJson(res), { status: res.status });
     }
     if (action === "create_group") {
       const res = await fetch(`${BASE}/groups`, {
@@ -119,7 +121,7 @@ export async function POST(req: NextRequest) {
         headers: headers(),
         body: JSON.stringify({ name: body.name }),
       });
-      return NextResponse.json(await res.json(), { status: res.status });
+      return NextResponse.json(await safeJson(res), { status: res.status });
     }
     if (action === "rename_group") {
       const res = await fetch(`${BASE}/groups/${body.id}`, {
@@ -127,59 +129,59 @@ export async function POST(req: NextRequest) {
         headers: headers(),
         body: JSON.stringify({ name: body.name }),
       });
-      return NextResponse.json(await res.json(), { status: res.status });
+      return NextResponse.json(await safeJson(res), { status: res.status });
     }
     if (action === "delete_group") {
       const res = await fetch(`${BASE}/groups/${body.id}`, { method: "DELETE", headers: headers() });
-      return NextResponse.json({ success: res.ok }, { status: res.status });
+      return NextResponse.json({ success: res.ok || res.status === 204 });
     }
     if (action === "create_campaign") {
-      // Step 1: create the campaign
       const createRes = await fetch(`${BASE}/campaigns`, {
         method: "POST",
         headers: headers(),
         body: JSON.stringify({
-          name: body.name,
+          subject: body.subject,
+          from: body.from_email,
+          from_name: body.from_name,
+          groups: (body.groups || []).map((id: string) => ({ id })),
           type: "regular",
-          emails: [{
-            subject: body.subject,
-            from_name: body.from_name,
-            from: body.from_email,
-            content: body.html,
-          }],
-          groups: body.groups || [],
         }),
       });
-      const campaign = await createRes.json();
+      const campaign = await safeJson(createRes);
       if (!createRes.ok) return NextResponse.json(campaign, { status: createRes.status });
-      const campaignId = campaign.data?.id;
+      const campaignId = campaign.id;
       if (!campaignId) return NextResponse.json({ error: "Campaign created but no ID returned" }, { status: 500 });
-      // Step 2: schedule/send immediately or as draft
+      await fetch(`${BASE}/campaigns/${campaignId}/content`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({ html: body.html }),
+      });
       if (body.send_now) {
-        const sendRes = await fetch(`${BASE}/campaigns/${campaignId}/schedule`, {
-          method: "POST",
-          headers: headers(),
-          body: JSON.stringify({ delivery: "instant" }),
+        const sendRes = await fetch(`${BASE}/campaigns/${campaignId}/actions/send`, {
+          method: "POST", headers: headers(),
         });
-        return NextResponse.json(await sendRes.json(), { status: sendRes.status });
+        return NextResponse.json(await safeJson(sendRes), { status: sendRes.status });
       }
       return NextResponse.json(campaign, { status: 201 });
     }
     if (action === "delete_campaign") {
       const res = await fetch(`${BASE}/campaigns/${body.id}`, { method: "DELETE", headers: headers() });
-      return NextResponse.json({ success: res.ok }, { status: res.status });
+      return NextResponse.json({ success: res.ok || res.status === 204 });
     }
     if (action === "assign_group") {
-      const res = await fetch(`${BASE}/subscribers/${body.subscriber_id}/groups/${body.group_id}`, {
-        method: "POST", headers: headers(),
+      // Classic API: POST /groups/{group_id}/subscribers with email body
+      const res = await fetch(`${BASE}/groups/${body.group_id}/subscribers`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({ email: body.email }),
       });
-      return NextResponse.json(await res.json(), { status: res.status });
+      return NextResponse.json(await safeJson(res), { status: res.status });
     }
     if (action === "remove_from_group") {
-      const res = await fetch(`${BASE}/subscribers/${body.subscriber_id}/groups/${body.group_id}`, {
+      const res = await fetch(`${BASE}/groups/${body.group_id}/subscribers/${body.subscriber_id}`, {
         method: "DELETE", headers: headers(),
       });
-      return NextResponse.json({ success: res.ok }, { status: res.status });
+      return NextResponse.json({ success: res.ok || res.status === 204 });
     }
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   } catch (err: any) {
