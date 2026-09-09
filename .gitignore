@@ -11,6 +11,9 @@
 /playwright-report
 /test-results
 .env.test
+.env.live
+switch-to-live.sh
+switch-to-test.sh
 
 # next.js
 /.next/
