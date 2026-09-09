@@ -18,13 +18,13 @@ const KEYS = {
 };
 
 export async function POST(req: NextRequest) {
-  const { mode } = await req.json();
+  const { mode } = await req.json() as { mode: string };
   if (mode !== "live" && mode !== "test") {
     return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
   }
 
   const envPath = path.resolve(process.cwd(), ".env.local");
-  const keys = KEYS[mode];
+  const keys = KEYS[mode as "live" | "test"];
   const log: string[] = [];
 
   try {
