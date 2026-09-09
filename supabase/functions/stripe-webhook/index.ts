@@ -82,14 +82,14 @@ Deno.serve(async (req: Request) => {
           const orderItems = orderRow?.items ?? (session.metadata?.items ? JSON.parse(session.metadata.items) : []);
           const itemsHtml = orderItems.map((item: any) =>
             `<tr>
-              <td style="padding:10px 0;vertical-align:top">
-                ${ item.image_url ? `<img src="${item.image_url}" alt="${item.title}" width="64" height="64" style="border-radius:8px;object-fit:cover;display:block;margin-right:12px;float:left" />` : "" }
-                <span style="display:block;padding-left:${item.image_url ? "76px" : "0"}">
+              <td style="padding:12px 0;vertical-align:top">
+                ${ item.image_url ? `<img src="${item.image_url}" alt="${item.title}" width="100" height="100" style="border-radius:8px;object-fit:cover;display:block;margin-right:16px;float:left" />` : "" }
+                <span style="display:block;padding-left:${item.image_url ? "116px" : "0"}">
                   <strong>${item.title}</strong><br/>
                   <span style="color:#666;font-size:13px">${item.variant_label} &times; ${item.quantity}</span>
                 </span>
               </td>
-              <td style="padding:10px 0;vertical-align:top;text-align:right;white-space:nowrap">$${(item.price * item.quantity).toFixed(2)}</td>
+              <td style="padding:12px 0;vertical-align:top;text-align:right;white-space:nowrap">$${(item.price * item.quantity).toFixed(2)}</td>
             </tr>`
           ).join("");
           await fetch("https://api.resend.com/emails", {
