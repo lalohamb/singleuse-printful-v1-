@@ -24,3 +24,28 @@ pm2 restart bodyandsleeves
 git pull --rebase
 npm run build
 pm2 restart bodyandsleeves --update-env
+
+
+##GitHub has all the commits. The droplet pulled successfully but the build 
+##might be serving stale .next cache. Can you SSH into the droplet and run:
+cd /var/www/bodyandsleeves
+rm -rf .next
+npm run build
+pm2 restart bodyandsleeves --update-env
+
+##The rm -rf .next forces a completely clean build — no cached chunks
+##from a previous build that might be serving the old nav.
+
+
+
+##The file on the droplet still has the old label. 
+##Git pull didn't update it. Run:
+
+cd /var/www/bodyandsleeves
+git fetch origin
+git reset --hard origin/main
+npm run build
+pm2 restart bodyandsleeves --update-env
+
+##'git reset --hard origin/main' forces the droplet to exactly match GitHub,
+##overwriting any local divergence.

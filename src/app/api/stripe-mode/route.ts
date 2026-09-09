@@ -52,14 +52,18 @@ export async function POST(req: NextRequest) {
     );
     log.push(`✅ Edge functions redeployed\n${(s2 + e2).trim()}`);
 
-    // 4. Restart pm2 — detached so it survives killing the current process
-    const pm2Exists = fs.existsSync("/usr/bin/pm2");
+    // 4. Rebuild + restart so Next.js picks up the new .env.local
+    const pm2Exists = fs.existsSync("/usr/bin/pm2") || fs.existsSync("/usr/local/bin/pm2");
     if (pm2Exists) {
-      spawn("/usr/bin/pm2", ["restart", "bodyandsleeves", "--update-env"], {
-        detached: true,
-        stdio: "ignore",
-      }).unref();
-      log.push("✅ pm2 restart triggered (detached)");
+      const pm2Bin = fs.existsSync("/usr/bin/pm2") ? "/usr/bin/pm2" : "/usr/local/bin/pm2";
+      const appDir = process.cwd();
+      // Run build then restart in a detached shell so the process survives
+      spawn(
+        "/bin/bash",
+        ["-c", `cd ${appDir} && npm run build && ${pm2Bin} restart bodyandsleeves --update-env`],
+        { detached: true, stdio: "ignore" }
+      ).unref();
+      log.push("✅ Rebuild + pm2 restart triggered (detached). Wait ~60s then refresh.");
     } else {
       log.push("ℹ️ Running locally — restart your dev server to pick up the new keys.");
     }
