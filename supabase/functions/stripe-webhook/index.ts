@@ -73,9 +73,24 @@ Deno.serve(async (req: Request) => {
         const resendKey = Deno.env.get("RESEND_API_KEY");
         if (resendKey && session.metadata?.email) {
           const customerEmail = session.metadata.email;
-          const orderItems = session.metadata?.items ? JSON.parse(session.metadata.items) : [];
+          // Fetch full items from DB (has image_url, stripped from metadata to avoid Stripe 500-char limit)
+          const { data: orderRow } = await supabase
+            .from("orders")
+            .select("items")
+            .eq("stripe_session_id", session.id)
+            .maybeSingle();
+          const orderItems = orderRow?.items ?? (session.metadata?.items ? JSON.parse(session.metadata.items) : []);
           const itemsHtml = orderItems.map((item: any) =>
-            `<tr><td style="padding:8px 0">${item.title} (${item.variant_label}) x${item.quantity}</td><td style="padding:8px 0;text-align:right">$${(item.price * item.quantity).toFixed(2)}</td></tr>`
+            `<tr>
+              <td style="padding:10px 0;vertical-align:top">
+                ${ item.image_url ? `<img src="${item.image_url}" alt="${item.title}" width="64" height="64" style="border-radius:8px;object-fit:cover;display:block;margin-right:12px;float:left" />` : "" }
+                <span style="display:block;padding-left:${item.image_url ? "76px" : "0"}">
+                  <strong>${item.title}</strong><br/>
+                  <span style="color:#666;font-size:13px">${item.variant_label} &times; ${item.quantity}</span>
+                </span>
+              </td>
+              <td style="padding:10px 0;vertical-align:top;text-align:right;white-space:nowrap">$${(item.price * item.quantity).toFixed(2)}</td>
+            </tr>`
           ).join("");
           await fetch("https://api.resend.com/emails", {
             method: "POST",
