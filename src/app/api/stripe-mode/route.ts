@@ -52,9 +52,14 @@ export async function POST(req: NextRequest) {
     );
     log.push(`✅ Edge functions redeployed\n${(s2 + e2).trim()}`);
 
-    // 4. Restart pm2 so Next.js picks up the new .env.local
-    const { stdout: s3, stderr: e3 } = await execAsync("pm2 restart all", { timeout: 30_000 });
-    log.push(`✅ pm2 restarted\n${(s3 + e3).trim()}`);
+    // 4. Restart pm2 on the droplet, or skip locally (Next.js watches .env.local automatically)
+    const pm2Exists = await execAsync("test -f /usr/bin/pm2 && echo yes || echo no").then(r => r.stdout.trim() === "yes").catch(() => false);
+    if (pm2Exists) {
+      const { stdout: s3, stderr: e3 } = await execAsync("/usr/bin/pm2 restart bodyandsleeves", { timeout: 30_000 });
+      log.push(`✅ pm2 restarted\n${(s3 + e3).trim()}`);
+    } else {
+      log.push("ℹ️ Running locally — restart your dev server to pick up the new keys.");
+    }
 
     return NextResponse.json({ ok: true, log: log.join("\n\n") });
   } catch (e: any) {

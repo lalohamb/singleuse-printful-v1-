@@ -124,25 +124,44 @@ On the product detail page, sizes automatically sort in the order: XS → S → 
 **Path:** `/admin/orders`
 
 ### Viewing Orders
-All orders are listed with order ID, customer name, email, date, total, and status. Use the search bar to filter by name, email, or order ID. Use the status dropdown to filter by a specific status.
+All orders are listed with order ID, customer name, email, date, total, and status. Click any row (or the eye icon) to open the order detail modal. Use the search bar to filter by name, email, or order ID. Use the status dropdown to filter by a specific status. Click **Refresh** to manually reload, or orders update automatically via Supabase Realtime.
 
 ### Order Statuses
 | Status | Meaning |
 |---|---|
 | `pending` | Order placed but payment not confirmed |
-| `paid` | Payment confirmed via Stripe |
-| `fulfilled` | Sent to Printify for production |
+| `paid` | Payment confirmed via Stripe webhook |
+| `fulfilled` | In production at Printify |
+| `partially-fulfilled` | Some items shipped, others still in production |
 | `shipped` | Carrier has picked up the package |
 | `delivered` | Package delivered to customer |
 | `cancelled` | Order cancelled |
 
 ### Order Detail
-Click the eye icon to open the order detail panel. From here you can:
-- **Change the order status** using the dropdown.
+Click any row or the eye icon to open the order detail modal. From here you can:
+- **Change the order status** using the dropdown — updates your store DB only. Does not push to Printify (except cancellation — see below).
 - View customer name, email, and full shipping address.
 - See all items ordered with variant, quantity, and line total.
 - View subtotal, shipping cost, and order total.
-- See Printify fulfillment details, tracking number, and a tracking link if available.
+- **Check Printify** — fetches the live Printify status for the order. Shows live status with a plain-English label alongside your stored status.
+- **Sync to Order** — writes Printify's live status, fulfillment status, tracking number, and tracking URL into your DB.
+
+### Cancelling an Order
+Setting status to `Cancelled` is the only change that pushes back to Printify.
+- If Printify confirms the cancellation → DB updated.
+- If Printify rejects it (order already in production) → alert shown, DB **not** changed, dropdown reverts.
+
+### Printify Status Labels
+| Printify status | Meaning |
+|---|---|
+| `on-hold` | Awaiting payment confirmation |
+| `payment-not-received` | Payment failed |
+| `pending` | Queued for production |
+| `in-production` | Being printed |
+| `partially-fulfilled` | Partially shipped |
+| `shipped` | On its way |
+| `delivered` | Delivered |
+| `canceled` | Cancelled by Printify |
 
 ---
 
