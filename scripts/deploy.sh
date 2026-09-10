@@ -19,8 +19,8 @@ echo "🏗️  Building..."
 npm run build
 
 echo "📋 Copying static assets to standalone..."
-cp -r .next/static .next/standalone/.next/static
-cp -r public .next/standalone/public
+cp -r .next/static .next/standalone/.next/
+cp -r public .next/standalone/
 cp -r node_modules/sharp .next/standalone/node_modules/ 2>/dev/null || true
 cp -r node_modules/@img .next/standalone/node_modules/ 2>/dev/null || true
 cp -r node_modules/stripe .next/standalone/node_modules/ 2>/dev/null || true
