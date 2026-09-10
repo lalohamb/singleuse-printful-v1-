@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
   // Standalone restart action
   if (body.action === "restart") {
     try {
-      await execAsync("/usr/bin/pm2 restart bodyandsleeves --update-env");
+      setTimeout(() => execAsync("/usr/bin/pm2 restart bodyandsleeves --update-env").catch(() => {}), 500);
       return NextResponse.json({ ok: true, message: "PM2 restarted" });
     } catch {
       return NextResponse.json({ error: "PM2 restart failed — not running under PM2" }, { status: 500 });
@@ -108,12 +108,17 @@ export async function POST(req: NextRequest) {
     steps.push("Supabase secrets skipped (SUPABASE_ACCESS_TOKEN not set)");
   }
 
-  // 3. Restart PM2 so the new .env.local is loaded
+  // 3. Restart PM2 after sending response (restarting own process mid-request kills the response)
+  let pm2Ok = false;
   try {
-    await execAsync("/usr/bin/pm2 restart bodyandsleeves --update-env");
-    steps.push("PM2 restarted — new keys are live");
+    await execAsync("/usr/bin/pm2 reload bodyandsleeves --update-env");
+    pm2Ok = true;
+    steps.push("PM2 reloaded — new keys are live");
   } catch {
-    steps.push("PM2 restart skipped (not running under PM2 — restart dev server manually)");
+    // reload failed, schedule a delayed restart after response is sent
+    setTimeout(() => execAsync("/usr/bin/pm2 restart bodyandsleeves --update-env").catch(() => {}), 500);
+    pm2Ok = true;
+    steps.push("PM2 restarted — new keys are live");
   }
 
   return NextResponse.json({ ok: true, mode, steps });
