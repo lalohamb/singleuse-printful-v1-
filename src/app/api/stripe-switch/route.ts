@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
   // Standalone restart action
   if (body.action === "restart") {
     try {
-      await execAsync("pm2 restart bodyandsleeves --update-env");
+      await execAsync("/usr/bin/pm2 restart bodyandsleeves --update-env");
       return NextResponse.json({ ok: true, message: "PM2 restarted" });
     } catch {
       return NextResponse.json({ error: "PM2 restart failed — not running under PM2" }, { status: 500 });
@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
 
   // 3. Restart PM2 so the new .env.local is loaded
   try {
-    await execAsync("pm2 restart bodyandsleeves --update-env");
+    await execAsync("/usr/bin/pm2 restart bodyandsleeves --update-env");
     steps.push("PM2 restarted — new keys are live");
   } catch {
     steps.push("PM2 restart skipped (not running under PM2 — restart dev server manually)");
