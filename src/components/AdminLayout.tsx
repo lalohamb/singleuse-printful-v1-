@@ -1,5 +1,5 @@
 "use client";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { LayoutDashboard, Package, ShoppingBag, Settings as SettingsIcon, LogOut, Menu, FolderTree, ExternalLink, Mail, CreditCard, Send, Search, Truck, Image, FileText } from "lucide-react";
@@ -25,30 +25,60 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [stripeMode, setStripeMode] = useState<"live" | "test" | null>(null);
+  const [ordersPaused, setOrdersPaused] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch("/api/stripe-mode").then((r) => r.ok ? r.json() : null).then((d) => {
+      if (d?.active_mode) setStripeMode(d.active_mode);
+    }).catch(() => {});
+
+    const fetchPaused = () =>
+      import("@/lib/supabase").then(({ supabase }) =>
+        supabase.from("settings").select("orders_paused").limit(1).maybeSingle().then(({ data }) => {
+          if (data) setOrdersPaused(!!data.orders_paused);
+        })
+      );
+
+    fetchPaused();
+    const interval = setInterval(fetchPaused, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleSignOut = async () => { await signOut(); router.push("/admin"); };
 
   return (
     <div className="min-h-screen bg-secondary-50 flex">
       <aside className={`fixed lg:sticky top-0 left-0 h-screen w-64 bg-secondary-900 text-white z-50 transition-transform flex flex-col ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
-        <div className="p-6 border-b border-secondary-700">
+        <div className="p-6 border-b border-secondary-700 flex-shrink-0">
           <Link href="/admin/dashboard" className="flex items-center gap-2">
             <span className="font-display text-xl font-bold">Body<span className="text-gold-500">&</span>Sleeves</span>
           </Link>
           <p className="text-secondary-400 text-xs mt-1">Admin Panel</p>
         </div>
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-3 space-y-0.5 overflow-hidden">
           {navItems.map((item) => {
             const isActive = pathname === item.path;
             return (
-              <Link key={item.path} href={item.path} onClick={() => setSidebarOpen(false)} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive ? "bg-secondary-800 text-white font-medium" : "text-secondary-400 hover:bg-secondary-800 hover:text-white"}`}>
-                <item.icon size={20} />{item.label}
+              <Link key={item.path} href={item.path} onClick={() => setSidebarOpen(false)} className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm ${isActive ? "bg-secondary-800 text-white font-medium" : "text-secondary-400 hover:bg-secondary-800 hover:text-white"}`}>
+                <item.icon size={20} />
+                <span className="flex-1">{item.label}</span>
+                {item.path === "/admin/stripe" && stripeMode && (
+                  <span className={`text-[10px] font-semibold ${
+                    stripeMode === "live" ? "text-green-400" : "text-amber-400"
+                  }`}>{stripeMode === "live" ? "LIVE" : "TEST"}</span>
+                )}
+                {item.path === "/admin/dashboard" && ordersPaused !== null && (
+                  <span className={`text-[10px] font-semibold ${
+                    ordersPaused ? "text-red-400" : "text-green-400"
+                  }`}>{ordersPaused ? "PAUSED" : "OPEN"}</span>
+                )}
               </Link>
             );
           })}
-          <Link href="/" className="flex items-center gap-3 px-4 py-3 rounded-lg text-secondary-400 hover:bg-secondary-800 hover:text-white transition-colors"><ExternalLink size={20} />View Store</Link>
+          <Link href="/" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-secondary-400 hover:bg-secondary-800 hover:text-white transition-colors"><ExternalLink size={18} />View Store</Link>
         </nav>
-        <div className="p-4 border-t border-secondary-700">
+        <div className="p-4 border-t border-secondary-700 flex-shrink-0">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-9 h-9 rounded-full bg-gold-500 flex items-center justify-center text-secondary-900 font-bold text-sm">{admin?.email?.[0]?.toUpperCase() || "A"}</div>
             <div className="min-w-0">
@@ -60,12 +90,16 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         </div>
       </aside>
       {sidebarOpen && <div className="fixed inset-0 bg-secondary-900/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
-      <div className="flex-1 min-w-0">
-        <header className="bg-white border-b border-secondary-100 sticky top-0 z-30">
-          <div className="flex items-center justify-between px-4 lg:px-8 h-16">
+      <div className="flex-1 min-w-0 flex flex-col h-screen overflow-y-auto">
+        <header className="bg-white border-b border-secondary-100 sticky top-0 z-30 flex-shrink-0">
+          <div className="flex items-center gap-3">
             <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 text-secondary-700"><Menu size={24} /></button>
             <h1 className="text-lg font-semibold text-secondary-900">{navItems.find((n) => pathname === n.path)?.label || "Admin"}</h1>
-            <div className="w-8 lg:hidden" />
+            {pathname === "/admin/dashboard" && ordersPaused !== null && (
+              <span className={`text-sm font-semibold ${ordersPaused ? "text-red-500" : "text-green-500"}`}>
+                {ordersPaused ? "orders paused" : "orders open"}
+              </span>
+            )}
           </div>
         </header>
         <div className="p-4 lg:p-8">{children}</div>
