@@ -6,7 +6,9 @@ import StorefrontLayout from "@/components/StorefrontLayout";
 import ProductDetailClient from "./ProductDetailClient";
 import type { Product } from "@/types";
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+  global: { fetch: (url, opts) => fetch(url, { ...opts, cache: "no-store" }) },
+});
 
 async function getSeoSettings() {
   const { data } = await supabase.from("seo_settings").select("site_url, default_og_image, jsonld_enabled, canonical_enabled, meta_title_suffix").limit(1).maybeSingle();
