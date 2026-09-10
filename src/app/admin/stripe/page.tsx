@@ -165,7 +165,7 @@ function KeyForm({ mode, status, onSaved }: { mode: "live" | "test"; status: Key
 
 const PM2_SKIP_MSG = "PM2 restart skipped (not running under PM2 — restart dev server manually)";
 
-function RestartOverlay() {
+function RestartOverlay({ manual }: { manual?: boolean }) {
   useEffect(() => {
     const t = setTimeout(() => window.location.reload(), 4000);
     return () => clearTimeout(t);
@@ -174,8 +174,12 @@ function RestartOverlay() {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-secondary-900/60">
       <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center space-y-4">
         <Loader2 size={36} className="animate-spin text-primary-500 mx-auto" />
-        <p className="font-semibold text-secondary-900 text-lg">Server restarting…</p>
-        <p className="text-sm text-secondary-500">This may take a few seconds. The page will refresh automatically when ready.</p>
+        <p className="font-semibold text-secondary-900 text-lg">{manual ? "Reloading page…" : "Server restarting…"}</p>
+        <p className="text-sm text-secondary-500">
+          {manual
+            ? "Restart your dev server manually, then the page will reload."
+            : "This may take a few seconds. The page will refresh automatically when ready."}
+        </p>
         <div className="w-full bg-secondary-100 rounded-full h-1.5 overflow-hidden">
           <div className="bg-primary-500 h-1.5 rounded-full animate-pulse w-3/4" />
         </div>
@@ -184,22 +188,20 @@ function RestartOverlay() {
   );
 }
 
-function RestartButton({ onRestarting }: { onRestarting: () => void }) {
-  const [state, setState] = useState<"idle" | "loading" | "error">("idle");
+function RestartButton({ onRestarting }: { onRestarting: (manual: boolean) => void }) {
+  const [state, setState] = useState<"idle" | "loading">("idle");
 
   const doRestart = async () => {
     setState("loading");
     const r = await fetch("/api/stripe-switch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "restart" }) });
-    if (r.ok) { onRestarting(); }
-    else { setState("error"); }
+    onRestarting(!r.ok);
   };
 
-  if (state === "error") return <span className="text-xs text-secondary-400 ml-1">(restart your dev server manually)</span>;
+  if (state === "loading") return <Loader2 size={10} className="animate-spin ml-1" />;
 
   return (
-    <button onClick={doRestart} disabled={state === "loading"} className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-warning-100 text-warning-700 hover:bg-warning-200 transition-colors ml-1">
-      {state === "loading" ? <Loader2 size={10} className="animate-spin" /> : <RefreshCw size={10} />}
-      Restart server
+    <button onClick={doRestart} className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-warning-100 text-warning-700 hover:bg-warning-200 transition-colors ml-1">
+      <RefreshCw size={10} />Restart server
     </button>
   );
 }
@@ -209,7 +211,7 @@ function SwitchButton({ mode, isActive, onSwitched }: { mode: "live" | "test"; i
   const [steps, setSteps] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
-  const [restarting, setRestarting] = useState(false);
+  const [restarting, setRestarting] = useState<{ manual: boolean } | null>(null);
 
   const doSwitch = async () => {
     setLoading(true); setSteps([]); setError(null); setDone(false);
@@ -224,7 +226,7 @@ function SwitchButton({ mode, isActive, onSwitched }: { mode: "live" | "test"; i
 
   return (
     <>
-      {restarting && <RestartOverlay />}
+      {restarting && <RestartOverlay manual={restarting.manual} />}
       <div className="space-y-2 w-full">
         {!done && (
           <button onClick={doSwitch} disabled={loading} className="btn-primary py-1.5 px-4 text-sm w-full">
@@ -238,7 +240,7 @@ function SwitchButton({ mode, isActive, onSwitched }: { mode: "live" | "test"; i
               <li key={i} className="flex items-center flex-wrap">
                 <Check size={10} className="mr-1 shrink-0" />
                 <span>{s}</span>
-                {s === PM2_SKIP_MSG && <RestartButton onRestarting={() => setRestarting(true)} />}
+                {s === PM2_SKIP_MSG && <RestartButton onRestarting={(manual) => setRestarting({ manual })} />}
               </li>
             ))}
           </ul>
