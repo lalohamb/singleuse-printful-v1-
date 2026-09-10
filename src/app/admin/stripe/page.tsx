@@ -227,10 +227,11 @@ function SwitchButton({ mode, isActive, onSwitched }: { mode: "live" | "test"; i
   return (
     <>
       {restarting && <RestartOverlay manual={restarting.manual} />}
-      <div className="space-y-2 w-full">
+      <div className="space-y-2">
         {!done && (
-          <button onClick={doSwitch} disabled={loading} className="btn-primary py-1.5 px-4 text-sm w-full">
-            {loading ? <Loader2 size={14} className="animate-spin mx-auto" /> : `Switch to ${mode.toUpperCase()}`}
+          <button onClick={doSwitch} disabled={loading} className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-primary-600 text-white hover:bg-primary-700 transition-colors disabled:opacity-50">
+            {loading ? <Loader2 size={12} className="animate-spin" /> : null}
+            {loading ? "Switching…" : `Switch to ${mode.toUpperCase()}`}
           </button>
         )}
         {error && <p className="text-xs text-error-600">{error}</p>}
