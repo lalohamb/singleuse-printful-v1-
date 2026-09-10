@@ -211,42 +211,40 @@ function SwitchButton({ mode, isActive, onSwitched }: { mode: "live" | "test"; i
   );
 }
 
-function StripeKeyManager({ isLive }: { isLive: boolean }) {
+function StripeKeyManager({ isLive, onModeChange }: { isLive: boolean; onModeChange?: (mode: string) => void }) {
   const [keyStatus, setKeyStatus] = useState<{ live: KeyStatus; test: KeyStatus; active_mode: string } | null>(null);
 
   const fetchStatus = async () => {
     const r = await fetch("/api/stripe-mode");
-    if (r.ok) setKeyStatus(await r.json());
+    if (r.ok) {
+      const data = await r.json();
+      setKeyStatus(data);
+      onModeChange?.(data.active_mode);
+    }
   };
 
   useEffect(() => { fetchStatus(); }, []);
 
   const activeMode = keyStatus?.active_mode ?? (isLive ? "live" : "test");
 
+  if (!keyStatus) return null;
+
   return (
-    <div className="space-y-3">
-      <div className={`rounded-xl border p-4 ${activeMode === "live" ? "bg-success-50 border-success-200" : "bg-amber-50 border-amber-200"}`}>
-        <p className="text-sm font-semibold text-secondary-900">Active mode: <span className={activeMode === "live" ? "text-success-700" : "text-amber-700"}>{activeMode === "live" ? "LIVE" : "TEST"}</span></p>
-        <p className="text-xs text-secondary-500 mt-0.5">{activeMode === "live" ? "Real payments are being processed." : "Test mode — no real charges."}</p>
+    <div className="flex flex-col gap-3 w-full max-w-xs">
+      <div className="rounded-xl border border-success-200 bg-success-50 p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-success-100 text-success-700">LIVE</span>
+          <SwitchButton mode="live" isActive={activeMode === "live"} onSwitched={fetchStatus} />
+        </div>
+        <KeyForm mode="live" status={keyStatus.live} onSaved={fetchStatus} />
       </div>
-      {keyStatus && (
-        <>
-          <div className="rounded-xl border border-success-200 bg-success-50 p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-success-100 text-success-700">LIVE</span>
-              <SwitchButton mode="live" isActive={activeMode === "live"} onSwitched={fetchStatus} />
-            </div>
-            <KeyForm mode="live" status={keyStatus.live} onSaved={fetchStatus} />
-          </div>
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">TEST</span>
-              <SwitchButton mode="test" isActive={activeMode === "test"} onSwitched={fetchStatus} />
-            </div>
-            <KeyForm mode="test" status={keyStatus.test} onSaved={fetchStatus} />
-          </div>
-        </>
-      )}
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">TEST</span>
+          <SwitchButton mode="test" isActive={activeMode === "test"} onSwitched={fetchStatus} />
+        </div>
+        <KeyForm mode="test" status={keyStatus.test} onSaved={fetchStatus} />
+      </div>
     </div>
   );
 }
@@ -330,8 +328,14 @@ function StripeDashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Stripe Key Manager */}
-      <StripeKeyManager isLive={isLive} />
+      {/* Active mode banner + key manager side by side */}
+      <div className="flex items-start justify-between gap-6">
+        <div className={`rounded-xl border p-4 self-start ${isLive ? "bg-success-50 border-success-200" : "bg-amber-50 border-amber-200"}`}>
+          <p className="text-sm font-semibold text-secondary-900">Active mode: <span className={isLive ? "text-success-700" : "text-amber-700"}>{isLive ? "LIVE" : "TEST"}</span></p>
+          <p className="text-xs text-secondary-500 mt-0.5">{isLive ? "Real payments are being processed." : "Test mode — no real charges."}</p>
+        </div>
+        <StripeKeyManager isLive={isLive} />
+      </div>
 
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -344,20 +348,33 @@ function StripeDashboard() {
       </div>
 
       {/* Balance Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
+      {(() => {
+        const balanceCards = [
           { label: "Available Balance", value: fmt(available), icon: DollarSign, color: "bg-success-50 text-success-600" },
           { label: "Pending Balance", value: fmt(pending), icon: TrendingUp, color: "bg-warning-50 text-warning-600" },
           { label: "Volume (last 20)", value: fmt(totalVolume), icon: CreditCard, color: "bg-primary-50 text-primary-600" },
           { label: "Refunded (last 20)", value: fmt(totalRefunded), icon: ArrowDownCircle, color: "bg-error-50 text-error-600" },
-        ].map((card) => (
-          <div key={card.label} className="bg-white rounded-xl p-5 border border-secondary-100 shadow-sm">
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${card.color}`}><card.icon size={20} /></div>
-            <p className="text-xl font-bold text-secondary-900">{card.value}</p>
-            <p className="text-xs text-secondary-500 mt-1">{card.label}</p>
-          </div>
-        ))}
-      </div>
+        ];
+        return (
+          <>
+            {!isLive && (
+              <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
+                <AlertCircle size={14} className="flex-shrink-0" />
+                These values reflect your Stripe test account — no real money involved.
+              </div>
+            )}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {balanceCards.map((card) => (
+                <div key={card.label} className="bg-white rounded-xl p-5 border border-secondary-100 shadow-sm">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${card.color}`}><card.icon size={20} /></div>
+                  <p className="text-xl font-bold text-secondary-900">{card.value}</p>
+                  <p className="text-xs text-secondary-500 mt-1">{card.label}</p>
+                </div>
+              ))}
+            </div>
+          </>
+        );
+      })()}
 
       {/* Recent Charges */}
       <div className="bg-white rounded-xl border border-secondary-100 shadow-sm overflow-hidden">
