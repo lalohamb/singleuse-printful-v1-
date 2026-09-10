@@ -168,11 +168,8 @@ function KeyForm({ mode, status, onSaved }: { mode: "live" | "test"; status: Key
   );
 }
 
-function StripeKeyManager({ isLive, onSwitched }: { isLive: boolean; onSwitched: () => void }) {
+function StripeKeyManager({ isLive }: { isLive: boolean }) {
   const [keyStatus, setKeyStatus] = useState<{ live: KeyStatus; test: KeyStatus } | null>(null);
-  const [switching, setSwitching] = useState(false);
-  const [switchMsg, setSwitchMsg] = useState<string | null>(null);
-  const [switchErr, setSwitchErr] = useState<string | null>(null);
 
   const fetchStatus = async () => {
     const r = await fetch("/api/stripe-mode");
@@ -181,35 +178,12 @@ function StripeKeyManager({ isLive, onSwitched }: { isLive: boolean; onSwitched:
 
   useEffect(() => { fetchStatus(); }, []);
 
-  const switchMode = async () => {
-    const target = isLive ? "test" : "live";
-    setSwitching(true); setSwitchMsg(null); setSwitchErr(null);
-    const r = await fetch("/api/stripe-mode", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "switch", mode: target }) });
-    const data = await r.json();
-    if (!r.ok) { setSwitchErr(data.error); }
-    else {
-      setSwitchMsg(data.message);
-      if (data.restarted) {
-        await new Promise(res => setTimeout(res, 10_000));
-        onSwitched();
-      }
-    }
-    setSwitching(false);
-  };
-
   return (
     <div className="space-y-3">
-      <div className={`rounded-xl border p-4 flex items-center justify-between gap-4 ${ isLive ? "bg-success-50 border-success-200" : "bg-amber-50 border-amber-200" }`}>
-        <div>
-          <p className="text-sm font-semibold text-secondary-900">Active mode: <span className={isLive ? "text-success-700" : "text-amber-700"}>{isLive ? "LIVE" : "TEST"}</span></p>
-          <p className="text-xs text-secondary-500 mt-0.5">{isLive ? "Real payments are being processed." : "Test mode — no real charges."}</p>
-        </div>
-        <button onClick={switchMode} disabled={switching} className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white ${ switching ? "bg-secondary-400" : isLive ? "bg-amber-500 hover:bg-amber-600" : "bg-success-600 hover:bg-success-700" }`}>
-          {switching ? <><Loader2 size={15} className="animate-spin" />Switching...</> : isLive ? "→ Switch to Test" : "→ Switch to Live"}
-        </button>
+      <div className={`rounded-xl border p-4 ${isLive ? "bg-success-50 border-success-200" : "bg-amber-50 border-amber-200"}`}>
+        <p className="text-sm font-semibold text-secondary-900">Active mode: <span className={isLive ? "text-success-700" : "text-amber-700"}>{isLive ? "LIVE" : "TEST"}</span></p>
+        <p className="text-xs text-secondary-500 mt-0.5">{isLive ? "Real payments are being processed." : "Test mode — no real charges."}</p>
       </div>
-      {switchMsg && <p className="text-xs text-success-600 bg-success-50 border border-success-100 rounded-lg p-3">{switchMsg}</p>}
-      {switchErr && <p className="text-xs text-error-600 bg-error-50 border border-error-100 rounded-lg p-3">{switchErr}</p>}
       {keyStatus && (
         <>
           <KeyForm mode="live" status={keyStatus.live} onSaved={fetchStatus} />
@@ -300,7 +274,7 @@ function StripeDashboard() {
   return (
     <div className="space-y-8">
       {/* Stripe Key Manager */}
-      <StripeKeyManager isLive={isLive} onSwitched={fetchAll} />
+      <StripeKeyManager isLive={isLive} />
 
       {/* Header */}
       <div className="flex items-center justify-between">
