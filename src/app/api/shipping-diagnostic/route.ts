@@ -32,18 +32,18 @@ export async function GET() {
   ).length ?? 0;
 
   const withShippingInfo = products?.filter(
-    (p) => p.shipping_info?.profiles?.length > 0
+    (p) => Array.isArray(p.shipping_info?.profiles) && p.shipping_info.profiles.length > 0
   ).length ?? 0;
 
   const missingShippingInfo = products
-    ?.filter((p) => !p.shipping_info?.profiles?.length)
+    ?.filter((p) => !Array.isArray(p.shipping_info?.profiles) || p.shipping_info.profiles.length === 0)
     .map((p) => ({ id: p.id, title: p.title })) ?? [];
 
   // 3. Sample rate — pick a product with shipping_info and calculate a US rate
   let sampleRate: number | null = null;
   let sampleProduct: string | null = null;
 
-  const sampleP = products?.find((p) => p.shipping_info?.profiles?.length > 0);
+  const sampleP = products?.find((p) => Array.isArray(p.shipping_info?.profiles) && p.shipping_info.profiles.length > 0);
   if (sampleP) {
     const profile =
       sampleP.shipping_info.profiles.find((p: any) =>
