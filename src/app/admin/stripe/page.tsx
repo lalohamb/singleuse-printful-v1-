@@ -262,7 +262,7 @@ function SwitchButton({ mode, isActive, onSwitched }: { mode: "live" | "test"; i
   );
 }
 
-function StripeKeyManager({ isLive, onModeSwitch }: { isLive: boolean; onModeSwitch: () => void }) {
+function StripeKeyManager({ isLive }: { isLive: boolean }) {
   const [keyStatus, setKeyStatus] = useState<{ live: KeyStatus; test: KeyStatus; active_mode: string } | null>(null);
 
   const fetchStatus = async () => {
@@ -285,14 +285,14 @@ function StripeKeyManager({ isLive, onModeSwitch }: { isLive: boolean; onModeSwi
           <div className="rounded-xl border border-success-200 bg-success-50 p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-success-100 text-success-700">LIVE</span>
-              <SwitchButton mode="live" isActive={activeMode === "live"} onSwitched={() => { fetchStatus(); onModeSwitch(); }} />
+              <SwitchButton mode="live" isActive={activeMode === "live"} onSwitched={fetchStatus} />
             </div>
             <KeyForm mode="live" status={keyStatus.live} onSaved={fetchStatus} />
           </div>
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">TEST</span>
-              <SwitchButton mode="test" isActive={activeMode === "test"} onSwitched={() => { fetchStatus(); onModeSwitch(); }} />
+              <SwitchButton mode="test" isActive={activeMode === "test"} onSwitched={fetchStatus} />
             </div>
             <KeyForm mode="test" status={keyStatus.test} onSaved={fetchStatus} />
           </div>
@@ -382,7 +382,7 @@ function StripeDashboard() {
   return (
     <div className="space-y-8">
       {/* Stripe Key Manager */}
-      <StripeKeyManager isLive={isLive} onModeSwitch={() => setTimeout(fetchAll, 3000)} />
+      <StripeKeyManager isLive={isLive} />
 
       {/* Header */}
       <div className="flex items-center justify-between">

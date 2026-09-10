@@ -1,5 +1,6 @@
 SSH="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -i $HOME/.ssh/id_rsa"
 $SSH root@146.190.252.82 '
+
 cd /var/www/bodyandsleeves
 echo "=== pull ==="
 git pull --ff-only 2>&1 | tail -6
@@ -68,3 +69,17 @@ cp -r node_modules/@img .next/standalone/node_modules/
 pm2 delete bodyandsleeves
 pm2 start node --name bodyandsleeves -- .next/standalone/server.js
 pm2 save
+=========================================
+
+Now push this and redeploy on the droplet:
+
+# on your local machine
+git add scripts/deploy.sh && git commit -m "fix deploy: copy static assets and public to standalone" && git push
+
+# then on the droplet
+cd /var/www/bodyandsleeves && git pull && bash scripts/deploy.sh
+
+
+The missing cp -r .next/static and cp -r public is what broke the formatting — CSS,
+JS chunks, fonts, and images all live in those folders and the standalone server 
+can't find them without the copy.
