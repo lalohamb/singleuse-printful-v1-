@@ -425,8 +425,18 @@ Deno.serve(async (req: Request) => {
             // Postgres upsert only updates the columns present in the payload.
             const isLocked = lockedMap.get(String(detail.id)) === true;
             if (!isLocked) {
+              const rawDesc = detail.description || "";
               payload.title = detail.title;
-              payload.description = detail.description || "";
+              payload.description = rawDesc
+                .replace(/<[^>]*>/g, " ")
+                .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&")
+                .replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+                .replace(/&ldquo;/g, '"').replace(/&rdquo;/g, '"')
+                .replace(/&lsquo;/g, "'").replace(/&rsquo;/g, "'")
+                .replace(/&mdash;/g, "\u2014").replace(/&ndash;/g, "\u2013")
+                .replace(/&hellip;/g, "...").replace(/&#[0-9]+;/g, "")
+                .replace(/&[a-z]+;/g, "").replace(/[ \t]+/g, " ")
+                .replace(/\n{3,}/g, "\n\n").trim();
               payload.image_url = images[0] || null;
               payload.images = images;
             }
