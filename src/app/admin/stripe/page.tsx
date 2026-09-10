@@ -167,9 +167,9 @@ const PM2_SKIP_MSG = "PM2 restart skipped (not running under PM2 — restart dev
 
 function RestartOverlay({ manual }: { manual?: boolean }) {
   useEffect(() => {
-    const t = setTimeout(() => window.location.reload(), 4000);
+    const t = setTimeout(() => window.location.reload(), manual ? 12000 : 4000);
     return () => clearTimeout(t);
-  }, []);
+  }, [manual]);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-secondary-900/60">
       <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center space-y-4">
