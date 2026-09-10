@@ -171,13 +171,33 @@ function RestartButton() {
   const doRestart = async () => {
     setState("loading");
     const r = await fetch("/api/stripe-switch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "restart" }) });
-    setState(r.ok ? "done" : "error");
+    if (r.ok) {
+      setState("done");
+      // hard refresh after 4s to let PM2 come back up
+      setTimeout(() => window.location.reload(), 4000);
+    } else {
+      setState("error");
+    }
   };
 
+  if (state === "loading" || state === "done") return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-secondary-900/60">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center space-y-4">
+        <Loader2 size={36} className="animate-spin text-primary-500 mx-auto" />
+        <p className="font-semibold text-secondary-900 text-lg">Server restarting…</p>
+        <p className="text-sm text-secondary-500">This may take a few seconds. The page will refresh automatically when ready.</p>
+        <div className="w-full bg-secondary-100 rounded-full h-1.5 overflow-hidden">
+          <div className="bg-primary-500 h-1.5 rounded-full animate-pulse w-3/4" />
+        </div>
+      </div>
+    </div>
+  );
+
+  if (state === "error") return <span className="text-xs text-secondary-400 ml-1">(restart your dev server manually)</span>;
+
   return (
-    <button onClick={doRestart} disabled={state === "loading" || state === "done"} className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-warning-100 text-warning-700 hover:bg-warning-200 transition-colors ml-1">
-      {state === "loading" ? <Loader2 size={10} className="animate-spin" /> : state === "done" ? <Check size={10} /> : <RefreshCw size={10} />}
-      {state === "done" ? "Restarted" : state === "error" ? "Failed" : "Restart server"}
+    <button onClick={doRestart} className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-warning-100 text-warning-700 hover:bg-warning-200 transition-colors ml-1">
+      <RefreshCw size={10} />Restart server
     </button>
   );
 }
