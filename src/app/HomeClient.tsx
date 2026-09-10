@@ -100,8 +100,8 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
           <div className="flex overflow-x-auto scrollbar-hide gap-1">
             {categories.map((cat) => (
               <Link key={cat.id} href={`/shop?category=${cat.slug}`} className="group relative flex-1 min-w-[140px] aspect-square overflow-hidden bg-secondary-900 hover:shadow-xl hover:shadow-gold-500/10 transition-all">
-                {categoryImages[cat.id] && (
-                  <img src={categoryImages[cat.id]} alt={cat.name} className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" />
+                {(cat.category_image_url || categoryImages[cat.id]) && (
+                  <img src={cat.category_image_url || categoryImages[cat.id]} alt={cat.name} className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" />
                 )}
                 {(() => {
                   const op = ((cat.gradient_opacity ?? 60) / 100);

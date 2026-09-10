@@ -41,6 +41,7 @@ export interface Category {
   description: string | null;
   gradient_opacity: number | null;
   gradient_dir: string | null;
+  category_image_url: string | null;
   created_at: string;
 }
 
@@ -72,6 +73,7 @@ export interface StoreSettings {
   story_gradient_dir: string | null;
   logo_url: string | null;
   logo_size: number | null;
+  favicon_url: string | null;
   promo_banner_active: boolean;
   promo_banner_title: string | null;
   promo_banner_body: string | null;

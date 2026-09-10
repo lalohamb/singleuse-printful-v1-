@@ -76,7 +76,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               </Link>
             );
           })}
-          <Link href="/" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-secondary-400 hover:bg-secondary-800 hover:text-white transition-colors"><ExternalLink size={18} />View Store</Link>
+          <a href="/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-secondary-400 hover:bg-secondary-800 hover:text-white transition-colors"><ExternalLink size={18} />View Store</a>
         </nav>
         <div className="p-4 border-t border-secondary-700 flex-shrink-0">
           <div className="flex items-center gap-3 mb-3">
