@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const runtime = "nodejs";
+
 const BASE = "https://api.mailerlite.com/api/v2";
 const key = process.env.MAILER_LITE_API_KEY;
 

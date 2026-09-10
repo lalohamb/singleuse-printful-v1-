@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const runtime = "nodejs";
+
 const RESEND_API = "https://api.resend.com";
 const key = process.env.RESEND_API_KEY;
 
