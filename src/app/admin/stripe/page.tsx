@@ -101,196 +101,120 @@ function RefundModal({ charge, onClose, onRefunded }: { charge: Charge; onClose:
   );
 }
 
-const WEBHOOK_URL = "https://SUPABASE_PROJECT_REF_REDACTED.supabase.co/functions/v1/stripe-webhook";
+interface KeyStatus { hasKeys: boolean; secret_key_hint: string; webhook_hint: string; }
 
-function GoLiveChecklist({ isLive, onSwitched }: { isLive: boolean; onSwitched: () => void }) {
-  const [open, setOpen] = useState(!isLive);
-  const [copiedStep, setCopiedStep] = useState<number | null>(null);
+function KeyForm({ mode, status, onSaved }: { mode: "live" | "test"; status: KeyStatus; onSaved: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [secretKey, setSecretKey] = useState("");
+  const [webhookSecret, setWebhookSecret] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const save = async () => {
+    setSaving(true); setMsg(null); setErr(null);
+    const r = await fetch("/api/stripe-mode", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "save-keys", mode, secret_key: secretKey.trim(), webhook_secret: webhookSecret.trim() }) });
+    const data = await r.json();
+    if (!r.ok) setErr(data.error);
+    else { setMsg(data.message); setSecretKey(""); setWebhookSecret(""); onSaved(); }
+    setSaving(false);
+  };
+
+  const isLiveMode = mode === "live";
+  const border = isLiveMode ? "border-success-200" : "border-amber-200";
+  const bg = isLiveMode ? "bg-success-50" : "bg-amber-50";
+  const badge = isLiveMode ? "bg-success-100 text-success-700" : "bg-amber-100 text-amber-700";
+  const stripeLink = isLiveMode ? "https://dashboard.stripe.com/apikeys" : "https://dashboard.stripe.com/test/apikeys";
+
+  return (
+    <div className={`rounded-xl border ${border} ${bg}`}>
+      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between p-4 text-left">
+        <div className="flex items-center gap-3">
+          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${badge}`}>{mode.toUpperCase()}</span>
+          <span className="text-sm font-medium text-secondary-900">{isLiveMode ? "Live" : "Test"} Stripe Keys</span>
+          {status.hasKeys
+            ? <span className="flex items-center gap-1 text-xs text-success-600"><Check size={12} />Saved</span>
+            : <span className="text-xs text-warning-600">Not set</span>}
+        </div>
+        <span className="text-xs text-secondary-400">{open ? "Hide" : "Edit"}</span>
+      </button>
+      {open && (
+        <div className="border-t border-secondary-100 p-4 space-y-3">
+          {status.hasKeys && (
+            <div className="text-xs text-secondary-500 space-y-1">
+              <p>Secret key: <code className="bg-white px-1 rounded">{status.secret_key_hint}</code></p>
+              <p>Webhook secret: <code className="bg-white px-1 rounded">{status.webhook_hint}</code></p>
+            </div>
+          )}
+          <a href={stripeLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-primary-600 hover:underline">
+            Get keys from Stripe <ExternalLink size={11} />
+          </a>
+          <div>
+            <label className="label-text">Secret Key (sk_{mode === "live" ? "live" : "test"}_...)</label>
+            <input value={secretKey} onChange={e => setSecretKey(e.target.value)} className="input-field font-mono text-sm" placeholder={`sk_${mode}_...`} />
+          </div>
+          <div>
+            <label className="label-text">Webhook Secret (whsec_...)</label>
+            <input value={webhookSecret} onChange={e => setWebhookSecret(e.target.value)} className="input-field font-mono text-sm" placeholder="whsec_..." />
+          </div>
+          {msg && <p className="text-xs text-success-600">{msg}</p>}
+          {err && <p className="text-xs text-error-600">{err}</p>}
+          <button onClick={save} disabled={saving || !secretKey || !webhookSecret} className="btn-primary py-2 w-full">
+            {saving ? <Loader2 size={16} className="animate-spin mx-auto" /> : `Save ${mode} keys`}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StripeKeyManager({ isLive, onSwitched }: { isLive: boolean; onSwitched: () => void }) {
+  const [keyStatus, setKeyStatus] = useState<{ live: KeyStatus; test: KeyStatus } | null>(null);
   const [switching, setSwitching] = useState(false);
-  const [switchLog, setSwitchLog] = useState<string | null>(null);
-  const [switchError, setSwitchError] = useState<string | null>(null);
+  const [switchMsg, setSwitchMsg] = useState<string | null>(null);
+  const [switchErr, setSwitchErr] = useState<string | null>(null);
+
+  const fetchStatus = async () => {
+    const r = await fetch("/api/stripe-mode");
+    if (r.ok) setKeyStatus(await r.json());
+  };
+
+  useEffect(() => { fetchStatus(); }, []);
 
   const switchMode = async () => {
-    setSwitching(true); setSwitchLog(null); setSwitchError(null);
     const target = isLive ? "test" : "live";
-    try {
-      const r = await fetch("/api/stripe-mode", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: target }),
-      });
-      const data = await r.json();
-      if (!r.ok) { setSwitchError(data.error || "Switch failed"); setSwitchLog(data.log || null); }
-      else {
-        setSwitchLog(data.log + "\n\n⏳ Waiting for server restart...");
-        // Wait for PM2 to restart before re-fetching mode
-        await new Promise(res => setTimeout(res, 12_000));
+    setSwitching(true); setSwitchMsg(null); setSwitchErr(null);
+    const r = await fetch("/api/stripe-mode", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "switch", mode: target }) });
+    const data = await r.json();
+    if (!r.ok) { setSwitchErr(data.error); }
+    else {
+      setSwitchMsg(data.message);
+      if (data.restarted) {
+        await new Promise(res => setTimeout(res, 10_000));
         onSwitched();
       }
-    } catch (e: any) {
-      setSwitchError(e.message);
     }
     setSwitching(false);
   };
 
-  const copy = (text: string, step: number) => {
-    navigator.clipboard.writeText(text);
-    setCopiedStep(step);
-    setTimeout(() => setCopiedStep(null), 2000);
-  };
-
-  const liveSteps = [
-    {
-      label: "Get your live Secret key from Stripe",
-      detail: "Go to Stripe Dashboard → Developers → API keys → copy the live Secret key (starts with sk_live_)",
-      link: { href: "https://dashboard.stripe.com/apikeys", label: "Open Stripe API Keys →" },
-    },
-    {
-      label: "Update .env.local with the live key",
-      code: "STRIPE_SECRET_KEY=sk_live_...",
-      detail: "Replace the existing sk_test_ value in your .env.local file.",
-    },
-    {
-      label: "Set the live key as a Supabase secret",
-      code: "npx supabase secrets set STRIPE_SECRET_KEY=sk_live_... --project-ref SUPABASE_PROJECT_REF_REDACTED",
-    },
-    {
-      label: "Register the webhook in Stripe (live mode)",
-      detail: `Go to Stripe Dashboard → Developers → Webhooks → Add endpoint → URL: ${WEBHOOK_URL} → Enable: checkout.session.completed, payment_intent.payment_failed`,
-      link: { href: "https://dashboard.stripe.com/webhooks", label: "Open Stripe Webhooks →" },
-    },
-    {
-      label: "Set the webhook signing secret",
-      code: "npx supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_... --project-ref SUPABASE_PROJECT_REF_REDACTED",
-      detail: "Copy the Signing secret from the webhook you just created (starts with whsec_).",
-    },
-    {
-      label: "Redeploy edge functions",
-      code: "npx supabase functions deploy stripe-webhook stripe-checkout --project-ref SUPABASE_PROJECT_REF_REDACTED",
-    },
-  ];
-
-  const testSteps = [
-    {
-      label: "Get your test Secret key from Stripe",
-      detail: "Go to Stripe Dashboard → toggle \"Test mode\" on → Developers → API keys → copy the test Secret key (starts with sk_test_)",
-      link: { href: "https://dashboard.stripe.com/test/apikeys", label: "Open Stripe Test API Keys →" },
-    },
-    {
-      label: "Update .env.local with the test key",
-      code: "STRIPE_SECRET_KEY=sk_test_...",
-      detail: "Replace the sk_live_ value in your .env.local file.",
-    },
-    {
-      label: "Set the test key as a Supabase secret",
-      code: "npx supabase secrets set STRIPE_SECRET_KEY=sk_test_... --project-ref SUPABASE_PROJECT_REF_REDACTED",
-    },
-    {
-      label: "Register a webhook in Stripe (test mode)",
-      detail: `In Stripe test mode: Developers → Webhooks → Add endpoint → URL: ${WEBHOOK_URL} → Enable: checkout.session.completed, payment_intent.payment_failed`,
-      link: { href: "https://dashboard.stripe.com/test/webhooks", label: "Open Stripe Test Webhooks →" },
-    },
-    {
-      label: "Set the test webhook signing secret",
-      code: "npx supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_... --project-ref SUPABASE_PROJECT_REF_REDACTED",
-      detail: "Copy the Signing secret from the test webhook you just created.",
-    },
-    {
-      label: "Redeploy edge functions",
-      code: "npx supabase functions deploy stripe-webhook stripe-checkout --project-ref SUPABASE_PROJECT_REF_REDACTED",
-    },
-  ];
-
-  const steps = isLive ? testSteps : liveSteps;
-  const accentBorder = isLive ? "border-success-200" : "border-amber-200";
-  const accentText = isLive ? "text-success-700" : "text-amber-700";
-  const accentBg = isLive ? "bg-success-50" : "bg-amber-50";
-  const stepBorder = isLive ? "border-success-100" : "border-amber-100";
-  const badgeBg = isLive ? "bg-success-100 text-success-700" : "bg-amber-100 text-amber-700";
-
   return (
-    <div className={`rounded-xl border ${accentBg} ${accentBorder}`}>
-      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between p-4 text-left">
-        <div className="flex items-center gap-3">
-          <AlertCircle size={18} className={isLive ? "text-success-500" : "text-amber-500"} />
-          <div>
-            <p className={`text-sm font-semibold ${isLive ? "text-success-800" : "text-amber-800"}`}>
-              Stripe is in <strong>{isLive ? "LIVE" : "TEST"}</strong> mode
-            </p>
-            <p className={`text-xs ${accentText}`}>
-              {isLive ? "Real payments are being processed." : "No real money is being processed — complete the checklist below before launching."}
-            </p>
-          </div>
+    <div className="space-y-3">
+      <div className={`rounded-xl border p-4 flex items-center justify-between gap-4 ${ isLive ? "bg-success-50 border-success-200" : "bg-amber-50 border-amber-200" }`}>
+        <div>
+          <p className="text-sm font-semibold text-secondary-900">Active mode: <span className={isLive ? "text-success-700" : "text-amber-700"}>{isLive ? "LIVE" : "TEST"}</span></p>
+          <p className="text-xs text-secondary-500 mt-0.5">{isLive ? "Real payments are being processed." : "Test mode — no real charges."}</p>
         </div>
-        <span className={`text-xs font-medium flex-shrink-0 ${accentText}`}>
-          {open ? "Hide" : isLive ? "Switch to Test Mode" : "Go Live checklist"}
-        </span>
-      </button>
-
-      {open && (
-        <div className={`border-t ${accentBorder} px-4 pb-4 pt-3 space-y-3`}>
-
-          {/* One-click switch button */}
-          <div className={`rounded-lg p-3 border ${accentBorder} bg-white flex items-center justify-between gap-4`}>
-            <div>
-              <p className="text-sm font-semibold text-secondary-900">
-                {isLive ? "Switch to Test / Sandbox mode" : "Switch to Live mode"}
-              </p>
-              <p className="text-xs text-secondary-500 mt-0.5">
-                Updates Supabase secrets and redeploys edge functions automatically.
-              </p>
-            </div>
-            <button
-              onClick={switchMode}
-              disabled={switching}
-              className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-colors ${
-                switching ? "bg-secondary-400 cursor-not-allowed" :
-                isLive ? "bg-amber-500 hover:bg-amber-600" : "bg-success-600 hover:bg-success-700"
-              }`}
-            >
-              {switching
-                ? <><Loader2 size={15} className="animate-spin" />Switching...</>
-                : isLive ? "→ Switch to Test" : "→ Switch to Live"
-              }
-            </button>
-          </div>
-
-          {/* Log output */}
-          {(switchLog || switchError) && (
-            <div className={`rounded-lg p-3 text-xs font-mono whitespace-pre-wrap border ${
-              switchError ? "bg-error-50 border-error-200 text-error-700" : "bg-secondary-900 border-secondary-700 text-green-400"
-            }`}>
-              {switchError && <p className="font-semibold mb-1">Error: {switchError}</p>}
-              {switchLog}
-            </div>
-          )}
-
-          <p className={`text-xs font-semibold uppercase tracking-wide ${accentText}`}>
-            {isLive ? "Manual steps (if needed)" : "Manual steps (if needed)"}
-          </p>
-          {steps.map((step, i) => (
-            <div key={i} className={`bg-white rounded-lg border ${stepBorder} p-3 space-y-1.5`}>
-              <p className="text-sm font-medium text-secondary-900">
-                <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full ${badgeBg} text-xs font-bold mr-2`}>{i + 1}</span>
-                {step.label}
-              </p>
-              {step.detail && <p className="text-xs text-secondary-500 ml-7">{step.detail}</p>}
-              {step.link && (
-                <a href={step.link.href} target="_blank" rel="noopener noreferrer" className="ml-7 inline-flex items-center gap-1 text-xs text-primary-600 hover:underline">
-                  {step.link.label} <ExternalLink size={11} />
-                </a>
-              )}
-              {step.code && (
-                <div className="ml-7 flex items-center gap-2">
-                  <code className="flex-1 text-xs bg-secondary-50 border border-secondary-200 rounded px-2 py-1.5 text-secondary-700 break-all">{step.code}</code>
-                  <button onClick={() => copy(step.code!, i)} className="flex-shrink-0 text-xs px-2 py-1.5 rounded border border-secondary-200 text-secondary-500 hover:text-secondary-900 hover:border-secondary-400 transition-colors">
-                    {copiedStep === i ? <Check size={13} className="text-success-500" /> : "Copy"}
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+        <button onClick={switchMode} disabled={switching} className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white ${ switching ? "bg-secondary-400" : isLive ? "bg-amber-500 hover:bg-amber-600" : "bg-success-600 hover:bg-success-700" }`}>
+          {switching ? <><Loader2 size={15} className="animate-spin" />Switching...</> : isLive ? "→ Switch to Test" : "→ Switch to Live"}
+        </button>
+      </div>
+      {switchMsg && <p className="text-xs text-success-600 bg-success-50 border border-success-100 rounded-lg p-3">{switchMsg}</p>}
+      {switchErr && <p className="text-xs text-error-600 bg-error-50 border border-error-100 rounded-lg p-3">{switchErr}</p>}
+      {keyStatus && (
+        <>
+          <KeyForm mode="live" status={keyStatus.live} onSaved={fetchStatus} />
+          <KeyForm mode="test" status={keyStatus.test} onSaved={fetchStatus} />
+        </>
       )}
     </div>
   );
@@ -375,8 +299,8 @@ function StripeDashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Go Live checklist */}
-      <GoLiveChecklist isLive={isLive} onSwitched={fetchAll} />
+      {/* Stripe Key Manager */}
+      <StripeKeyManager isLive={isLive} onSwitched={fetchAll} />
 
       {/* Header */}
       <div className="flex items-center justify-between">

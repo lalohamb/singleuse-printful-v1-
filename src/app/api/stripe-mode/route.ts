@@ -1,108 +1,106 @@
 import { NextRequest, NextResponse } from "next/server";
-import { exec, spawn } from "child_process";
-import { promisify } from "util";
+import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 
 export const runtime = "nodejs";
 
-const execAsync = promisify(exec);
+const PM2_PATHS = ["/usr/bin/pm2", "/usr/local/bin/pm2", "/root/.nvm/versions/node/v22/bin/pm2"];
 
 function parseEnvFile(filePath: string): Record<string, string> {
   if (!fs.existsSync(filePath)) return {};
-  return fs.readFileSync(filePath, "utf8")
-    .split("\n")
-    .reduce((acc, line) => {
-      const match = line.match(/^([^#=]+)=(.*)$/);
-      if (match) acc[match[1].trim()] = match[2].trim();
-      return acc;
-    }, {} as Record<string, string>);
+  return fs.readFileSync(filePath, "utf8").split("\n").reduce((acc, line) => {
+    const m = line.match(/^([^#=]+)=(.*)$/);
+    if (m) acc[m[1].trim()] = m[2].trim();
+    return acc;
+  }, {} as Record<string, string>);
 }
 
-function getKeysFromEnvFile(mode: "live" | "test") {
-  const file = path.resolve(process.cwd(), mode === "live" ? ".env.live" : ".env.test");
-  const env = parseEnvFile(file);
-  if (!env.STRIPE_SECRET_KEY || !env.STRIPE_WEBHOOK_SECRET) return null;
-  return { STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET: env.STRIPE_WEBHOOK_SECRET };
+function writeEnvFile(filePath: string, env: Record<string, string>) {
+  const content = Object.entries(env).map(([k, v]) => `${k}=${v}`).join("\n") + "\n";
+  fs.writeFileSync(filePath, content, "utf8");
 }
 
+function rebuildEcosystem(appDir: string) {
+  const envPath = path.resolve(appDir, ".env.local");
+  const fullEnv = parseEnvFile(envPath);
+  const ecosystemPath = path.resolve(appDir, "ecosystem.config.js");
+  const config = `module.exports = { apps: [{ name: 'bodyandsleeves', script: '.next/standalone/server.js', interpreter: 'node', cwd: '${appDir}', env: ${JSON.stringify(fullEnv, null, 2)} }] };`;
+  fs.writeFileSync(ecosystemPath, config, "utf8");
+  return ecosystemPath;
+}
+
+function restartPM2(ecosystemPath: string) {
+  const pm2 = PM2_PATHS.find(p => fs.existsSync(p));
+  if (!pm2) return false;
+  spawn("/bin/bash", ["-c", `${pm2} delete bodyandsleeves; ${pm2} start ${ecosystemPath}; ${pm2} save`],
+    { detached: true, stdio: "ignore" }).unref();
+  return true;
+}
+
+// POST /api/stripe-mode
+// body: { action: "save-keys", mode: "live"|"test", secret_key, webhook_secret }
+//     | { action: "switch", mode: "live"|"test" }
 export async function POST(req: NextRequest) {
-  const { mode } = await req.json() as { mode: string };
-  if (mode !== "live" && mode !== "test") {
-    return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
+  const body = await req.json();
+  const appDir = process.cwd();
+
+  // ── Save keys to .env.live or .env.test ──
+  if (body.action === "save-keys") {
+    const { mode, secret_key, webhook_secret } = body as { mode: string; secret_key: string; webhook_secret: string };
+    if (mode !== "live" && mode !== "test") return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
+    if (!secret_key || !webhook_secret) return NextResponse.json({ error: "Both keys are required" }, { status: 400 });
+
+    const filePath = path.resolve(appDir, mode === "live" ? ".env.live" : ".env.test");
+    const existing = parseEnvFile(filePath);
+    writeEnvFile(filePath, { ...existing, STRIPE_SECRET_KEY: secret_key, STRIPE_WEBHOOK_SECRET: webhook_secret });
+    return NextResponse.json({ ok: true, message: `${mode} keys saved to .env.${mode}` });
   }
 
-  const keys = getKeysFromEnvFile(mode as "live" | "test");
-  if (!keys) {
-    return NextResponse.json({ error: `.env.${mode} not found or missing STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET. Make sure both files exist on the droplet at /var/www/bodyandsleeves/.env.live and .env.test` }, { status: 500 });
-  }
-  const log: string[] = [];
+  // ── Switch active mode ──
+  if (body.action === "switch") {
+    const { mode } = body as { mode: string };
+    if (mode !== "live" && mode !== "test") return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
 
-  try {
-    // Always update .env.local with the new keys
-    const envPath = path.resolve(process.cwd(), ".env.local");
-    if (fs.existsSync(envPath)) {
-      let envContent = fs.readFileSync(envPath, "utf8");
-      envContent = envContent.replace(/^STRIPE_SECRET_KEY=.*/m, `STRIPE_SECRET_KEY=${keys.STRIPE_SECRET_KEY}`);
-      envContent = envContent.replace(/^STRIPE_WEBHOOK_SECRET=.*/m, `STRIPE_WEBHOOK_SECRET=${keys.STRIPE_WEBHOOK_SECRET}`);
-      fs.writeFileSync(envPath, envContent, "utf8");
-      log.push(`✅ .env.local updated with ${mode} keys`);
+    const modeFile = path.resolve(appDir, mode === "live" ? ".env.live" : ".env.test");
+    const modeEnv = parseEnvFile(modeFile);
+    if (!modeEnv.STRIPE_SECRET_KEY || !modeEnv.STRIPE_WEBHOOK_SECRET) {
+      return NextResponse.json({ error: `No keys found for ${mode} mode. Save them first.` }, { status: 400 });
     }
 
-    // 2. Push secrets to Supabase edge functions
-    const secretsCmd = [
-      "npx supabase secrets set",
-      `STRIPE_SECRET_KEY=${keys.STRIPE_SECRET_KEY}`,
-      `STRIPE_WEBHOOK_SECRET=${keys.STRIPE_WEBHOOK_SECRET}`,
-      "--project-ref SUPABASE_PROJECT_REF_REDACTED",
-    ].join(" ");
-    const { stdout: s1, stderr: e1 } = await execAsync(secretsCmd, { timeout: 30_000 });
-    log.push(`✅ Supabase secrets updated\n${(s1 + e1).trim()}`);
+    // Update .env.local
+    const envPath = path.resolve(appDir, ".env.local");
+    const currentEnv = parseEnvFile(envPath);
+    writeEnvFile(envPath, { ...currentEnv, STRIPE_SECRET_KEY: modeEnv.STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET: modeEnv.STRIPE_WEBHOOK_SECRET });
 
-    // 3. Redeploy edge functions
-    const { stdout: s2, stderr: e2 } = await execAsync(
-      "npx supabase functions deploy stripe-webhook stripe-checkout --project-ref SUPABASE_PROJECT_REF_REDACTED",
-      { timeout: 120_000 }
-    );
-    log.push(`✅ Edge functions redeployed\n${(s2 + e2).trim()}`);
+    // Rebuild ecosystem and restart PM2
+    const ecosystemPath = rebuildEcosystem(appDir);
+    const restarted = restartPM2(ecosystemPath);
 
-    // 4. Write ecosystem.config.js with updated env, then pm2 reload from it
-    const pm2Bin = ["/usr/bin/pm2", "/usr/local/bin/pm2", "/root/.nvm/versions/node/v22/bin/pm2"]
-      .find(p => fs.existsSync(p));
-
-    if (pm2Bin) {
-      const appDir = process.cwd();
-      const ecosystemPath = path.join(appDir, "ecosystem.config.js");
-
-      // Read all vars from .env.local — source of truth
-      const envPath = path.resolve(appDir, ".env.local");
-      const fullEnv: Record<string, string> = {};
-      if (fs.existsSync(envPath)) {
-        fs.readFileSync(envPath, "utf8").split("\n").forEach(line => {
-          const m = line.match(/^([^#=]+)=(.*)$/);
-          if (m) fullEnv[m[1].trim()] = m[2].trim();
-        });
-      }
-
-      const ecosystem = `module.exports = { apps: [{ name: 'bodyandsleeves', script: '.next/standalone/server.js', interpreter: 'node', cwd: '${appDir}', env: ${JSON.stringify(fullEnv, null, 2)} }] };`;
-      fs.writeFileSync(ecosystemPath, ecosystem, "utf8");
-      log.push(`✅ ecosystem.config.js written with ${Object.keys(fullEnv).length} vars`);
-
-      spawn(
-        "/bin/bash",
-        ["-c", `${pm2Bin} delete bodyandsleeves; ${pm2Bin} start ${ecosystemPath}; ${pm2Bin} save`],
-        { detached: true, stdio: "ignore" }
-      ).unref();
-      log.push("✅ PM2 restart triggered. Wait ~10s then refresh.");
-    } else {
-      log.push("ℹ️ Running locally — restart your dev server to pick up the new keys.");
-    }
-
-    return NextResponse.json({ ok: true, log: log.join("\n\n") });
-  } catch (e: any) {
-    return NextResponse.json(
-      { error: e.message, log: [...log, `❌ ${e.stderr || e.message}`].join("\n\n") },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      ok: true,
+      restarted,
+      message: restarted
+        ? `Switched to ${mode} mode. PM2 restarting — wait ~10s then refresh.`
+        : `Switched to ${mode} mode. Restart your dev server to apply.`,
+    });
   }
+
+  return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+}
+
+// GET /api/stripe-mode — return which keys are saved
+export async function GET() {
+  const appDir = process.cwd();
+  const liveEnv = parseEnvFile(path.resolve(appDir, ".env.live"));
+  const testEnv = parseEnvFile(path.resolve(appDir, ".env.test"));
+  const activeEnv = parseEnvFile(path.resolve(appDir, ".env.local"));
+
+  const mask = (k: string) => k ? `${k.slice(0, 12)}...${k.slice(-4)}` : "";
+
+  return NextResponse.json({
+    live: { hasKeys: !!(liveEnv.STRIPE_SECRET_KEY && liveEnv.STRIPE_WEBHOOK_SECRET), secret_key_hint: mask(liveEnv.STRIPE_SECRET_KEY), webhook_hint: mask(liveEnv.STRIPE_WEBHOOK_SECRET) },
+    test: { hasKeys: !!(testEnv.STRIPE_SECRET_KEY && testEnv.STRIPE_WEBHOOK_SECRET), secret_key_hint: mask(testEnv.STRIPE_SECRET_KEY), webhook_hint: mask(testEnv.STRIPE_WEBHOOK_SECRET) },
+    active_mode: activeEnv.STRIPE_SECRET_KEY?.startsWith("sk_live") ? "live" : "test",
+  });
 }
