@@ -105,6 +105,7 @@ function Products() {
       if (!res.ok) { const err = await res.json().catch(() => ({ error: "Sync failed" })); throw new Error(err.error || "Sync failed"); }
       const data = await res.json();
       setSyncMsg(`Synced ${data.synced || 0} products from Printify${data.deleted ? ` · ${data.deleted} removed` : ""}.`);
+      fetch("/api/revalidate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths: ["/", "/shop"] }) });
       fetchData();
     } catch (err) { setSyncMsg(err instanceof Error ? err.message : "Sync failed"); }
     finally { setSyncing(false); }

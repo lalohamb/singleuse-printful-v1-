@@ -10,9 +10,8 @@ export const metadata: Metadata = {
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
-// ISR: regenerate this page at most once per 60s so product/settings edits
-// and Printify re-syncs show up on the storefront without a manual rebuild.
-export const revalidate = 60;
+// Page cache is purged explicitly via /api/revalidate after any admin save.
+export const revalidate = false;
 
 export default async function HomePage() {
   const [settingsRes, featuredRes, newArrivalsRes, trendingRes, categoriesRes, catImgRes] = await Promise.all([
