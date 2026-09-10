@@ -59,7 +59,7 @@ function EmailPanel() {
 
   const fetchCustomerEmails = async () => {
     const { data } = await supabase.from("orders").select("email").eq("livemode", true).eq("status", "paid");
-    const unique = [...new Set((data || []).map((o: any) => o.email).filter(Boolean))];
+    const unique = Array.from(new Set((data || []).map((o: any) => o.email).filter(Boolean)));
     setCustomerEmails(unique);
   };
 
