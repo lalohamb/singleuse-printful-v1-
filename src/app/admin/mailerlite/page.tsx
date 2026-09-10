@@ -39,7 +39,7 @@ function AddSubscriberModal({ groups, onClose, onDone }: { groups: Group[]; onCl
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setLoading(true); setError(null);
     const res = await post({ action: "add_subscriber", email: form.email, name: form.name, groups: form.group ? [form.group] : [] });
-    if (res.error || res.message) setError(res.message || res.error);
+    if (res.error || res.message) setError(typeof res.message === "string" ? res.message : typeof res.error === "string" ? res.error : JSON.stringify(res.message || res.error));
     else { setDone(true); setTimeout(() => { onDone(); onClose(); }, 1000); }
     setLoading(false);
   };
@@ -103,7 +103,13 @@ function CreateCampaignModal({ groups, onClose, onDone }: { groups: Group[]; onC
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setLoading(true); setError(null);
     const res = await post({ action: "create_campaign", ...form, groups: form.group ? [form.group] : [] });
-    if (res.error || res.message || res.errors) setError(res.message || res.error || JSON.stringify(res.errors));
+    if (res.error || res.message || res.errors) {
+      const msg = typeof res.message === "string" ? res.message
+        : typeof res.error === "string" ? res.error
+        : res.errors ? Object.values(res.errors).flat().join(", ")
+        : JSON.stringify(res.message || res.error || res.errors);
+      setError(msg);
+    }
     else { setDone(true); setTimeout(() => { onDone(); onClose(); }, 1200); }
     setLoading(false);
   };
