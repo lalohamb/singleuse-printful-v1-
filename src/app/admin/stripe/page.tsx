@@ -213,12 +213,23 @@ function SwitchButton({ mode, isActive, onSwitched }: { mode: "live" | "test"; i
   const [done, setDone] = useState(false);
   const [restarting, setRestarting] = useState<{ manual: boolean } | null>(null);
 
+  const handleRestarting = (manual: boolean) => {
+    setRestarting({ manual });
+    onSwitched(); // update parent badge now that restart is confirmed
+  };
+
   const doSwitch = async () => {
     setLoading(true); setSteps([]); setError(null); setDone(false);
     const r = await fetch("/api/stripe-switch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode }) });
     const data = await r.json();
     if (!r.ok) { setError(data.error); }
-    else { setSteps(data.steps); setDone(true); onSwitched(); }
+    else {
+      setSteps(data.steps);
+      setDone(true);
+      // only refresh parent status if PM2 restarted automatically (no manual step needed)
+      const needsManualRestart = data.steps?.some((s: string) => s === PM2_SKIP_MSG);
+      if (!needsManualRestart) onSwitched();
+    }
     setLoading(false);
   };
 
@@ -241,7 +252,7 @@ function SwitchButton({ mode, isActive, onSwitched }: { mode: "live" | "test"; i
               <li key={i} className="flex items-center flex-wrap">
                 <Check size={10} className="mr-1 shrink-0" />
                 <span>{s}</span>
-                {s === PM2_SKIP_MSG && <RestartButton onRestarting={(manual) => setRestarting({ manual })} />}
+                {s === PM2_SKIP_MSG && <RestartButton onRestarting={handleRestarting} />}
               </li>
             ))}
           </ul>
