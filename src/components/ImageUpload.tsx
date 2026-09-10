@@ -4,7 +4,7 @@ import { Upload, Loader2, X, Image as ImageIcon, Check } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 const BUCKET = "store-images";
-const FOLDERS = ["uploads", "settings/hero", "settings/our-why", "settings/story"];
+const FOLDERS = ["uploads", "settings/hero", "settings/our-why", "settings/story", "settings/logo"];
 
 interface MediaFile {
   name: string;

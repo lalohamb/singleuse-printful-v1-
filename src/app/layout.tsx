@@ -20,7 +20,7 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: { siteName: "Body & Sleeves", type: "website" },
     ...(seo?.twitter_handle && { twitter: { card: "summary_large_image", site: seo.twitter_handle } }),
     ...(seo?.google_site_verification && { verification: { google: seo.google_site_verification } }),
-    ...(settings?.favicon_url && { icons: { icon: settings.favicon_url, shortcut: settings.favicon_url } }),
+    ...(settings?.favicon_url && { icons: { icon: "/api/favicon", shortcut: "/api/favicon" } }),
   };
 }
 

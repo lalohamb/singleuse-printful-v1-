@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
 
 const BUCKET = "store-images";
-const FOLDERS = ["uploads", "settings/hero", "settings/our-why", "settings/story"];
+const FOLDERS = ["uploads", "settings/hero", "settings/our-why", "settings/story", "settings/logo"];
 
 interface MediaFile {
   name: string;
