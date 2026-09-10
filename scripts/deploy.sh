@@ -24,6 +24,10 @@ cp -r public .next/standalone/
 cp -r node_modules/sharp .next/standalone/node_modules/ 2>/dev/null || true
 cp -r node_modules/@img .next/standalone/node_modules/ 2>/dev/null || true
 cp -r node_modules/stripe .next/standalone/node_modules/ 2>/dev/null || true
+# Copy env files so API routes can read them from process.cwd() in standalone
+[ -f .env.live ] && cp .env.live .next/standalone/.env.live
+[ -f .env.test ] && cp .env.test .next/standalone/.env.test
+[ -f .env.local ] && cp .env.local .next/standalone/.env.local
 echo "♻️  Restarting PM2..."
 # Load .env.local into an ecosystem config so standalone server has all vars
 node -e "
