@@ -56,3 +56,13 @@ cd /var/www/bodyandsleeves
 pm2 start npm --name bodyandsleeves -- start
 pm2 save
 
+=====================================Force a fresh deploy
+cd /var/www/bodyandsleeves
+git pull
+npm ci
+npm run build
+cp -r node_modules/sharp .next/standalone/node_modules/
+cp -r node_modules/@img .next/standalone/node_modules/
+pm2 delete bodyandsleeves
+pm2 start node --name bodyandsleeves -- .next/standalone/server.js
+pm2 save

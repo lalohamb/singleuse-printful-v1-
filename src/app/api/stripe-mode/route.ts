@@ -4,6 +4,8 @@ import { promisify } from "util";
 import fs from "fs";
 import path from "path";
 
+export const runtime = "nodejs";
+
 const execAsync = promisify(exec);
 
 function parseEnvFile(filePath: string): Record<string, string> {
@@ -32,7 +34,7 @@ export async function POST(req: NextRequest) {
 
   const keys = getKeysFromEnvFile(mode as "live" | "test");
   if (!keys) {
-    return NextResponse.json({ error: `.env.${mode} not found or missing Stripe keys` }, { status: 500 });
+    return NextResponse.json({ error: `.env.${mode} not found or missing STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET. Make sure both files exist on the droplet at /var/www/bodyandsleeves/.env.live and .env.test` }, { status: 500 });
   }
   const log: string[] = [];
 
