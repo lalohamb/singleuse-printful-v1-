@@ -3,12 +3,11 @@ import Stripe from "stripe";
 
 export const runtime = "nodejs";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2026-08-26.dahlia" });
-
 export async function GET(req: NextRequest) {
   if (!process.env.STRIPE_SECRET_KEY) {
     return NextResponse.json({ error: "STRIPE_SECRET_KEY not set" }, { status: 500 });
   }
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2026-08-26.dahlia" });
   const { searchParams } = new URL(req.url);
   const action = searchParams.get("action");
 
@@ -37,7 +36,7 @@ export async function POST(req: NextRequest) {
   if (!process.env.STRIPE_SECRET_KEY) {
     return NextResponse.json({ error: "STRIPE_SECRET_KEY not set" }, { status: 500 });
   }
-  const { action, charge_id, amount, secret_key, webhook_url } = await req.json();
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2026-08-26.dahlia" });
 
   try {
     if (action === "refund") {
