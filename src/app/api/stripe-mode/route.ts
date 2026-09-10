@@ -4,6 +4,22 @@ import path from "path";
 
 export const runtime = "nodejs";
 
+// Resolves to /var/www/bodyandsleeves regardless of whether we're running
+// from the repo root or the standalone bundle (.next/standalone/server.js)
+function appRoot(): string {
+  const cwd = process.cwd();
+  // standalone server runs from the repo root via ecosystem.config.js cwd
+  // but double-check by looking for .env.local walking up if needed
+  if (fs.existsSync(path.join(cwd, ".env.local"))) return cwd;
+  // fallback: walk up from __dirname
+  let dir = __dirname;
+  for (let i = 0; i < 8; i++) {
+    if (fs.existsSync(path.join(dir, ".env.local"))) return dir;
+    dir = path.dirname(dir);
+  }
+  return cwd;
+}
+
 function parseEnvFile(filePath: string): Record<string, string> {
   if (!fs.existsSync(filePath)) return {};
   return fs.readFileSync(filePath, "utf8").split("\n").reduce((acc, line) => {
@@ -24,18 +40,18 @@ export async function POST(req: NextRequest) {
   if (mode !== "live" && mode !== "test") return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
   if (!secret_key || !webhook_secret) return NextResponse.json({ error: "Both keys are required" }, { status: 400 });
 
-  const appDir = process.cwd();
-  const filePath = path.resolve(appDir, mode === "live" ? ".env.live" : ".env.test");
+  const root = appRoot();
+  const filePath = path.resolve(root, mode === "live" ? ".env.live" : ".env.test");
   writeEnvFile(filePath, { ...parseEnvFile(filePath), STRIPE_SECRET_KEY: secret_key, STRIPE_WEBHOOK_SECRET: webhook_secret });
   return NextResponse.json({ ok: true, message: `${mode} keys saved` });
 }
 
 // GET — return saved key hints
 export async function GET() {
-  const appDir = process.cwd();
-  const liveEnv = parseEnvFile(path.resolve(appDir, ".env.live"));
-  const testEnv = parseEnvFile(path.resolve(appDir, ".env.test"));
-  const activeEnv = parseEnvFile(path.resolve(appDir, ".env.local"));
+  const root = appRoot();
+  const liveEnv = parseEnvFile(path.resolve(root, ".env.live"));
+  const testEnv = parseEnvFile(path.resolve(root, ".env.test"));
+  const activeEnv = parseEnvFile(path.resolve(root, ".env.local"));
   const mask = (k: string) => k ? `${k.slice(0, 12)}...${k.slice(-4)}` : "";
   return NextResponse.json({
     live: { hasKeys: !!(liveEnv.STRIPE_SECRET_KEY && liveEnv.STRIPE_WEBHOOK_SECRET), secret_key_hint: mask(liveEnv.STRIPE_SECRET_KEY), webhook_hint: mask(liveEnv.STRIPE_WEBHOOK_SECRET) },

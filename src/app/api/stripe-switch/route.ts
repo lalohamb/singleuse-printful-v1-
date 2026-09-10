@@ -9,6 +9,17 @@ export const runtime = "nodejs";
 const execAsync = promisify(exec);
 const SUPABASE_PROJECT_REF = "SUPABASE_PROJECT_REF_REDACTED";
 
+function appRoot(): string {
+  const cwd = process.cwd();
+  if (fs.existsSync(path.join(cwd, ".env.local"))) return cwd;
+  let dir = __dirname;
+  for (let i = 0; i < 8; i++) {
+    if (fs.existsSync(path.join(dir, ".env.local"))) return dir;
+    dir = path.dirname(dir);
+  }
+  return cwd;
+}
+
 function parseEnvFile(filePath: string): Record<string, string> {
   if (!fs.existsSync(filePath)) return {};
   return fs.readFileSync(filePath, "utf8").split("\n").reduce((acc, line) => {
@@ -42,7 +53,7 @@ export async function POST(req: NextRequest) {
   if (mode !== "live" && mode !== "test")
     return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
 
-  const appDir = process.cwd();
+  const appDir = appRoot();
   const envFile = path.resolve(appDir, mode === "live" ? ".env.live" : ".env.test");
 
   if (!fs.existsSync(envFile))
