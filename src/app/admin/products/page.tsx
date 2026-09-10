@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Plus, Edit2, Trash2, Search, X, Loader2, RefreshCw, Star, EyeOff, Package, Lock, CheckCircle, AlertTriangle } from "lucide-react";
 import { supabase, formatPrice } from "@/lib/supabase";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
@@ -119,7 +119,7 @@ function Products() {
           <div className="flex items-start gap-2 text-sm text-amber-800">
             <AlertTriangle size={16} className="flex-shrink-0 mt-0.5 text-amber-500" />
             <span>
-              <strong>Printify publish flow:</strong> When you click "Publish" on a product in Printify, it fires a webhook → this site confirms back → product becomes active. If a product is stuck at <em>"Publishing"</em> in Printify, the webhook confirmation failed — redeploy the <code className="bg-amber-100 px-1 rounded">printify-webhook</code> edge function and try publishing again.
+              <strong>Printify sync flow:</strong> Products are automatically pulled from your connected Printify store — no need to click "Publish" in Printify. That button is misleading and redundant here. Just make sure the product is <em>visible</em> in your Printify store, then click <strong>Sync Printify</strong> below to pull it in and set status as <span className="text-xs px-2 py-0.5 rounded-full bg-success-50 text-success-600 font-medium">active</span><span className="ml-1 text-[10px] text-secondary-400">via Printify</span>.
             </span>
           </div>
           <button onClick={() => setWebhookInfoDismissed(true)} className="flex-shrink-0 text-amber-500 hover:text-amber-700"><X size={16} /></button>
@@ -305,6 +305,29 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [titleEmojiOpen, setTitleEmojiOpen] = useState(false);
+  const descRef = useRef<HTMLTextAreaElement>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
+
+  const EMOJIS = [
+    { label: "Style",   icons: ["👕","👗","🧥","👖","👟","🧢","👒","🧣","🧤","💍"] },
+    { label: "Vibes",   icons: ["🔥","✨","💫","⚡","🌟","💥","🎯","💎","🏆","👑"] },
+    { label: "Love",    icons: ["❤️","🖤","🤍","💛","🧡","💜","💙","💚","🤎","💗"] },
+    { label: "Culture", icons: ["✊🏾","🙌🏾","💪🏾","🫶🏾","🤝🏾","👏🏾","🫁","🌍","☀️","🕊️"] },
+    { label: "Fun",     icons: ["😍","🥰","😎","🤩","😏","🙏","💯","🎉","🛍️","📦"] },
+  ];
+
+  const insertEmojiInto = (ref: React.RefObject<HTMLInputElement | HTMLTextAreaElement>, field: "title" | "description", emoji: string) => {
+    const el = ref.current;
+    if (!el) { setForm((prev) => ({ ...prev, [field]: prev[field] + emoji })); return; }
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? el.value.length;
+    const next = el.value.slice(0, start) + emoji + el.value.slice(end);
+    setForm((prev) => ({ ...prev, [field]: next }));
+    requestAnimationFrame(() => { el.focus(); el.setSelectionRange(start + emoji.length, start + emoji.length); });
+  };
+  const insertEmoji = (emoji: string) => insertEmojiInto(descRef as React.RefObject<HTMLTextAreaElement>, "description", emoji);
 
   const handleSave = async () => {
     setSaving(true); setError(null);
@@ -340,11 +363,54 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
           <button onClick={onClose} className="p-2 text-secondary-400 hover:text-secondary-900"><X size={20} /></button>
         </div>
         <div className="p-6 space-y-4">
-          <div><label className="label-text">Title</label><input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="input-field" placeholder="Product title" /></div>
+          <div>
+            <label className="label-text">Title</label>
+            <input ref={titleRef} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="input-field" placeholder="Product title" />
+            <div className="mt-2 border border-secondary-100 rounded-lg overflow-hidden">
+              <button type="button" onClick={() => setTitleEmojiOpen((o) => !o)} className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-secondary-600 hover:bg-secondary-50 transition-colors">
+                <span>😊 Add emoji</span>
+                <span className="text-secondary-400">{titleEmojiOpen ? "▲" : "▼"}</span>
+              </button>
+              {titleEmojiOpen && (
+                <div className="border-t border-secondary-100 p-2 space-y-2">
+                  {EMOJIS.map((group) => (
+                    <div key={group.label}>
+                      <p className="text-[10px] font-semibold text-secondary-400 uppercase tracking-wide mb-1">{group.label}</p>
+                      <div className="flex flex-wrap gap-1">
+                        {group.icons.map((e) => (
+                          <button key={e} type="button" onClick={() => insertEmojiInto(titleRef, "title", e)} className="text-lg hover:scale-125 transition-transform leading-none p-0.5 rounded hover:bg-secondary-100">{e}</button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
           <div>
             <label className="label-text">Description</label>
-            <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="input-field min-h-[200px] whitespace-pre-wrap" placeholder="Product description" />
+            <textarea ref={descRef} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="input-field min-h-[200px] whitespace-pre-wrap" placeholder="Product description" />
             <button type="button" onClick={() => setForm((prev) => ({ ...prev, description: (prev.description || "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&ldquo;/g, "\"").replace(/&rdquo;/g, "\"").replace(/&lsquo;/g, "'").replace(/&rsquo;/g, "'").replace(/&mdash;/g, "—").replace(/&ndash;/g, "–").replace(/&hellip;/g, "...").replace(/&#[0-9]+;/g, "").replace(/&[a-z]+;/g, "").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim() }))} className="text-xs text-secondary-400 hover:text-secondary-700 mt-1 underline">Clean HTML tags</button>
+            <div className="mt-2 border border-secondary-100 rounded-lg overflow-hidden">
+              <button type="button" onClick={() => setEmojiOpen((o) => !o)} className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-secondary-600 hover:bg-secondary-50 transition-colors">
+                <span>😊 Add emoji</span>
+                <span className="text-secondary-400">{emojiOpen ? "▲" : "▼"}</span>
+              </button>
+              {emojiOpen && (
+                <div className="border-t border-secondary-100 p-2 space-y-2">
+                  {EMOJIS.map((group) => (
+                    <div key={group.label}>
+                      <p className="text-[10px] font-semibold text-secondary-400 uppercase tracking-wide mb-1">{group.label}</p>
+                      <div className="flex flex-wrap gap-1">
+                        {group.icons.map((e) => (
+                          <button key={e} type="button" onClick={() => insertEmoji(e)} className="text-lg hover:scale-125 transition-transform leading-none p-0.5 rounded hover:bg-secondary-100">{e}</button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div><label className="label-text">Price ($)</label><input type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="input-field" placeholder="32.00" /></div>
