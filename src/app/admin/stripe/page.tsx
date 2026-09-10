@@ -165,22 +165,12 @@ function KeyForm({ mode, status, onSaved }: { mode: "live" | "test"; status: Key
 
 const PM2_SKIP_MSG = "PM2 restart skipped (not running under PM2 — restart dev server manually)";
 
-function RestartButton() {
-  const [state, setState] = useState<"idle" | "loading" | "done" | "error">("idle");
-
-  const doRestart = async () => {
-    setState("loading");
-    const r = await fetch("/api/stripe-switch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "restart" }) });
-    if (r.ok) {
-      setState("done");
-      // hard refresh after 4s to let PM2 come back up
-      setTimeout(() => window.location.reload(), 4000);
-    } else {
-      setState("error");
-    }
-  };
-
-  if (state === "loading" || state === "done") return (
+function RestartOverlay() {
+  useEffect(() => {
+    const t = setTimeout(() => window.location.reload(), 4000);
+    return () => clearTimeout(t);
+  }, []);
+  return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-secondary-900/60">
       <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center space-y-4">
         <Loader2 size={36} className="animate-spin text-primary-500 mx-auto" />
@@ -192,12 +182,24 @@ function RestartButton() {
       </div>
     </div>
   );
+}
+
+function RestartButton({ onRestarting }: { onRestarting: () => void }) {
+  const [state, setState] = useState<"idle" | "loading" | "error">("idle");
+
+  const doRestart = async () => {
+    setState("loading");
+    const r = await fetch("/api/stripe-switch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "restart" }) });
+    if (r.ok) { onRestarting(); }
+    else { setState("error"); }
+  };
 
   if (state === "error") return <span className="text-xs text-secondary-400 ml-1">(restart your dev server manually)</span>;
 
   return (
-    <button onClick={doRestart} className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-warning-100 text-warning-700 hover:bg-warning-200 transition-colors ml-1">
-      <RefreshCw size={10} />Restart server
+    <button onClick={doRestart} disabled={state === "loading"} className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-warning-100 text-warning-700 hover:bg-warning-200 transition-colors ml-1">
+      {state === "loading" ? <Loader2 size={10} className="animate-spin" /> : <RefreshCw size={10} />}
+      Restart server
     </button>
   );
 }
@@ -207,6 +209,7 @@ function SwitchButton({ mode, isActive, onSwitched }: { mode: "live" | "test"; i
   const [steps, setSteps] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [restarting, setRestarting] = useState(false);
 
   const doSwitch = async () => {
     setLoading(true); setSteps([]); setError(null); setDone(false);
@@ -220,25 +223,28 @@ function SwitchButton({ mode, isActive, onSwitched }: { mode: "live" | "test"; i
   if (isActive && !done) return <span className="text-xs text-success-600 font-medium flex items-center gap-1"><Check size={12} />Active</span>;
 
   return (
-    <div className="space-y-2 w-full">
-      {!done && (
-        <button onClick={doSwitch} disabled={loading} className="btn-primary py-1.5 px-4 text-sm w-full">
-          {loading ? <Loader2 size={14} className="animate-spin mx-auto" /> : `Switch to ${mode.toUpperCase()}`}
-        </button>
-      )}
-      {error && <p className="text-xs text-error-600">{error}</p>}
-      {steps.length > 0 && (
-        <ul className="text-xs text-success-700 space-y-1 bg-white/60 rounded-lg p-2">
-          {steps.map((s, i) => (
-            <li key={i} className="flex items-center flex-wrap">
-              <Check size={10} className="mr-1 shrink-0" />
-              <span>{s}</span>
-              {s === PM2_SKIP_MSG && <RestartButton />}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <>
+      {restarting && <RestartOverlay />}
+      <div className="space-y-2 w-full">
+        {!done && (
+          <button onClick={doSwitch} disabled={loading} className="btn-primary py-1.5 px-4 text-sm w-full">
+            {loading ? <Loader2 size={14} className="animate-spin mx-auto" /> : `Switch to ${mode.toUpperCase()}`}
+          </button>
+        )}
+        {error && <p className="text-xs text-error-600">{error}</p>}
+        {steps.length > 0 && (
+          <ul className="text-xs text-success-700 space-y-1 bg-white/60 rounded-lg p-2">
+            {steps.map((s, i) => (
+              <li key={i} className="flex items-center flex-wrap">
+                <Check size={10} className="mr-1 shrink-0" />
+                <span>{s}</span>
+                {s === PM2_SKIP_MSG && <RestartButton onRestarting={() => setRestarting(true)} />}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </>
   );
 }
 
