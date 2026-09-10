@@ -1,22 +1,44 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Send, Loader2, Check, Mail, RefreshCw } from "lucide-react";
+import { Send, Loader2, Check, Mail, RefreshCw, Users, AlertTriangle, CheckCircle, XCircle, Info } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
 
-interface SentEmail {
-  id: string;
-  to: string[];
-  subject: string;
-  created_at: string;
-}
+interface SentEmail { id: string; to: string[]; subject: string; created_at: string; }
+interface EmailEvent { resend_id: string; to_email: string; subject: string; event_type: string; created_at: string; }
+
+const eventBadge: Record<string, { label: string; cls: string }> = {
+  sent:       { label: "Sent",       cls: "bg-secondary-100 text-secondary-600" },
+  delivered:  { label: "Delivered",  cls: "bg-success-50 text-success-600" },
+  opened:     { label: "Opened",     cls: "bg-primary-50 text-primary-600" },
+  clicked:    { label: "Clicked",    cls: "bg-primary-100 text-primary-700" },
+  bounced:    { label: "Bounced",    cls: "bg-error-50 text-error-600" },
+  complained: { label: "Spam",       cls: "bg-error-100 text-error-700" },
+};
 
 function EmailPanel() {
+  const [tab, setTab] = useState<"send" | "broadcast" | "events">("send");
+
+  // Single send
   const [form, setForm] = useState({ to: "", subject: "", html: "" });
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
+
+  // Broadcast
+  const [broadcast, setBroadcast] = useState({ subject: "", html: "" });
+  const [broadcasting, setBroadcasting] = useState(false);
+  const [broadcastDone, setBroadcastDone] = useState<string | null>(null);
+  const [broadcastError, setBroadcastError] = useState<string | null>(null);
+  const [customerEmails, setCustomerEmails] = useState<string[]>([]);
+
+  // Recent sent
   const [emails, setEmails] = useState<SentEmail[]>([]);
   const [loadingEmails, setLoadingEmails] = useState(true);
+
+  // Delivery events
+  const [events, setEvents] = useState<EmailEvent[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
 
   const fetchEmails = async () => {
     setLoadingEmails(true);
@@ -24,17 +46,28 @@ function EmailPanel() {
       const res = await fetch("/api/resend?path=/emails");
       const data = await res.json();
       setEmails(data.data || []);
-    } catch {
-      setEmails([]);
-    }
+    } catch { setEmails([]); }
     setLoadingEmails(false);
   };
 
-  useEffect(() => { fetchEmails(); }, []);
+  const fetchEvents = async () => {
+    setLoadingEvents(true);
+    const { data } = await supabase.from("email_events").select("*").order("created_at", { ascending: false }).limit(50);
+    setEvents((data || []) as EmailEvent[]);
+    setLoadingEvents(false);
+  };
+
+  const fetchCustomerEmails = async () => {
+    const { data } = await supabase.from("orders").select("email").eq("livemode", true).eq("status", "paid");
+    const unique = [...new Set((data || []).map((o: any) => o.email).filter(Boolean))];
+    setCustomerEmails(unique);
+  };
+
+  useEffect(() => { fetchEmails(); fetchEvents(); fetchCustomerEmails(); }, []);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSending(true); setError(null);
+    setSending(true); setSendError(null);
     const res = await fetch("/api/resend", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -46,68 +79,138 @@ function EmailPanel() {
       }),
     });
     const data = await res.json();
-    if (!res.ok) { setError(data.message || "Failed to send"); }
+    if (!res.ok) { setSendError(data.message || "Failed to send"); }
     else { setSent(true); setForm({ to: "", subject: "", html: "" }); fetchEmails(); setTimeout(() => setSent(false), 3000); }
     setSending(false);
   };
 
-  return (
-    <div className="max-w-3xl space-y-8">
-      {/* Send Email */}
-      <section className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6">
-        <h2 className="text-lg font-semibold text-secondary-900 flex items-center gap-2 mb-6">
-          <Mail size={22} className="text-primary-500" />Send Email via Resend
-        </h2>
-        <form onSubmit={handleSend} className="space-y-4">
-          <div>
-            <label className="label-text">To (comma-separated)</label>
-            <input required value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })} className="input-field" placeholder="customer@example.com, another@example.com" />
-          </div>
-          <div>
-            <label className="label-text">Subject</label>
-            <input required value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} className="input-field" placeholder="Your order has shipped!" />
-          </div>
-          <div>
-            <label className="label-text">Body (HTML)</label>
-            <textarea required rows={8} value={form.html} onChange={(e) => setForm({ ...form, html: e.target.value })} className="input-field font-mono text-sm" placeholder="<p>Hello,</p><p>Your order is on its way!</p>" />
-          </div>
-          {error && <div className="bg-error-50 border border-error-100 text-error-700 rounded-lg p-3 text-sm">{error}</div>}
-          <button type="submit" disabled={sending} className="btn-primary">
-            {sending ? <><Loader2 size={18} className="mr-2 animate-spin" />Sending...</>
-              : sent ? <><Check size={18} className="mr-2" />Sent!</>
-              : <><Send size={18} className="mr-2" />Send Email</>}
-          </button>
-        </form>
-      </section>
+  const handleBroadcast = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customerEmails.length) { setBroadcastError("No live customer emails found."); return; }
+    if (!confirm(`Send to ${customerEmails.length} customers?`)) return;
+    setBroadcasting(true); setBroadcastError(null); setBroadcastDone(null);
+    let success = 0;
+    // Send in batches of 10 to avoid rate limits
+    for (let i = 0; i < customerEmails.length; i += 10) {
+      const batch = customerEmails.slice(i, i + 10);
+      await Promise.all(batch.map((email) =>
+        fetch("/api/resend", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            from: "Body & Sleeves <orders@bodyandsleeves.com>",
+            to: [email],
+            subject: broadcast.subject,
+            html: broadcast.html,
+          }),
+        }).then((r) => { if (r.ok) success++; })
+      ));
+    }
+    setBroadcastDone(`Sent to ${success} of ${customerEmails.length} customers.`);
+    setBroadcast({ subject: "", html: "" });
+    setBroadcasting(false);
+    fetchEmails();
+  };
 
-      {/* Recent Emails */}
-      <section className="bg-white rounded-xl border border-secondary-100 shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between p-6 border-b border-secondary-100">
-          <h2 className="font-semibold text-secondary-900">Recent Emails · Resend</h2>
-          <button onClick={fetchEmails} className="text-secondary-400 hover:text-secondary-700 transition-colors">
-            <RefreshCw size={18} className={loadingEmails ? "animate-spin" : ""} />
+  return (
+    <div className="max-w-3xl space-y-6">
+      {/* Tabs */}
+      <div className="flex gap-1 bg-secondary-100 p-1 rounded-lg w-fit">
+        {([["send", "Send Email"], ["broadcast", "Broadcast"], ["events", "Delivery Events"]] as const).map(([key, label]) => (
+          <button key={key} onClick={() => setTab(key)} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === key ? "bg-white text-secondary-900 shadow-sm" : "text-secondary-500 hover:text-secondary-700"}`}>
+            {label}{key === "broadcast" && customerEmails.length > 0 && <span className="ml-1.5 text-xs bg-primary-100 text-primary-600 px-1.5 py-0.5 rounded-full">{customerEmails.length}</span>}
           </button>
-        </div>
-        {loadingEmails ? (
-          <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-6 w-6 border-2 border-secondary-300 border-t-secondary-900" /></div>
-        ) : emails.length === 0 ? (
-          <div className="p-10 text-center text-secondary-400"><Mail size={36} className="mx-auto mb-2 text-secondary-200" />No emails sent yet</div>
-        ) : (
-          <div className="divide-y divide-secondary-50">
-            {emails.map((email) => (
-              <div key={email.id} className="flex items-start justify-between p-4 hover:bg-secondary-50 transition-colors">
-                <div>
-                  <p className="font-medium text-sm text-secondary-900">{email.subject}</p>
-                  <p className="text-xs text-secondary-500 mt-0.5">{email.to?.join(", ")}</p>
+        ))}
+      </div>
+
+      {/* Send single email */}
+      {tab === "send" && (
+        <section className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-secondary-900 flex items-center gap-2 mb-6"><Mail size={22} className="text-primary-500" />Send Email via Resend</h2>
+          <form onSubmit={handleSend} className="space-y-4">
+            <div><label className="label-text">To (comma-separated)</label><input required value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })} className="input-field" placeholder="customer@example.com" /></div>
+            <div><label className="label-text">Subject</label><input required value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} className="input-field" placeholder="Your order has shipped!" /></div>
+            <div><label className="label-text">Body (HTML)</label><textarea required rows={8} value={form.html} onChange={(e) => setForm({ ...form, html: e.target.value })} className="input-field font-mono text-sm" placeholder="<p>Hello,</p>" /></div>
+            {sendError && <div className="bg-error-50 border border-error-100 text-error-700 rounded-lg p-3 text-sm">{sendError}</div>}
+            <button type="submit" disabled={sending} className="btn-primary">
+              {sending ? <><Loader2 size={18} className="mr-2 animate-spin" />Sending...</> : sent ? <><Check size={18} className="mr-2" />Sent!</> : <><Send size={18} className="mr-2" />Send Email</>}
+            </button>
+          </form>
+          {/* Recent sent */}
+          <div className="mt-8 border-t border-secondary-100 pt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-secondary-900">Recent Sent</h3>
+              <button onClick={fetchEmails} className="text-secondary-400 hover:text-secondary-700"><RefreshCw size={16} className={loadingEmails ? "animate-spin" : ""} /></button>
+            </div>
+            {loadingEmails ? <div className="flex justify-center py-6"><div className="animate-spin rounded-full h-6 w-6 border-2 border-secondary-300 border-t-secondary-900" /></div>
+              : emails.length === 0 ? <p className="text-secondary-400 text-sm text-center py-6">No emails sent yet</p>
+              : <div className="divide-y divide-secondary-50">{emails.map((email) => (
+                <div key={email.id} className="flex items-start justify-between py-3">
+                  <div><p className="text-sm font-medium text-secondary-900">{email.subject}</p><p className="text-xs text-secondary-500">{email.to?.join(", ")}</p></div>
+                  <p className="text-xs text-secondary-400 whitespace-nowrap ml-4">{new Date(email.created_at).toLocaleDateString()}</p>
                 </div>
-                <p className="text-xs text-secondary-400 whitespace-nowrap ml-4">
-                  {new Date(email.created_at).toLocaleDateString()}
-                </p>
-              </div>
-            ))}
+              ))}</div>}
           </div>
-        )}
-      </section>
+        </section>
+      )}
+
+      {/* Broadcast */}
+      {tab === "broadcast" && (
+        <section className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-secondary-900 flex items-center gap-2 mb-2"><Users size={22} className="text-primary-500" />Broadcast to Customers</h2>
+          <div className="flex items-center gap-2 mb-6 p-3 bg-primary-50 rounded-lg">
+            <Info size={15} className="text-primary-500 flex-shrink-0" />
+            <p className="text-sm text-secondary-600"><strong>{customerEmails.length}</strong> unique live customer email{customerEmails.length !== 1 ? "s" : ""} found from paid orders.</p>
+          </div>
+          <form onSubmit={handleBroadcast} className="space-y-4">
+            <div><label className="label-text">Subject</label><input required value={broadcast.subject} onChange={(e) => setBroadcast({ ...broadcast, subject: e.target.value })} className="input-field" placeholder="New arrivals just dropped! 🔥" /></div>
+            <div><label className="label-text">Body (HTML)</label><textarea required rows={10} value={broadcast.html} onChange={(e) => setBroadcast({ ...broadcast, html: e.target.value })} className="input-field font-mono text-sm" placeholder="<p>Hey,</p><p>Check out our latest collection...</p>" /></div>
+            {broadcastError && <div className="bg-error-50 border border-error-100 text-error-700 rounded-lg p-3 text-sm">{broadcastError}</div>}
+            {broadcastDone && <div className="bg-success-50 border border-success-100 text-success-700 rounded-lg p-3 text-sm flex items-center gap-2"><CheckCircle size={16} />{broadcastDone}</div>}
+            <button type="submit" disabled={broadcasting || !customerEmails.length} className="btn-primary">
+              {broadcasting ? <><Loader2 size={18} className="mr-2 animate-spin" />Sending...</> : <><Send size={18} className="mr-2" />Send to {customerEmails.length} customers</>}
+            </button>
+          </form>
+        </section>
+      )}
+
+      {/* Delivery events */}
+      {tab === "events" && (
+        <section className="bg-white rounded-xl border border-secondary-100 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between p-6 border-b border-secondary-100">
+            <div>
+              <h2 className="font-semibold text-secondary-900">Delivery Events</h2>
+              <p className="text-xs text-secondary-400 mt-0.5">Webhook URL: <code className="bg-secondary-100 px-1 rounded">{typeof window !== "undefined" ? window.location.origin : "https://bodyandsleeves.com"}/api/resend/webhook</code></p>
+            </div>
+            <button onClick={fetchEvents} className="text-secondary-400 hover:text-secondary-700"><RefreshCw size={16} className={loadingEvents ? "animate-spin" : ""} /></button>
+          </div>
+          <div className="p-4 bg-amber-50 border-b border-amber-100 flex items-start gap-2 text-sm text-amber-800">
+            <AlertTriangle size={15} className="flex-shrink-0 mt-0.5 text-amber-500" />
+            <span>Add the webhook URL above in your <a href="https://resend.com/webhooks" target="_blank" rel="noreferrer" className="underline font-medium">Resend dashboard → Webhooks</a> to start receiving delivery events.</span>
+          </div>
+          {loadingEvents ? <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-6 w-6 border-2 border-secondary-300 border-t-secondary-900" /></div>
+            : events.length === 0 ? <div className="p-10 text-center text-secondary-400"><Mail size={36} className="mx-auto mb-2 text-secondary-200" />No events yet — add the webhook in Resend to start tracking</div>
+            : (
+              <div className="divide-y divide-secondary-50">
+                {events.map((ev, i) => {
+                  const badge = eventBadge[ev.event_type] || { label: ev.event_type, cls: "bg-secondary-100 text-secondary-500" };
+                  return (
+                    <div key={i} className="flex items-center justify-between px-5 py-3 hover:bg-secondary-50">
+                      <div>
+                        <p className="text-sm font-medium text-secondary-900">{ev.subject || "—"}</p>
+                        <p className="text-xs text-secondary-500">{ev.to_email}</p>
+                      </div>
+                      <div className="flex items-center gap-3 ml-4">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badge.cls}`}>{badge.label}</span>
+                        <p className="text-xs text-secondary-400 whitespace-nowrap">{new Date(ev.created_at).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+        </section>
+      )}
     </div>
   );
 }
