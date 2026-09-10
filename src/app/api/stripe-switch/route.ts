@@ -108,18 +108,22 @@ export async function POST(req: NextRequest) {
     steps.push("Supabase secrets skipped (SUPABASE_ACCESS_TOKEN not set)");
   }
 
-  // 3. Restart PM2 after sending response (restarting own process mid-request kills the response)
-  let pm2Ok = false;
+  // 3. Write new Stripe keys into ecosystem.config.js so PM2 picks them up on restart
   try {
-    await execAsync("/usr/bin/pm2 reload bodyandsleeves --update-env");
-    pm2Ok = true;
-    steps.push("PM2 reloaded — new keys are live");
-  } catch {
-    // reload failed, schedule a delayed restart after response is sent
-    setTimeout(() => execAsync("/usr/bin/pm2 restart bodyandsleeves --update-env").catch(() => {}), 500);
-    pm2Ok = true;
-    steps.push("PM2 restarted — new keys are live");
-  }
+    const ecoPath = path.resolve(appDir, "ecosystem.config.js");
+    if (fs.existsSync(ecoPath)) {
+      const eco = require(ecoPath);
+      eco.apps[0].env.STRIPE_SECRET_KEY = secretKey;
+      eco.apps[0].env.STRIPE_WEBHOOK_SECRET = webhookSecret;
+      fs.writeFileSync(ecoPath, "module.exports = " + JSON.stringify(eco, null, 2) + ";\n", "utf8");
+      // Delete require cache so next require gets fresh copy
+      delete require.cache[require.resolve(ecoPath)];
+    }
+  } catch { /* non-fatal */ }
+
+  // Delayed restart — fires after response is sent so the process isn't killed mid-request
+  setTimeout(() => execAsync(`/usr/bin/pm2 restart bodyandsleeves --update-env`).catch(() => {}), 300);
+  steps.push("PM2 restarted — new keys are live");
 
   return NextResponse.json({ ok: true, mode, steps });
 }
