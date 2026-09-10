@@ -125,7 +125,7 @@ function CreateCampaignModal({ groups, onClose, onDone }: { groups: Group[]; onC
         </div>
         <div><label className="label-text">Send To Group</label>
           <select value={form.group} onChange={(e) => setForm({ ...form, group: e.target.value })} className="input-field">
-            <option value="">All subscribers</option>
+            <option value="">All subscribers (all groups)</option>
             {groups.map((g) => <option key={g.id} value={g.id}>{g.name} ({g.active ?? g.total ?? 0})</option>)}
           </select>
         </div>

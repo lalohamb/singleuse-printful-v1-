@@ -138,19 +138,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: res.ok || res.status === 204 });
     }
     if (action === "create_campaign") {
+      // MailerLite Classic API requires at least one group.
+      // If none selected, fetch all groups and use all their IDs.
+      let groupIds: string[] = (body.groups || []);
+      if (groupIds.length === 0) {
+        const allGroupsRes = await fetch(`${BASE}/groups?limit=100`, { headers: headers() });
+        const allGroups = await safeJson(allGroupsRes);
+        groupIds = Array.isArray(allGroups) ? allGroups.map((g: any) => String(g.id)) : [];
+      }
+      if (groupIds.length === 0) {
+        return NextResponse.json({ error: "No groups found in your MailerLite account. Create at least one group first." }, { status: 422 });
+      }
+      const createPayload = {
+        subject: body.subject,
+        from: body.from_email,
+        from_name: body.from_name,
+        groups: groupIds.map((id: string) => ({ id })),
+        type: "regular",
+      };
+      console.log("[MailerLite] create_campaign payload:", JSON.stringify(createPayload));
       const createRes = await fetch(`${BASE}/campaigns`, {
         method: "POST",
         headers: headers(),
-        body: JSON.stringify({
-          subject: body.subject,
-          from: body.from_email,
-          from_name: body.from_name,
-          groups: (body.groups || []).map((id: string) => ({ id })),
-          type: "regular",
-        }),
+        body: JSON.stringify(createPayload),
       });
       const campaign = await safeJson(createRes);
-      if (!createRes.ok) return NextResponse.json(campaign, { status: createRes.status });
+      if (!createRes.ok) {
+        console.error("[MailerLite] create_campaign failed:", createRes.status, JSON.stringify(campaign));
+        return NextResponse.json(campaign, { status: createRes.status });
+      }
       const campaignId = campaign.id;
       if (!campaignId) return NextResponse.json({ error: "Campaign created but no ID returned" }, { status: 500 });
       await fetch(`${BASE}/campaigns/${campaignId}/content`, {
