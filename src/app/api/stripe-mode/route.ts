@@ -46,8 +46,19 @@ export async function POST(req: NextRequest) {
 }
 
 // GET — return saved key hints
-export async function GET() {
+export async function GET(req: NextRequest) {
   const root = appRoot();
+  const { searchParams } = new URL(req.url);
+  if (searchParams.get("debug")) {
+    return NextResponse.json({
+      APP_ROOT: process.env.APP_ROOT,
+      cwd: process.cwd(),
+      dirname: __dirname,
+      root,
+      liveExists: fs.existsSync(path.resolve(root, ".env.live")),
+      testExists: fs.existsSync(path.resolve(root, ".env.test")),
+    });
+  }
   const liveEnv = parseEnvFile(path.resolve(root, ".env.live"));
   const testEnv = parseEnvFile(path.resolve(root, ".env.test"));
   const activeEnv = parseEnvFile(path.resolve(root, ".env.local"));
