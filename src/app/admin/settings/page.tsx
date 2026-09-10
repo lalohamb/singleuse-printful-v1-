@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Save, Loader2, Check, Store, CreditCard, Printer, Send, Mail, Share2, AlertTriangle, Eye, EyeOff } from "lucide-react";
 import type { StoreSettings } from "@/types";
 
@@ -143,6 +143,26 @@ function Settings() {
   const [heroPreviewH, setHeroPreviewH] = useState(400);
   const [ourWhyPreviewH, setOurWhyPreviewH] = useState(400);
   const [showHeroPicker, setShowHeroPicker] = useState(false);
+  const [promoEmojiOpen, setPromoEmojiOpen] = useState(false);
+  const promoTitleRef = useRef<HTMLInputElement>(null);
+
+  const PROMO_EMOJIS = [
+    { label: "Hype",    icons: ["🔥","⚡","💥","🚨","🎯","💎","👑","🏆","✨","💫"] },
+    { label: "Sale",    icons: ["🛍️","🎁","💸","💰","🤑","📦","🏷️","🎉","🎊","🥳"] },
+    { label: "Style",   icons: ["👕","👗","🧥","👟","🧢","💍","🕶️","👜","🧣","🧤"] },
+    { label: "Vibes",   icons: ["😍","🥰","😎","🤩","💯","🙌","👏","🫶","❤️","🖤"] },
+  ];
+
+  const insertPromoEmoji = (emoji: string) => {
+    const el = promoTitleRef.current;
+    const current = form.promo_banner_title || "";
+    if (!el) { setForm((prev) => ({ ...prev, promo_banner_title: current + emoji })); return; }
+    const start = el.selectionStart ?? current.length;
+    const end = el.selectionEnd ?? current.length;
+    const next = current.slice(0, start) + emoji + current.slice(end);
+    setForm((prev) => ({ ...prev, promo_banner_title: next }));
+    requestAnimationFrame(() => { el.focus(); el.setSelectionRange(start + emoji.length, start + emoji.length); });
+  };
   const [showOurWhyPicker, setShowOurWhyPicker] = useState(false);
 
   const [stripeOk, setStripeOk] = useState<"checking" | "connected" | "warning" | "disconnected">("checking");
@@ -244,7 +264,42 @@ function Settings() {
                 <span className="text-sm font-medium text-secondary-700">Active</span>
               </label>
             </div>
-            <div><label className="label-text">Headline</label><input value={form.promo_banner_title || ""} onChange={(e) => setForm({ ...form, promo_banner_title: e.target.value })} className="input-field" placeholder="🔥 Limited Drop — 20% Off This Weekend Only" /></div>
+            <div>
+              <label className="label-text">Headline</label>
+              <input
+                ref={promoTitleRef}
+                value={form.promo_banner_title || ""}
+                onChange={(e) => setForm({ ...form, promo_banner_title: e.target.value })}
+                className="input-field"
+                placeholder="🔥 Limited Drop — 20% Off This Weekend Only"
+              />
+              <button
+                type="button"
+                onClick={() => setPromoEmojiOpen((o) => !o)}
+                className="mt-1.5 flex items-center gap-1.5 text-xs text-secondary-500 hover:text-secondary-800 transition-colors"
+              >
+                <span>😊</span>
+                <span>Add emoji</span>
+                <span className="text-secondary-400">{promoEmojiOpen ? "▲" : "▼"}</span>
+              </button>
+              {promoEmojiOpen && (
+                <div className="mt-2 border border-secondary-200 rounded-xl p-3 bg-secondary-50 space-y-2">
+                  {PROMO_EMOJIS.map((group) => (
+                    <div key={group.label}>
+                      <p className="text-[10px] font-semibold text-secondary-400 uppercase tracking-wide mb-1">{group.label}</p>
+                      <div className="flex flex-wrap gap-1">
+                        {group.icons.map((e) => (
+                          <button key={e} type="button" onClick={() => insertPromoEmoji(e)}
+                            className="text-lg hover:scale-125 transition-transform leading-none p-0.5 rounded hover:bg-secondary-200">
+                            {e}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <div><label className="label-text">Body Text</label><input value={form.promo_banner_body || ""} onChange={(e) => setForm({ ...form, promo_banner_body: e.target.value })} className="input-field" placeholder="Use code CULTURE20 at checkout. Ends Sunday." /></div>
             <div className="grid grid-cols-2 gap-3">
               <div><label className="label-text">CTA Button Label</label><input value={form.promo_banner_cta_label || ""} onChange={(e) => setForm({ ...form, promo_banner_cta_label: e.target.value })} className="input-field" placeholder="Shop the Drop" /></div>
