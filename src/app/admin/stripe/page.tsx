@@ -163,102 +163,51 @@ function KeyForm({ mode, status, onSaved }: { mode: "live" | "test"; status: Key
   );
 }
 
-const PM2_SKIP_MSG = "PM2 restart skipped (not running under PM2 — restart dev server manually)";
-
-function RestartOverlay({ manual }: { manual?: boolean }) {
-  useEffect(() => {
-    const t = setTimeout(() => window.location.reload(), manual ? 12000 : 4000);
-    return () => clearTimeout(t);
-  }, [manual]);
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-secondary-900/60">
-      <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center space-y-4">
-        <Loader2 size={36} className="animate-spin text-primary-500 mx-auto" />
-        <p className="font-semibold text-secondary-900 text-lg">{manual ? "Reloading page…" : "Server restarting…"}</p>
-        <p className="text-sm text-secondary-500">
-          {manual
-            ? "Restart your dev server manually, then the page will reload."
-            : "This may take a few seconds. The page will refresh automatically when ready."}
-        </p>
-        <div className="w-full bg-secondary-100 rounded-full h-1.5 overflow-hidden">
-          <div className="bg-primary-500 h-1.5 rounded-full animate-pulse w-3/4" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function RestartButton({ onRestarting }: { onRestarting: (manual: boolean) => void }) {
-  const [state, setState] = useState<"idle" | "loading">("idle");
-
-  const doRestart = async () => {
-    setState("loading");
-    const r = await fetch("/api/stripe-switch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "restart" }) });
-    onRestarting(!r.ok);
-  };
-
-  if (state === "loading") return <Loader2 size={10} className="animate-spin ml-1" />;
-
-  return (
-    <button onClick={doRestart} className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-warning-100 text-warning-700 hover:bg-warning-200 transition-colors ml-1">
-      <RefreshCw size={10} />Restart server
-    </button>
-  );
-}
-
 function SwitchButton({ mode, isActive, onSwitched }: { mode: "live" | "test"; isActive: boolean; onSwitched: () => void }) {
   const [loading, setLoading] = useState(false);
   const [steps, setSteps] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState(false);
-  const [restarting, setRestarting] = useState<{ manual: boolean } | null>(null);
+  const [restarting, setRestarting] = useState(false);
 
-  const handleRestarting = (manual: boolean) => {
-    setRestarting({ manual });
-    onSwitched(); // update parent badge now that restart is confirmed
+  const pollUntilBack = () => {
+    setRestarting(true);
+    const interval = setInterval(async () => {
+      try {
+        const r = await fetch("/api/stripe-mode", { cache: "no-store" });
+        if (r.ok) { clearInterval(interval); window.location.reload(); }
+      } catch { /* still down, keep polling */ }
+    }, 1500);
   };
 
   const doSwitch = async () => {
-    setLoading(true); setSteps([]); setError(null); setDone(false);
+    setLoading(true); setSteps([]); setError(null);
     const r = await fetch("/api/stripe-switch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode }) });
     const data = await r.json();
-    if (!r.ok) { setError(data.error); }
-    else {
-      setSteps(data.steps);
-      setDone(true);
-      // only refresh parent status if PM2 restarted automatically (no manual step needed)
-      const needsManualRestart = data.steps?.some((s: string) => s === PM2_SKIP_MSG);
-      if (!needsManualRestart) onSwitched();
-    }
-    setLoading(false);
+    if (!r.ok) { setError(data.error); setLoading(false); }
+    else { setSteps(data.steps || []); setLoading(false); pollUntilBack(); }
   };
 
-  if (isActive && !done) return <span className="text-xs text-success-600 font-medium flex items-center gap-1"><Check size={12} />Active</span>;
+  if (restarting) return (
+    <div className="flex items-center gap-2 text-xs text-warning-600">
+      <Loader2 size={12} className="animate-spin" />Server restarting…
+    </div>
+  );
+
+  if (isActive) return <span className="text-xs text-success-600 font-medium flex items-center gap-1"><Check size={12} />Active</span>;
 
   return (
-    <>
-      {restarting && <RestartOverlay manual={restarting.manual} />}
-      <div className="space-y-2">
-        {!done && (
-          <button onClick={doSwitch} disabled={loading} className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-primary-600 text-white hover:bg-primary-700 transition-colors disabled:opacity-50">
-            {loading ? <Loader2 size={12} className="animate-spin" /> : null}
-            {loading ? "Switching…" : `Switch to ${mode.toUpperCase()}`}
-          </button>
-        )}
-        {error && <p className="text-xs text-error-600">{error}</p>}
-        {steps.length > 0 && (
-          <ul className="text-xs text-success-700 space-y-1 bg-white/60 rounded-lg p-2">
-            {steps.map((s, i) => (
-              <li key={i} className="flex items-center flex-wrap">
-                <Check size={10} className="mr-1 shrink-0" />
-                <span>{s}</span>
-                {s === PM2_SKIP_MSG && <RestartButton onRestarting={handleRestarting} />}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </>
+    <div className="space-y-2">
+      <button onClick={doSwitch} disabled={loading} className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-primary-600 text-white hover:bg-primary-700 transition-colors disabled:opacity-50">
+        {loading ? <Loader2 size={12} className="animate-spin" /> : null}
+        {loading ? "Switching…" : `Switch to ${mode.toUpperCase()}`}
+      </button>
+      {error && <p className="text-xs text-error-600">{error}</p>}
+      {steps.length > 0 && (
+        <ul className="text-xs text-success-700 space-y-1 bg-white/60 rounded-lg p-2">
+          {steps.map((s, i) => <li key={i} className="flex items-center gap-1"><Check size={10} className="shrink-0" />{s}</li>)}
+        </ul>
+      )}
+    </div>
   );
 }
 

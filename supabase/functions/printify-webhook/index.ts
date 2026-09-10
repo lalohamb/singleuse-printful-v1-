@@ -303,6 +303,39 @@ Deno.serve(async (req: Request) => {
         .eq("printify_order_id", printifyOrderId);
     }
 
+    if (type === "order:created") {
+      await supabase
+        .from("orders")
+        .update({
+          fulfillment_status: "in-production",
+          status: "fulfilled",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("printify_order_id", printifyOrderId);
+    }
+
+    if (type === "order:canceled") {
+      await supabase
+        .from("orders")
+        .update({
+          fulfillment_status: "cancelled",
+          status: "cancelled",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("printify_order_id", printifyOrderId);
+    }
+
+    if (type === "order:payment:failed") {
+      await supabase
+        .from("orders")
+        .update({
+          fulfillment_status: "payment-failed",
+          status: "pending",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("printify_order_id", printifyOrderId);
+    }
+
     return json({ received: true });
   } catch (err) {
     const safeMsg = String(err instanceof Error ? err.message : err).replace(/[\r\n]/g, " ");

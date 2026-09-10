@@ -20,6 +20,7 @@ function Orders() {
   const [modeFilter, setModeFilter] = useState("all");
   const [selected, setSelected] = useState<Order | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [infoDismissed, setInfoDismissed] = useState(false);
 
   const fetchOrders = () => {
     setLoading(true);
@@ -91,6 +92,40 @@ function Orders() {
 
   return (
     <div className="space-y-6">
+      {!infoDismissed && (
+        <div className="bg-primary-50 border border-primary-100 rounded-lg p-4 flex items-start justify-between gap-4">
+          <div className="space-y-3 text-sm text-secondary-700">
+            <p className="font-semibold text-secondary-900 text-base">How Orders Work</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="flex items-start gap-2">
+                <span className="text-lg leading-none mt-0.5">💳</span>
+                <div><p className="font-medium">Customer places order</p><p className="text-secondary-500 text-xs">Stripe processes payment → order is created here with status <span className="px-1.5 py-0.5 rounded-full bg-warning-50 text-warning-600 text-[10px] font-medium">pending</span> then <span className="px-1.5 py-0.5 rounded-full bg-success-50 text-success-600 text-[10px] font-medium">paid</span>.</p></div>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-lg leading-none mt-0.5">📦</span>
+                <div><p className="font-medium">Sent to Printify</p><p className="text-secondary-500 text-xs">Paid orders are automatically submitted to Printify for printing &amp; fulfillment. A Printify Order ID is assigned.</p></div>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-lg leading-none mt-0.5">🔄</span>
+                <div><p className="font-medium">Check Printify status</p><p className="text-secondary-500 text-xs">Open any order with a Printify ID → click <strong>Check Printify</strong> to fetch live fulfillment status, then <strong>Sync to Order</strong> to update tracking &amp; status here.</p></div>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-lg leading-none mt-0.5">🚫</span>
+                <div><p className="font-medium">Cancellations</p><p className="text-secondary-500 text-xs">Setting status to <span className="px-1.5 py-0.5 rounded-full bg-error-50 text-error-600 text-[10px] font-medium">cancelled</span> will also attempt to cancel in Printify. Only possible before the order enters production.</p></div>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-lg leading-none mt-0.5">🧪</span>
+                <div><p className="font-medium">Test orders</p><p className="text-secondary-500 text-xs">Orders placed in test mode show a <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-medium">Test</span> badge and can be deleted. Live orders cannot be deleted.</p></div>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-lg leading-none mt-0.5">📊</span>
+                <div><p className="font-medium">Status is local</p><p className="text-secondary-500 text-xs">Changing status here updates your store DB only. Use <strong>Check Printify</strong> + <strong>Sync to Order</strong> to keep statuses accurate.</p></div>
+              </div>
+            </div>
+          </div>
+          <button onClick={() => setInfoDismissed(true)} className="flex-shrink-0 text-secondary-400 hover:text-secondary-700"><X size={16} /></button>
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[200px]"><Search size={18} className="absolute left-3 top-2.5 text-secondary-400" /><input type="text" placeholder="Search by name, email, or order ID..." value={search} onChange={(e) => setSearch(e.target.value)} className="input-field pl-10 py-2" /></div>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="input-field py-2 w-auto">

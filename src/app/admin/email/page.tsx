@@ -114,6 +114,20 @@ function EmailPanel() {
 
   return (
     <div className="max-w-3xl space-y-6">
+      {/* Info banner */}
+      <div className="bg-primary-50 border border-primary-100 rounded-lg p-4 flex items-start gap-3">
+        <Info size={18} className="text-primary-500 flex-shrink-0 mt-0.5" />
+        <div className="space-y-2 text-sm text-secondary-700">
+          <p className="font-semibold text-secondary-900">Email — Resend</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div><p className="font-medium">📧 Send Email</p><p className="text-xs text-secondary-500">Send a one-off email to any address — customer support, manual order updates, etc.</p></div>
+            <div><p className="font-medium">📣 Broadcast</p><p className="text-xs text-secondary-500">Send a message to all customers who have placed a live paid order. Great for announcements, new arrivals, and promotions.</p></div>
+            <div><p className="font-medium">📊 Delivery Events</p><p className="text-xs text-secondary-500">Track whether emails are delivered, opened, bounced, or marked as spam. Requires the webhook URL to be added in your Resend dashboard.</p></div>
+          </div>
+          <p className="text-xs text-secondary-400 pt-1">Order confirmation and shipping emails are sent automatically — you do not need to send those manually here.</p>
+        </div>
+      </div>
+
       {/* Tabs */}
       <div className="flex gap-1 bg-secondary-100 p-1 rounded-lg w-fit">
         {([["send", "Send Email"], ["broadcast", "Broadcast"], ["events", "Delivery Events"]] as const).map(([key, label]) => (
