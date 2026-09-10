@@ -42,6 +42,15 @@ function Products() {
   const toggleAll = () => setSelectedIds((s) => s.size === activeFiltered.length ? new Set() : new Set(activeFiltered.map((p) => p.id)));
   const clearSel = () => setSelectedIds(new Set());
 
+  const stripHtml = (s: string) => s
+    .replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&ldquo;/g, '"').replace(/&rdquo;/g, '"')
+    .replace(/&lsquo;/g, "'").replace(/&rsquo;/g, "'")
+    .replace(/&mdash;/g, "\u2014").replace(/&ndash;/g, "\u2013").replace(/&hellip;/g, "...")
+    .replace(/&#[0-9]+;/g, "").replace(/&[a-z]+;/g, "")
+    .replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+
   const runBulk = async (patch: Record<string, unknown>) => {
     if (!selectedIds.size) return;
     setBulkBusy(true);
@@ -51,6 +60,13 @@ function Products() {
   const bulkAssignCategory = () => runBulk({ category_id: bulkCategory || null });
   const bulkSetFlag = (key: string, value: boolean) => runBulk({ [key]: value });
   const bulkSetStatus = (status: string) => runBulk({ status });
+  const bulkCleanHtml = async () => {
+    if (!selectedIds.size) return;
+    setBulkBusy(true);
+    const selected = products.filter((p) => selectedIds.has(p.id) && p.description);
+    await Promise.all(selected.map((p) => supabase.from("products").update({ description: stripHtml(p.description!), updated_at: new Date().toISOString() }).eq("id", p.id)));
+    setBulkBusy(false); clearSel(); fetchData();
+  };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this product?")) return;
@@ -146,6 +162,7 @@ function Products() {
                 <button key={f.key as string} onClick={() => bulkSetFlag(f.key as string, true)} disabled={bulkBusy} className="btn-outline py-1.5">+ {f.label}</button>
               ))}
               <button onClick={() => bulkSetStatus("draft")} disabled={bulkBusy} className="btn-outline py-1.5 text-warning-600 border-warning-300 hover:bg-warning-50">Set Draft</button>
+              <button onClick={bulkCleanHtml} disabled={bulkBusy} className="btn-outline py-1.5 text-secondary-600">Clean HTML</button>
               <button onClick={clearSel} className="text-sm text-secondary-500 underline">Clear</button>
             </div>
           )}
