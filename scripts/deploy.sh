@@ -24,8 +24,20 @@ cp -r public .next/standalone/public
 cp -r node_modules/sharp .next/standalone/node_modules/ 2>/dev/null || true
 cp -r node_modules/@img .next/standalone/node_modules/ 2>/dev/null || true
 echo "♻️  Restarting PM2..."
+# Load .env.local into an ecosystem config so standalone server has all vars
+node -e "
+  const fs = require('fs');
+  const env = {};
+  fs.readFileSync('.env.local', 'utf8').split('\\n').forEach(line => {
+    const m = line.match(/^([^#=]+)=(.*)$/);
+    if (m) env[m[1].trim()] = m[2].trim();
+  });
+  const config = \`module.exports = { apps: [{ name: 'bodyandsleeves', script: '.next/standalone/server.js', interpreter: 'node', cwd: '${APP_DIR}', env: \${JSON.stringify(env, null, 2)} }] };\`;
+  fs.writeFileSync('ecosystem.config.js', config);
+  console.log('ecosystem.config.js written with', Object.keys(env).length, 'env vars');
+"
 pm2 delete $APP_NAME 2>/dev/null || true
-pm2 start node --name $APP_NAME -- .next/standalone/server.js
+pm2 start ecosystem.config.js
 pm2 save
 
 echo "🔄 Reloading nginx..."
