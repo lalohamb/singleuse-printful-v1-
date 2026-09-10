@@ -39,17 +39,14 @@ export async function POST(req: NextRequest) {
   const log: string[] = [];
 
   try {
-    // On local (no PM2): patch .env.local so next dev picks up the new keys
-    const pm2Check = ["/usr/bin/pm2", "/usr/local/bin/pm2", "/root/.nvm/versions/node/v22/bin/pm2"].find(p => fs.existsSync(p));
-    if (!pm2Check) {
-      const envPath = path.resolve(process.cwd(), ".env.local");
-      if (fs.existsSync(envPath)) {
-        let env = fs.readFileSync(envPath, "utf8");
-        env = env.replace(/^STRIPE_SECRET_KEY=.*/m, `STRIPE_SECRET_KEY=${keys.STRIPE_SECRET_KEY}`);
-        env = env.replace(/^STRIPE_WEBHOOK_SECRET=.*/m, `STRIPE_WEBHOOK_SECRET=${keys.STRIPE_WEBHOOK_SECRET}`);
-        fs.writeFileSync(envPath, env, "utf8");
-        log.push(`✅ .env.local updated with ${mode} keys`);
-      }
+    // Always update .env.local with the new keys
+    const envPath = path.resolve(process.cwd(), ".env.local");
+    if (fs.existsSync(envPath)) {
+      let envContent = fs.readFileSync(envPath, "utf8");
+      envContent = envContent.replace(/^STRIPE_SECRET_KEY=.*/m, `STRIPE_SECRET_KEY=${keys.STRIPE_SECRET_KEY}`);
+      envContent = envContent.replace(/^STRIPE_WEBHOOK_SECRET=.*/m, `STRIPE_WEBHOOK_SECRET=${keys.STRIPE_WEBHOOK_SECRET}`);
+      fs.writeFileSync(envPath, envContent, "utf8");
+      log.push(`✅ .env.local updated with ${mode} keys`);
     }
 
     // 2. Push secrets to Supabase edge functions
@@ -77,48 +74,23 @@ export async function POST(req: NextRequest) {
       const appDir = process.cwd();
       const ecosystemPath = path.join(appDir, "ecosystem.config.js");
 
-      // Seed from current process.env so we don't lose other vars
-      let existingEnv: Record<string, string> = {};
-      const envKeysToPreserve = [
-        "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-        "PRINTIFY_SHOP_ID", "NEXT_PUBLIC_PRINTIFY_SHOP_ID", "PRINTIFY_API_TOKEN",
-        "RESEND_API_KEY", "MAILER_LITE_API_KEY",
-      ];
-      for (const k of envKeysToPreserve) {
-        if (process.env[k]) existingEnv[k] = process.env[k]!;
-      }
-      if (fs.existsSync(ecosystemPath)) {
-        // Extract current env block via regex — avoids eval
-        const content = fs.readFileSync(ecosystemPath, "utf8");
-        const m = content.match(/env\s*:\s*(\{[\s\S]*?\})/m);
-        if (m) {
-          try { existingEnv = JSON.parse(m[1].replace(/'/g, '"')); } catch {}
-        }
+      // Read all vars from .env.local — source of truth
+      const envPath = path.resolve(appDir, ".env.local");
+      const fullEnv: Record<string, string> = {};
+      if (fs.existsSync(envPath)) {
+        fs.readFileSync(envPath, "utf8").split("\n").forEach(line => {
+          const m = line.match(/^([^#=]+)=(.*)$/);
+          if (m) fullEnv[m[1].trim()] = m[2].trim();
+        });
       }
 
-      const mergedEnv = { ...existingEnv, ...keys };
-      const envLines = Object.entries(mergedEnv)
-        .map(([k, v]) => `    ${k}: '${v}'`)
-        .join(",\n");
-
-      const ecosystem = `module.exports = {
-  apps: [{
-    name: 'bodyandsleeves',
-    script: 'npm',
-    args: 'start',
-    cwd: '${appDir}',
-    env: {
-${envLines}
-    }
-  }]
-};
-`;
+      const ecosystem = `module.exports = { apps: [{ name: 'bodyandsleeves', script: '.next/standalone/server.js', interpreter: 'node', cwd: '${appDir}', env: ${JSON.stringify(fullEnv, null, 2)} }] };`;
       fs.writeFileSync(ecosystemPath, ecosystem, "utf8");
-      log.push(`✅ ecosystem.config.js written with ${mode} keys`);
+      log.push(`✅ ecosystem.config.js written with ${Object.keys(fullEnv).length} vars`);
 
       spawn(
         "/bin/bash",
-        ["-c", `${pm2Bin} restart ${ecosystemPath} --update-env`],
+        ["-c", `${pm2Bin} delete bodyandsleeves; ${pm2Bin} start ${ecosystemPath}; ${pm2Bin} save`],
         { detached: true, stdio: "ignore" }
       ).unref();
       log.push("✅ PM2 restart triggered. Wait ~10s then refresh.");
