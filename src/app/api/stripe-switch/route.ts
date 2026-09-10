@@ -126,7 +126,10 @@ export async function POST(req: NextRequest) {
   }
 
   // Delayed restart — fires after response is sent
-  setTimeout(() => execAsync("/usr/bin/pm2 restart bodyandsleeves --update-env").catch(() => {}), 300);
+  // Use startOrReload to force PM2 to re-read ecosystem.config.js with new keys
+  setTimeout(() => execAsync("/usr/bin/pm2 startOrReload /var/www/bodyandsleeves/ecosystem.config.js --update-env").catch(() =>
+    execAsync("/usr/bin/pm2 restart bodyandsleeves --update-env").catch(() => {})
+  ), 300);
   steps.push("PM2 restarted — new keys are live");
 
   return NextResponse.json({ ok: true, mode, steps });
