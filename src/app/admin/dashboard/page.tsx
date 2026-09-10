@@ -15,7 +15,6 @@ function Dashboard() {
   const [pauseLoading, setPauseLoading] = useState(false);
   const [settingsId, setSettingsId] = useState<string | null>(null);
   const [stripeLive, setStripeLive] = useState<boolean | null>(null);
-  const [stripeEnvMode, setStripeEnvMode] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -31,10 +30,7 @@ function Dashboard() {
       setRecentProducts(products.slice(0, 5));
       if (s) { setSettingsId(s.id); setPaused(!!s.orders_paused); }
       setLoading(false);
-      // active key in running process
-      fetch("/api/stripe-admin?action=balance").then(r => r.ok ? r.json() : null).then(d => { if (d) setStripeLive(!!d.livemode); });
-      // active mode per .env.local on disk
-      fetch("/api/stripe-mode").then(r => r.ok ? r.json() : null).then(d => { if (d) setStripeEnvMode(d.active_mode); });
+      fetch("/api/stripe-mode").then(r => r.ok ? r.json() : null).then(d => { if (d) setStripeLive(d.active_mode === "live"); });
     });
   }, []);
 
@@ -59,26 +55,12 @@ function Dashboard() {
   return (
     <div className="space-y-8">
       {stripeLive !== null && (
-        <div className="flex flex-wrap items-center gap-2">
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold border ${
-            stripeLive ? "bg-success-50 border-success-200 text-success-700" : "bg-amber-50 border-amber-200 text-amber-700"
-          }`}>
-            <CreditCard size={14} />
-            Active key: {stripeLive ? "LIVE" : "TEST"}
-          </div>
-          {stripeEnvMode && (
-            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold border ${
-              stripeEnvMode === "live" ? "bg-success-50 border-success-200 text-success-700" : "bg-amber-50 border-amber-200 text-amber-700"
-            }`}>
-              .env: {stripeEnvMode.toUpperCase()}
-            </div>
-          )}
-          {stripeEnvMode && (stripeLive ? "live" : "test") !== stripeEnvMode && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold border bg-error-50 border-error-200 text-error-700">
-              ⚠ Out of sync — restart server to apply .env change
-            </div>
-          )}
-        </div>
+        <Link href="/admin/stripe" className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold w-fit border transition-colors hover:opacity-80 ${
+          stripeLive ? "bg-success-50 border-success-200 text-success-700" : "bg-amber-50 border-amber-200 text-amber-700"
+        }`}>
+          <CreditCard size={14} />
+          Stripe: {stripeLive ? "LIVE" : "TEST"}
+        </Link>
       )}
       <div className={`flex items-center justify-between rounded-xl p-4 border ${paused ? "bg-red-50 border-red-200" : "bg-success-50 border-success-200"}`}>
         <div className="flex items-center gap-3">
