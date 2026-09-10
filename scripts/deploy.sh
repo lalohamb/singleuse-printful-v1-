@@ -13,12 +13,14 @@ git fetch origin
 git reset --hard origin/main
 
 echo "🔧 Installing dependencies..."
-npm ci --omit=dev
+npm ci
 
 echo "🏗️  Building..."
 npm run build
 
-echo "📋 Copying sharp to standalone..."
+echo "📋 Copying static assets to standalone..."
+cp -r .next/static .next/standalone/.next/static
+cp -r public .next/standalone/public
 cp -r node_modules/sharp .next/standalone/node_modules/ 2>/dev/null || true
 cp -r node_modules/@img .next/standalone/node_modules/ 2>/dev/null || true
 echo "♻️  Restarting PM2..."
