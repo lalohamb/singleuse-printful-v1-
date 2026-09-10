@@ -7,11 +7,10 @@ export const runtime = "nodejs";
 // Resolves to /var/www/bodyandsleeves regardless of whether we're running
 // from the repo root or the standalone bundle (.next/standalone/server.js)
 function appRoot(): string {
+  // APP_ROOT is set in ecosystem.config.js on the droplet
+  if (process.env.APP_ROOT && fs.existsSync(path.join(process.env.APP_ROOT, ".env.local"))) return process.env.APP_ROOT;
   const cwd = process.cwd();
-  // standalone server runs from the repo root via ecosystem.config.js cwd
-  // but double-check by looking for .env.local walking up if needed
   if (fs.existsSync(path.join(cwd, ".env.local"))) return cwd;
-  // fallback: walk up from __dirname
   let dir = __dirname;
   for (let i = 0; i < 8; i++) {
     if (fs.existsSync(path.join(dir, ".env.local"))) return dir;

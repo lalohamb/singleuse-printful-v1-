@@ -10,6 +10,7 @@ const execAsync = promisify(exec);
 const SUPABASE_PROJECT_REF = "SUPABASE_PROJECT_REF_REDACTED";
 
 function appRoot(): string {
+  if (process.env.APP_ROOT && fs.existsSync(path.join(process.env.APP_ROOT, ".env.local"))) return process.env.APP_ROOT;
   const cwd = process.cwd();
   if (fs.existsSync(path.join(cwd, ".env.local"))) return cwd;
   let dir = __dirname;
