@@ -103,7 +103,7 @@ export default function ProductDetailClient({ product, related }: { product: Pro
           {product.featured && <span className="inline-block bg-gold-500 text-secondary-900 text-xs font-bold px-3 py-1 rounded-full mb-4">Featured</span>}
           <h1 className="text-3xl lg:text-4xl font-bold text-secondary-900">{product.title}</h1>
           <p className="text-2xl font-bold text-secondary-900 mt-4">{formatPrice(product.price)}</p>
-          <p className="text-secondary-600 mt-6 leading-relaxed whitespace-pre-wrap">{product.description}</p>
+          <p className="text-secondary-600 mt-6 leading-relaxed whitespace-pre-wrap">{(product.description || "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&ldquo;/g, '"').replace(/&rdquo;/g, '"').replace(/&lsquo;/g, "'").replace(/&rsquo;/g, "'").replace(/&mdash;/g, "—").replace(/&ndash;/g, "–").replace(/&hellip;/g, "...").replace(/&#[0-9]+;/g, "").replace(/&[a-z]+;/g, "").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim()}</p>
           {hasColorChoice && (
             <div className="mt-8">
               <label className="label-text">Color: <span className="font-normal text-secondary-500">{selectedColor}</span></label>
