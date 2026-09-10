@@ -51,16 +51,40 @@ function Categories() {
 }
 
 function CategoryModal({ category, onClose, onSave }: { category: Category | null; onClose: () => void; onSave: () => void }) {
-  const [form, setForm] = useState({ name: category?.name || "", slug: category?.slug || "", description: category?.description || "" });
+  const [form, setForm] = useState({
+    name: category?.name || "",
+    slug: category?.slug || "",
+    description: category?.description || "",
+    gradient_opacity: category?.gradient_opacity ?? 60,
+    gradient_dir: category?.gradient_dir ?? "bottom",
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSave = async () => {
     setSaving(true); setError(null);
     const slug = form.slug || form.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-    const payload = { name: form.name, slug, description: form.description };
+    const payload = { name: form.name, slug, description: form.description, gradient_opacity: form.gradient_opacity, gradient_dir: form.gradient_dir };
     const result = category ? await supabase.from("categories").update(payload).eq("id", category.id) : await supabase.from("categories").insert(payload);
     if (result.error) { setError(result.error.message); setSaving(false); } else onSave();
+  };
+
+  const dirOptions = [
+    { value: "bottom", label: "Bottom → Top (default)" },
+    { value: "top", label: "Top → Bottom" },
+    { value: "full", label: "Full overlay" },
+    { value: "none", label: "No gradient" },
+  ];
+
+  const previewGrad = () => {
+    const op = form.gradient_opacity / 100;
+    const map: Record<string, string> = {
+      bottom: `linear-gradient(to top, rgba(17,17,17,${op * 0.9}) 0%, rgba(17,17,17,${op * 0.3}) 60%, transparent 100%)`,
+      top:    `linear-gradient(to bottom, rgba(17,17,17,${op * 0.9}) 0%, transparent 100%)`,
+      full:   `rgba(17,17,17,${op * 0.85})`,
+      none:   `transparent`,
+    };
+    return map[form.gradient_dir] ?? map.bottom;
   };
 
   return (
@@ -75,6 +99,29 @@ function CategoryModal({ category, onClose, onSave }: { category: Category | nul
           <div><label className="label-text">Name</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-field" placeholder="T-Shirts" /></div>
           <div><label className="label-text">Slug (URL)</label><input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} className="input-field" placeholder="t-shirts" /></div>
           <div><label className="label-text">Description</label><textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="input-field min-h-[60px]" placeholder="Category description" /></div>
+
+          {/* Gradient controls */}
+          <div className="border-t border-secondary-100 pt-4 space-y-3">
+            <p className="text-sm font-semibold text-secondary-700">Image Gradient</p>
+            <div>
+              <label className="label-text">Direction</label>
+              <select value={form.gradient_dir} onChange={(e) => setForm({ ...form, gradient_dir: e.target.value })} className="input-field">
+                {dirOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label-text">Opacity — {form.gradient_opacity}%</label>
+              <input type="range" min={0} max={100} value={form.gradient_opacity} onChange={(e) => setForm({ ...form, gradient_opacity: Number(e.target.value) })} className="w-full accent-primary-600" />
+            </div>
+            {/* Live preview */}
+            <div className="relative h-16 rounded-lg overflow-hidden bg-secondary-300">
+              <div className="absolute inset-0" style={{ background: previewGrad() }} />
+              <div className="absolute bottom-2 left-3">
+                <span className="text-white text-xs font-bold drop-shadow">{form.name || "Category Name"}</span>
+              </div>
+            </div>
+          </div>
+
           {error && <div className="bg-error-50 border border-error-100 text-error-700 rounded-lg p-3 text-sm">{error}</div>}
         </div>
         <div className="flex gap-3 p-6 border-t border-secondary-100">

@@ -39,6 +39,8 @@ export interface Category {
   name: string;
   slug: string;
   description: string | null;
+  gradient_opacity: number | null;
+  gradient_dir: string | null;
   created_at: string;
 }
 

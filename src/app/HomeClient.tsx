@@ -103,7 +103,18 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
                 {categoryImages[cat.id] && (
                   <img src={categoryImages[cat.id]} alt={cat.name} className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" />
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-secondary-900 via-secondary-900/30 to-transparent" />
+                {(() => {
+                  const op = ((cat.gradient_opacity ?? 60) / 100);
+                  const dir = cat.gradient_dir ?? "bottom";
+                  const gradMap: Record<string, string> = {
+                    bottom: `linear-gradient(to top, rgba(17,17,17,${op * 0.9}) 0%, rgba(17,17,17,${op * 0.3}) 60%, transparent 100%)`,
+                    top:    `linear-gradient(to bottom, rgba(17,17,17,${op * 0.9}) 0%, transparent 100%)`,
+                    full:   `rgba(17,17,17,${op * 0.85})`,
+                    none:   `transparent`,
+                  };
+                  if (dir === "none") return null;
+                  return <div className="absolute inset-0" style={{ background: gradMap[dir] }} />;
+                })()}
                 <div className="absolute bottom-0 left-0 right-0 p-4">
                   <h3 className="text-white font-display font-bold text-lg leading-tight">{cat.name}</h3>
                   <span className="inline-block mt-1 text-gold-400 text-xs font-medium opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all">Shop now →</span>
