@@ -120,18 +120,13 @@ function KeyForm({ mode, status, onSaved }: { mode: "live" | "test"; status: Key
     setSaving(false);
   };
 
-  const isLiveMode = mode === "live";
-  const border = isLiveMode ? "border-success-200" : "border-amber-200";
-  const bg = isLiveMode ? "bg-success-50" : "bg-amber-50";
-  const badge = isLiveMode ? "bg-success-100 text-success-700" : "bg-amber-100 text-amber-700";
-  const stripeLink = isLiveMode ? "https://dashboard.stripe.com/apikeys" : "https://dashboard.stripe.com/test/apikeys";
+  const stripeLink = mode === "live" ? "https://dashboard.stripe.com/apikeys" : "https://dashboard.stripe.com/test/apikeys";
 
   return (
-    <div className={`rounded-xl border ${border} ${bg}`}>
-      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between p-4 text-left">
-        <div className="flex items-center gap-3">
-          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${badge}`}>{mode.toUpperCase()}</span>
-          <span className="text-sm font-medium text-secondary-900">{isLiveMode ? "Live" : "Test"} Stripe Keys</span>
+    <div className="border-t border-secondary-200 pt-3">
+      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between text-left">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-secondary-700">API Keys</span>
           {status.hasKeys
             ? <span className="flex items-center gap-1 text-xs text-success-600"><Check size={12} />Saved</span>
             : <span className="text-xs text-warning-600">Not set</span>}
@@ -139,7 +134,7 @@ function KeyForm({ mode, status, onSaved }: { mode: "live" | "test"; status: Key
         <span className="text-xs text-secondary-400">{open ? "Hide" : "Edit"}</span>
       </button>
       {open && (
-        <div className="border-t border-secondary-100 p-4 space-y-3">
+        <div className="mt-3 space-y-3">
           {status.hasKeys && (
             <div className="text-xs text-secondary-500 space-y-1">
               <p>Secret key: <code className="bg-white px-1 rounded">{status.secret_key_hint}</code></p>
@@ -150,7 +145,7 @@ function KeyForm({ mode, status, onSaved }: { mode: "live" | "test"; status: Key
             Get keys from Stripe <ExternalLink size={11} />
           </a>
           <div>
-            <label className="label-text">Secret Key (sk_{mode === "live" ? "live" : "test"}_...)</label>
+            <label className="label-text">Secret Key (sk_{mode}_...)</label>
             <input value={secretKey} onChange={e => setSecretKey(e.target.value)} className="input-field font-mono text-sm" placeholder={`sk_${mode}_...`} />
           </div>
           <div>
