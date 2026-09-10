@@ -206,28 +206,31 @@ function SwitchButton({ mode, isActive, onSwitched }: { mode: "live" | "test"; i
   const [loading, setLoading] = useState(false);
   const [steps, setSteps] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
 
   const doSwitch = async () => {
-    setLoading(true); setSteps([]); setError(null);
+    setLoading(true); setSteps([]); setError(null); setDone(false);
     const r = await fetch("/api/stripe-switch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode }) });
     const data = await r.json();
     if (!r.ok) { setError(data.error); }
-    else { setSteps(data.steps); onSwitched(); }
+    else { setSteps(data.steps); setDone(true); onSwitched(); }
     setLoading(false);
   };
 
-  if (isActive) return <span className="text-xs text-success-600 font-medium flex items-center gap-1"><Check size={12} />Active</span>;
+  if (isActive && !done) return <span className="text-xs text-success-600 font-medium flex items-center gap-1"><Check size={12} />Active</span>;
 
   return (
-    <div className="space-y-2">
-      <button onClick={doSwitch} disabled={loading} className="btn-primary py-1.5 px-4 text-sm w-full">
-        {loading ? <Loader2 size={14} className="animate-spin mx-auto" /> : `Switch to ${mode.toUpperCase()}`}
-      </button>
+    <div className="space-y-2 w-full">
+      {!done && (
+        <button onClick={doSwitch} disabled={loading} className="btn-primary py-1.5 px-4 text-sm w-full">
+          {loading ? <Loader2 size={14} className="animate-spin mx-auto" /> : `Switch to ${mode.toUpperCase()}`}
+        </button>
+      )}
       {error && <p className="text-xs text-error-600">{error}</p>}
       {steps.length > 0 && (
-        <ul className="text-xs text-success-700 space-y-0.5">
+        <ul className="text-xs text-success-700 space-y-1 bg-white/60 rounded-lg p-2">
           {steps.map((s, i) => (
-            <li key={i} className="flex items-center">
+            <li key={i} className="flex items-center flex-wrap">
               <Check size={10} className="mr-1 shrink-0" />
               <span>{s}</span>
               {s === PM2_SKIP_MSG && <RestartButton />}
