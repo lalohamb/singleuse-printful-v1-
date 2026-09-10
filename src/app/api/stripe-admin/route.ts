@@ -38,6 +38,8 @@ export async function POST(req: NextRequest) {
   }
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2026-08-26.dahlia" });
 
+  const { action, charge_id, amount, secret_key, webhook_url } = await req.json();
+
   try {
     if (action === "refund") {
       const params: Stripe.RefundCreateParams = { charge: charge_id };
