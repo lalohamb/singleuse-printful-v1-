@@ -95,7 +95,7 @@ function EditSubscriberModal({ subscriber, groups, onClose, onDone }: { subscrib
 }
 
 function CreateCampaignModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () => void; onDone: () => void }) {
-  const [form, setForm] = useState({ name: "", subject: "", from_name: "Body and Sleeves", from_email: "Hello.BodyandSleeves@gmail.com", html: "", group: "", send_now: false });
+  const [form, setForm] = useState({ name: "", subject: "", from_name: "Body and Sleeves", from_email: "orders@bodyandsleeves.com", html: "", group: "", send_now: false });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -121,7 +121,7 @@ function CreateCampaignModal({ groups, onClose, onDone }: { groups: Group[]; onC
         <div><label className="label-text">Subject Line</label><input required value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} className="input-field" placeholder="e.g. New arrivals just dropped 🔥" /></div>
         <div className="grid grid-cols-2 gap-3">
           <div><label className="label-text">From Name</label><input required value={form.from_name} onChange={(e) => setForm({ ...form, from_name: e.target.value })} className="input-field" /></div>
-          <div><label className="label-text">From Email</label><input required type="email" value={form.from_email} onChange={(e) => setForm({ ...form, from_email: e.target.value })} className="input-field" /></div>
+          <div><label className="label-text">From Email</label><input required type="email" value={form.from_email} onChange={(e) => setForm({ ...form, from_email: e.target.value })} className="input-field" /><p className="text-xs text-secondary-400 mt-1">Must be a domain verified in MailerLite — no Gmail/Yahoo addresses.</p></div>
         </div>
         <div><label className="label-text">Send To Group</label>
           <select value={form.group} onChange={(e) => setForm({ ...form, group: e.target.value })} className="input-field">
@@ -178,19 +178,29 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-secondary-900/50" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-        <div className="flex items-center justify-between mb-6">
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between p-6 border-b border-secondary-100 flex-shrink-0">
           <h2 className="text-lg font-bold text-secondary-900">{title}</h2>
           <button onClick={onClose} className="p-1 text-secondary-400 hover:text-secondary-900"><X size={20} /></button>
         </div>
-        {children}
+        <div className="overflow-y-auto flex-1 p-6">
+          {children}
+        </div>
       </div>
     </div>
   );
 }
 
 function ErrorMsg({ msg }: { msg: string }) {
-  return <div className="flex items-center gap-2 text-error-600 text-sm"><AlertCircle size={16} />{msg}</div>;
+  const is500 = msg.includes("500") || msg.toLowerCase().includes("internal server error");
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2 text-error-600 text-sm"><AlertCircle size={16} className="flex-shrink-0" />{msg}</div>
+      {is500 && (
+        <p className="text-xs text-secondary-500 pl-6">A 500 error from MailerLite usually means the <strong>From email address</strong> is not verified with them. Check that your sending domain is authenticated under <a href="https://app.mailerlite.com/settings/domains" target="_blank" rel="noopener noreferrer" className="text-primary-600 underline">MailerLite → Settings → Domains</a>.</p>
+      )}
+    </div>
+  );
 }
 
 function SubmitBtn({ loading, done, label, onClick }: { loading: boolean; done: boolean; label: string; onClick?: () => void }) {
@@ -287,6 +297,30 @@ function MailerLiteDashboard() {
 
   return (
     <div className="space-y-8">
+
+      {/* Requirements banner */}
+      <div className="bg-primary-50 border border-primary-100 rounded-xl p-5 space-y-3">
+        <p className="font-semibold text-secondary-900 flex items-center gap-2"><Mail size={18} className="text-primary-500" />MailerLite Requirements</p>
+        <ul className="space-y-2 text-sm text-secondary-600">
+          <li className="flex items-start gap-2">
+            <span className="text-primary-500 mt-0.5 flex-shrink-0">✦</span>
+            <span><strong>Verified custom domain required</strong> — campaigns cannot be sent from Gmail, Yahoo, or other free email addresses. Use a domain you own (e.g. <code className="bg-white px-1 rounded text-xs">orders@bodyandsleeves.com</code>) and verify it under <a href="https://app.mailerlite.com/settings/domains" target="_blank" rel="noopener noreferrer" className="text-primary-600 underline hover:text-primary-700">MailerLite → Settings → Domains</a>.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-primary-500 mt-0.5 flex-shrink-0">✦</span>
+            <span><strong>At least one group required</strong> — MailerLite's API requires subscribers to be in a group. Campaigns sent to "All subscribers" will automatically include all groups in your account.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-primary-500 mt-0.5 flex-shrink-0">✦</span>
+            <span><strong>HTML email body</strong> — paste plain text or basic HTML. For rich drag-and-drop designs, build the campaign directly in <a href="https://app.mailerlite.com" target="_blank" rel="noopener noreferrer" className="text-primary-600 underline hover:text-primary-700">MailerLite's editor</a> and send from there.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-primary-500 mt-0.5 flex-shrink-0">✦</span>
+            <span><strong>API key</strong> — set <code className="bg-white px-1 rounded text-xs">MAILER_LITE_API_KEY</code> in <code className="bg-white px-1 rounded text-xs">.env.local</code> and in Supabase edge function secrets.</span>
+          </li>
+        </ul>
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

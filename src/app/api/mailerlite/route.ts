@@ -150,6 +150,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "No groups found in your MailerLite account. Create at least one group first." }, { status: 422 });
       }
       const createPayload = {
+        name: body.name,
         subject: body.subject,
         from: body.from_email,
         from_name: body.from_name,

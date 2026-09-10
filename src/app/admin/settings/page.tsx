@@ -668,27 +668,41 @@ function Settings() {
         <p className="text-sm text-secondary-500 mb-6">Toggle and update the social links shown in the footer. Disabled icons are hidden from visitors.</p>
         <div className="space-y-3">
           {SOCIAL_META.map(({ key, label, placeholder }) => (
-            <div key={key} className="flex items-center gap-3 p-3 bg-secondary-50 rounded-lg">
-              <button
-                type="button"
-                onClick={() => setSocialField(key, "enabled", !social[key]?.enabled)}
-                className={`relative flex-shrink-0 w-10 h-6 rounded-full transition-colors ${social[key]?.enabled ? "bg-primary-500" : "bg-secondary-200"}`}
-                aria-label={`Toggle ${label}`}
-              >
-                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${social[key]?.enabled ? "translate-x-4" : "translate-x-0"}`} />
-              </button>
-              <span className={`text-sm font-medium w-20 flex-shrink-0 ${social[key]?.enabled ? "text-secondary-900" : "text-secondary-400"}`}>{label}</span>
-              <input
-                value={social[key]?.url || ""}
-                onChange={(e) => setSocialField(key, "url", e.target.value)}
-                placeholder={placeholder}
-                disabled={!social[key]?.enabled}
-                className="input-field flex-1 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-              />
-              {social[key]?.url && social[key]?.enabled && (
-                <a href={social[key].url} target="_blank" rel="noreferrer" className="text-secondary-400 hover:text-primary-500 transition-colors flex-shrink-0" title="Preview link">
-                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
-                </a>
+            <div key={key}>
+              <div className="flex items-center gap-3 p-3 bg-secondary-50 rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => setSocialField(key, "enabled", !social[key]?.enabled)}
+                  className={`relative flex-shrink-0 w-10 h-6 rounded-full transition-colors ${social[key]?.enabled ? "bg-primary-500" : "bg-secondary-200"}`}
+                  aria-label={`Toggle ${label}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${social[key]?.enabled ? "translate-x-4" : "translate-x-0"}`} />
+                </button>
+                <span className={`text-sm font-medium w-20 flex-shrink-0 ${social[key]?.enabled ? "text-secondary-900" : "text-secondary-400"}`}>{label}</span>
+                <input
+                  value={social[key]?.url || ""}
+                  onChange={(e) => setSocialField(key, "url", e.target.value)}
+                  placeholder={placeholder}
+                  disabled={!social[key]?.enabled}
+                  className="input-field flex-1 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                />
+                {social[key]?.url && social[key]?.enabled && (
+                  <a href={social[key].url} target="_blank" rel="noreferrer" className="text-secondary-400 hover:text-primary-500 transition-colors flex-shrink-0" title="Preview link">
+                    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+                  </a>
+                )}
+              </div>
+              {key === "email" && (
+                <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-secondary-700 space-y-1.5">
+                  <p className="font-semibold text-secondary-900">📧 Domain email required</p>
+                  <p>This address and any email used for sending must come from a <strong>verified custom domain</strong> — e.g. <code className="bg-white px-1 rounded text-xs">orders@yourdomain.com</code>. Free addresses are rejected by:</p>
+                  <ul className="list-disc list-inside space-y-1 text-secondary-600 pl-1">
+                    <li><strong>MailerLite</strong> — blocks campaigns from Gmail, Yahoo, Hotmail, etc.</li>
+                    <li><strong>Resend</strong> — requires a verified sending domain for transactional emails</li>
+                    <li><strong>Printify webhook emails</strong> — shipment notifications use your store address</li>
+                  </ul>
+                  <p className="text-xs text-secondary-500 pt-0.5">Verify in <a href="https://app.mailerlite.com/settings/domains" target="_blank" rel="noopener noreferrer" className="text-primary-600 underline">MailerLite → Domains</a> and <a href="https://resend.com/domains" target="_blank" rel="noopener noreferrer" className="text-primary-600 underline">Resend → Domains</a>.</p>
+                </div>
               )}
             </div>
           ))}
