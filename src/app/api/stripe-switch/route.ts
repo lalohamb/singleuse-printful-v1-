@@ -86,7 +86,13 @@ export async function POST(req: NextRequest) {
   const localEnv = parseEnvFile(localPath);
   localEnv.STRIPE_SECRET_KEY = secretKey;
   localEnv.STRIPE_WEBHOOK_SECRET = webhookSecret;
-  fs.writeFileSync(localPath, Object.entries(localEnv).map(([k, v]) => `${k}=${v}`).join("\n") + "\n", "utf8");
+  const localContent = Object.entries(localEnv).map(([k, v]) => `${k}=${v}`).join("\n") + "\n";
+  fs.writeFileSync(localPath, localContent, "utf8");
+  // Also write to standalone dir (process.cwd() on prod)
+  const standalonePath = path.resolve(process.cwd(), ".env.local");
+  if (standalonePath !== localPath && fs.existsSync(path.dirname(standalonePath))) {
+    fs.writeFileSync(standalonePath, localContent, "utf8");
+  }
   steps.push(".env.local updated");
 
   // 2. Push to Supabase via Management API

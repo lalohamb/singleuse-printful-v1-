@@ -50,7 +50,8 @@ export async function GET() {
   const root = appRoot();
   const liveEnv = parseEnvFile(path.resolve(root, ".env.live"));
   const testEnv = parseEnvFile(path.resolve(root, ".env.test"));
-  const activeEnv = parseEnvFile(path.resolve(root, ".env.local"));
+  // active_mode must read from process.cwd() — the actual file the running process loaded
+  const activeEnv = parseEnvFile(path.resolve(process.cwd(), ".env.local"));
   const mask = (k: string) => k ? `${k.slice(0, 12)}...${k.slice(-4)}` : "";
   return NextResponse.json({
     live: { hasKeys: !!(liveEnv.STRIPE_SECRET_KEY && liveEnv.STRIPE_WEBHOOK_SECRET), secret_key_hint: mask(liveEnv.STRIPE_SECRET_KEY), webhook_hint: mask(liveEnv.STRIPE_WEBHOOK_SECRET) },
