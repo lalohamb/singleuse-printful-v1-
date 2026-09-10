@@ -163,6 +163,25 @@ function KeyForm({ mode, status, onSaved }: { mode: "live" | "test"; status: Key
   );
 }
 
+const PM2_SKIP_MSG = "PM2 restart skipped (not running under PM2 — restart dev server manually)";
+
+function RestartButton() {
+  const [state, setState] = useState<"idle" | "loading" | "done" | "error">("idle");
+
+  const doRestart = async () => {
+    setState("loading");
+    const r = await fetch("/api/stripe-switch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "restart" }) });
+    setState(r.ok ? "done" : "error");
+  };
+
+  return (
+    <button onClick={doRestart} disabled={state === "loading" || state === "done"} className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-warning-100 text-warning-700 hover:bg-warning-200 transition-colors ml-1">
+      {state === "loading" ? <Loader2 size={10} className="animate-spin" /> : state === "done" ? <Check size={10} /> : <RefreshCw size={10} />}
+      {state === "done" ? "Restarted" : state === "error" ? "Failed" : "Restart server"}
+    </button>
+  );
+}
+
 function SwitchButton({ mode, isActive, onSwitched }: { mode: "live" | "test"; isActive: boolean; onSwitched: () => void }) {
   const [loading, setLoading] = useState(false);
   const [steps, setSteps] = useState<string[]>([]);
@@ -187,7 +206,13 @@ function SwitchButton({ mode, isActive, onSwitched }: { mode: "live" | "test"; i
       {error && <p className="text-xs text-error-600">{error}</p>}
       {steps.length > 0 && (
         <ul className="text-xs text-success-700 space-y-0.5">
-          {steps.map((s, i) => <li key={i} className="flex items-center gap-1"><Check size={10} />{s}</li>)}
+          {steps.map((s, i) => (
+            <li key={i} className="flex items-center">
+              <Check size={10} className="mr-1 shrink-0" />
+              <span>{s}</span>
+              {s === PM2_SKIP_MSG && <RestartButton />}
+            </li>
+          ))}
         </ul>
       )}
     </div>

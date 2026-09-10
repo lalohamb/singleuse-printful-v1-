@@ -48,9 +48,21 @@ async function pushSupabaseSecrets(secretKey: string, webhookSecret: string, sup
   if (!res.ok) throw new Error(`Supabase secrets update failed: ${await res.text()}`);
 }
 
-// POST — body: { mode: "live" | "test" }
+// POST — body: { mode: "live" | "test" } or { action: "restart" }
 export async function POST(req: NextRequest) {
-  const { mode } = await req.json();
+  const body = await req.json();
+
+  // Standalone restart action
+  if (body.action === "restart") {
+    try {
+      await execAsync("pm2 restart bodyandsleeves --update-env");
+      return NextResponse.json({ ok: true, message: "PM2 restarted" });
+    } catch {
+      return NextResponse.json({ error: "PM2 restart failed — not running under PM2" }, { status: 500 });
+    }
+  }
+
+  const { mode } = body;
   if (mode !== "live" && mode !== "test")
     return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
 
