@@ -343,7 +343,7 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
           <div><label className="label-text">Title</label><input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="input-field" placeholder="Product title" /></div>
           <div>
             <label className="label-text">Description</label>
-            <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="input-field min-h-[80px] whitespace-pre-wrap" placeholder="Product description" />
+            <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="input-field min-h-[200px] whitespace-pre-wrap" placeholder="Product description" />
             <button type="button" onClick={() => setForm((prev) => ({ ...prev, description: (prev.description || "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&ldquo;/g, "\"").replace(/&rdquo;/g, "\"").replace(/&lsquo;/g, "'").replace(/&rsquo;/g, "'").replace(/&mdash;/g, "—").replace(/&ndash;/g, "–").replace(/&hellip;/g, "...").replace(/&#[0-9]+;/g, "").replace(/&[a-z]+;/g, "").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim() }))} className="text-xs text-secondary-400 hover:text-secondary-700 mt-1 underline">Clean HTML tags</button>
           </div>
           <div className="grid grid-cols-2 gap-4">
