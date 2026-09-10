@@ -351,7 +351,7 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
       images: form.image_url ? [form.image_url] : [], updated_at: new Date().toISOString(),
     };
     const result = product ? await supabase.from("products").update(payload).eq("id", product.id) : await supabase.from("products").insert({ ...payload, variants: [{ id: "S", label: "Small", color: "Default" }] });
-    if (result.error) { setError(result.error.message); setSaving(false); } else onSave();
+    if (result.error) { setError(result.error.message); setSaving(false); } else { fetch("/api/revalidate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths: ["/", "/shop"] }) }); onSave(); }
   };
 
   return (

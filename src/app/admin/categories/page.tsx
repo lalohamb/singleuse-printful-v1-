@@ -244,7 +244,7 @@ function CategoryCard({ cat, autoImage, onEdit, onDelete, onSaved }: {
       .select()
       .single();
     setSaving(false);
-    if (data) { setSaved(true); onSaved(data as Category); setTimeout(() => setSaved(false), 2000); }
+    if (data) { setSaved(true); onSaved(data as Category); fetch("/api/revalidate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths: ["/", "/shop"] }) }); setTimeout(() => setSaved(false), 2000); }
   };
 
   return (
@@ -406,7 +406,7 @@ function CategoryModal({ category, onClose, onSave }: { category: Category | nul
     const result = category
       ? await supabase.from("categories").update(payload).eq("id", category.id)
       : await supabase.from("categories").insert(payload);
-    if (result.error) { setError(result.error.message); setSaving(false); } else onSave();
+    if (result.error) { setError(result.error.message); setSaving(false); } else { fetch("/api/revalidate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths: ["/", "/shop"] }) }); onSave(); }
   };
 
   return (

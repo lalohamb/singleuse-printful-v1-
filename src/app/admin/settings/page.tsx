@@ -181,7 +181,7 @@ function Settings() {
   const handleSave = async () => {
     setSaving(true);
     const { error } = await supabase.from("settings").update({ store_name: form.store_name, tagline: form.tagline, logo_url: form.logo_url, logo_size: form.logo_size ?? 40, favicon_url: form.favicon_url ?? null, hero_title: form.hero_title, hero_subtitle: form.hero_subtitle, hero_image_url: form.hero_image_url, story_image_url: form.story_image_url, story_object_position: form.story_object_position, story_image_scale: form.story_image_scale ?? 100, story_image_flip: form.story_image_flip, story_image_fit: form.story_image_fit ?? "cover", story_gradient_opacity: form.story_gradient_opacity ?? 40, story_gradient_dir: form.story_gradient_dir ?? "full", hero_object_position: form.hero_object_position, hero_height_vh: heroPreviewH, hero_image_flip: form.hero_image_flip, hero_image_scale: form.hero_image_scale ?? 100, hero_gradient_opacity: form.hero_gradient_opacity ?? 70, hero_gradient_dir: form.hero_gradient_dir ?? "left", hero_image_fit: form.hero_image_fit ?? "cover", our_why_image_url: form.our_why_image_url, our_why_object_position: form.our_why_object_position, our_why_height_vh: ourWhyPreviewH, our_why_label: form.our_why_label, our_why_quote: form.our_why_quote, our_why_body: form.our_why_body, our_why_image_scale: form.our_why_image_scale ?? 100, our_why_image_flip: form.our_why_image_flip, our_why_image_fit: form.our_why_image_fit ?? "cover", our_why_gradient_opacity: form.our_why_gradient_opacity ?? 70, our_why_gradient_dir: form.our_why_gradient_dir ?? "left", announcement: form.announcement, announcement_active: form.announcement_active, promo_banner_active: form.promo_banner_active ?? false, promo_banner_title: form.promo_banner_title, promo_banner_body: form.promo_banner_body, promo_banner_cta_label: form.promo_banner_cta_label, promo_banner_cta_url: form.promo_banner_cta_url, promo_banner_bg_color: form.promo_banner_bg_color, shipping_free_threshold: form.shipping_free_threshold, default_shipping_cost: form.default_shipping_cost, printify_shop_id: form.printify_shop_id, stripe_connected: form.stripe_connected, testimonials: form.testimonials ?? DEFAULT_TESTIMONIALS, updated_at: new Date().toISOString() }).eq("id", settings?.id);
-    if (!error) { setSaved(true); setSaveError(null); fetch("/api/revalidate", { method: "POST" }); setTimeout(() => setSaved(false), 2000); }
+    if (!error) { setSaved(true); setSaveError(null); fetch("/api/revalidate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths: ["/", "/shop", "/about"] }) }); setTimeout(() => setSaved(false), 2000); }
     else { setSaveError(error.message); }
     setSaving(false);
   };
@@ -189,7 +189,7 @@ function Settings() {
   const handleSocialSave = async () => {
     setSocialSaving(true);
     const { error } = await supabase.from("settings").update({ social_links: social, updated_at: new Date().toISOString() }).eq("id", settings?.id);
-    if (!error) { setSocialSaved(true); setTimeout(() => setSocialSaved(false), 2000); }
+    if (!error) { setSocialSaved(true); fetch("/api/revalidate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths: ["/"] }) }); setTimeout(() => setSocialSaved(false), 2000); }
     setSocialSaving(false);
   };
 

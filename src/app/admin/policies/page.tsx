@@ -45,6 +45,8 @@ export default function PoliciesPage() {
       setPolicies((prev) => ({ ...prev, [id]: { ...prev[id], content: drafts[id] } }));
       setDirty((prev) => ({ ...prev, [id]: false }));
       setMsg((prev) => ({ ...prev, [id]: "Saved & published!" }));
+      const policyHref = POLICIES.find(p => p.id === id)?.href;
+      if (policyHref) fetch("/api/revalidate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths: [policyHref] }) });
       setTimeout(() => setMsg((prev) => ({ ...prev, [id]: "" })), 3000);
     }
   };

@@ -82,7 +82,7 @@ function SeoPanel() {
     const { updated_at, ...payload } = form;
     const r = await fetch("/api/seo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     setStatus(r.ok ? "saved" : "error");
-    if (r.ok) setTimeout(() => setStatus("idle"), 2500);
+    if (r.ok) { fetch("/api/revalidate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths: ["/"] }) }); setTimeout(() => setStatus("idle"), 2500); }
   };
 
   const set = (key: keyof SeoSettings, value: string | boolean) => setForm((f) => ({ ...f, [key]: value }));
