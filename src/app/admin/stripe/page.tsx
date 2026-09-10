@@ -168,8 +168,39 @@ function KeyForm({ mode, status, onSaved }: { mode: "live" | "test"; status: Key
   );
 }
 
+function SwitchButton({ mode, isActive, onSwitched }: { mode: "live" | "test"; isActive: boolean; onSwitched: () => void }) {
+  const [loading, setLoading] = useState(false);
+  const [steps, setSteps] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const doSwitch = async () => {
+    setLoading(true); setSteps([]); setError(null);
+    const r = await fetch("/api/stripe-switch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode }) });
+    const data = await r.json();
+    if (!r.ok) { setError(data.error); }
+    else { setSteps(data.steps); onSwitched(); }
+    setLoading(false);
+  };
+
+  if (isActive) return <span className="text-xs text-success-600 font-medium flex items-center gap-1"><Check size={12} />Active</span>;
+
+  return (
+    <div className="space-y-2">
+      <button onClick={doSwitch} disabled={loading} className="btn-primary py-1.5 px-4 text-sm w-full">
+        {loading ? <Loader2 size={14} className="animate-spin mx-auto" /> : `Switch to ${mode.toUpperCase()}`}
+      </button>
+      {error && <p className="text-xs text-error-600">{error}</p>}
+      {steps.length > 0 && (
+        <ul className="text-xs text-success-700 space-y-0.5">
+          {steps.map((s, i) => <li key={i} className="flex items-center gap-1"><Check size={10} />{s}</li>)}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function StripeKeyManager({ isLive }: { isLive: boolean }) {
-  const [keyStatus, setKeyStatus] = useState<{ live: KeyStatus; test: KeyStatus } | null>(null);
+  const [keyStatus, setKeyStatus] = useState<{ live: KeyStatus; test: KeyStatus; active_mode: string } | null>(null);
 
   const fetchStatus = async () => {
     const r = await fetch("/api/stripe-mode");
@@ -178,16 +209,30 @@ function StripeKeyManager({ isLive }: { isLive: boolean }) {
 
   useEffect(() => { fetchStatus(); }, []);
 
+  const activeMode = keyStatus?.active_mode ?? (isLive ? "live" : "test");
+
   return (
     <div className="space-y-3">
-      <div className={`rounded-xl border p-4 ${isLive ? "bg-success-50 border-success-200" : "bg-amber-50 border-amber-200"}`}>
-        <p className="text-sm font-semibold text-secondary-900">Active mode: <span className={isLive ? "text-success-700" : "text-amber-700"}>{isLive ? "LIVE" : "TEST"}</span></p>
-        <p className="text-xs text-secondary-500 mt-0.5">{isLive ? "Real payments are being processed." : "Test mode — no real charges."}</p>
+      <div className={`rounded-xl border p-4 ${activeMode === "live" ? "bg-success-50 border-success-200" : "bg-amber-50 border-amber-200"}`}>
+        <p className="text-sm font-semibold text-secondary-900">Active mode: <span className={activeMode === "live" ? "text-success-700" : "text-amber-700"}>{activeMode === "live" ? "LIVE" : "TEST"}</span></p>
+        <p className="text-xs text-secondary-500 mt-0.5">{activeMode === "live" ? "Real payments are being processed." : "Test mode — no real charges."}</p>
       </div>
       {keyStatus && (
         <>
-          <KeyForm mode="live" status={keyStatus.live} onSaved={fetchStatus} />
-          <KeyForm mode="test" status={keyStatus.test} onSaved={fetchStatus} />
+          <div className="rounded-xl border border-success-200 bg-success-50 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-success-100 text-success-700">LIVE</span>
+              <SwitchButton mode="live" isActive={activeMode === "live"} onSwitched={fetchStatus} />
+            </div>
+            <KeyForm mode="live" status={keyStatus.live} onSaved={fetchStatus} />
+          </div>
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">TEST</span>
+              <SwitchButton mode="test" isActive={activeMode === "test"} onSwitched={fetchStatus} />
+            </div>
+            <KeyForm mode="test" status={keyStatus.test} onSaved={fetchStatus} />
+          </div>
         </>
       )}
     </div>
