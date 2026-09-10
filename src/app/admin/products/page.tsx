@@ -63,8 +63,8 @@ function Products() {
   const bulkCleanHtml = async () => {
     if (!selectedIds.size) return;
     setBulkBusy(true);
-    const selected = products.filter((p) => selectedIds.has(p.id) && p.description);
-    await Promise.all(selected.map((p) => supabase.from("products").update({ description: stripHtml(p.description!), updated_at: new Date().toISOString() }).eq("id", p.id)));
+    const selected = products.filter((p) => selectedIds.has(p.id) && p.description && /<[^>]|&[a-z#]/.test(p.description));
+    await Promise.all(selected.map((p) => supabase.from("products").update({ description: stripHtml(p.description!), content_locked: true, updated_at: new Date().toISOString() }).eq("id", p.id)));
     setBulkBusy(false); clearSel(); fetchData();
   };
 
@@ -364,10 +364,26 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
               ))}
             </div>
           </div>
-          {product && form.content_locked && (
-            <div className="bg-warning-50 border border-warning-100 text-warning-700 rounded-lg p-3 text-sm flex items-center justify-between gap-3">
-              <span>Content locked — title, description &amp; image are preserved on Printify re-sync.</span>
-              <button type="button" onClick={() => setForm({ ...form, content_locked: false })} className="underline font-medium flex-shrink-0">Unlock</button>
+          {product ? (
+            <div className={`border rounded-lg p-3 text-sm flex items-center justify-between gap-3 ${
+              form.content_locked
+                ? "bg-warning-50 border-warning-100 text-warning-700"
+                : "bg-secondary-50 border-secondary-100 text-secondary-600"
+            }`}>
+              <span className="flex items-center gap-2">
+                <Lock size={14} className={form.content_locked ? "text-warning-500" : "text-secondary-400"} />
+                {form.content_locked
+                  ? "Content locked — title, description & image preserved on Printify re-sync."
+                  : "Content unlocked — Printify re-sync will overwrite title, description & image."}
+              </span>
+              <button type="button" onClick={() => setForm({ ...form, content_locked: !form.content_locked })} className="underline font-medium flex-shrink-0">
+                {form.content_locked ? "Unlock" : "Lock"}
+              </button>
+            </div>
+          ) : (
+            <div className="bg-secondary-50 border border-secondary-100 text-secondary-500 rounded-lg p-3 text-sm flex items-center gap-2">
+              <Lock size={14} className="text-secondary-400" />
+              New products are not linked to Printify — no sync lock needed.
             </div>
           )}
           <div className="border-t border-secondary-100 pt-4">
