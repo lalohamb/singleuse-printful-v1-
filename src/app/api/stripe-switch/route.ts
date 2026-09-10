@@ -108,24 +108,25 @@ export async function POST(req: NextRequest) {
     steps.push("Supabase secrets skipped (SUPABASE_ACCESS_TOKEN not set)");
   }
 
-  // 3. Update ecosystem.config.js and restart PM2 after response is sent
-  const ecoPath = path.resolve(appDir, "ecosystem.config.js");
-  try {
-    if (fs.existsSync(ecoPath)) {
+  // 3. Update ecosystem.config.js (always at repo root) and restart PM2 after response
+  const repoPaths = [
+    "/var/www/bodyandsleeves/ecosystem.config.js",
+    path.resolve(appDir, "ecosystem.config.js"),
+    path.resolve(process.cwd(), "ecosystem.config.js"),
+  ];
+  for (const ecoPath of repoPaths) {
+    try {
+      if (!fs.existsSync(ecoPath)) continue;
       let ecoContent = fs.readFileSync(ecoPath, "utf8");
-      // Replace STRIPE_SECRET_KEY value in the file directly
-      ecoContent = ecoContent.replace(
-        /("STRIPE_SECRET_KEY"\s*:\s*")[^"]*(")/, `$1${secretKey}$2`
-      );
-      ecoContent = ecoContent.replace(
-        /("STRIPE_WEBHOOK_SECRET"\s*:\s*")[^"]*(")/, `$1${webhookSecret}$2`
-      );
+      ecoContent = ecoContent.replace(/("STRIPE_SECRET_KEY"\s*:\s*")[^"]*(")/g, `$1${secretKey}$2`);
+      ecoContent = ecoContent.replace(/("STRIPE_WEBHOOK_SECRET"\s*:\s*")[^"]*(")/g, `$1${webhookSecret}$2`);
       fs.writeFileSync(ecoPath, ecoContent, "utf8");
-    }
-  } catch { /* non-fatal */ }
+      break;
+    } catch { /* try next */ }
+  }
 
   // Delayed restart — fires after response is sent
-  setTimeout(() => execAsync(`/usr/bin/pm2 restart bodyandsleeves --update-env`).catch(() => {}), 300);
+  setTimeout(() => execAsync("/usr/bin/pm2 restart bodyandsleeves --update-env").catch(() => {}), 300);
   steps.push("PM2 restarted — new keys are live");
 
   return NextResponse.json({ ok: true, mode, steps });
