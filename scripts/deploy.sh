@@ -23,6 +23,7 @@ cp -r .next/static .next/standalone/.next/static
 cp -r public .next/standalone/public
 cp -r node_modules/sharp .next/standalone/node_modules/ 2>/dev/null || true
 cp -r node_modules/@img .next/standalone/node_modules/ 2>/dev/null || true
+cp -r node_modules/stripe .next/standalone/node_modules/ 2>/dev/null || true
 echo "♻️  Restarting PM2..."
 # Load .env.local into an ecosystem config so standalone server has all vars
 node -e "
