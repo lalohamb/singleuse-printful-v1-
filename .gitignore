@@ -12,6 +12,14 @@ dist/
 .env
 .env.*
 !.env.example
+.env.local
+.env.*.local
+
+# Secrets / credentials
+supabase/PAT
+*.pem
+*.key
+*.p12
 
 # Logs
 npm-debug.log*

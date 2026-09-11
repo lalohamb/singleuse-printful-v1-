@@ -7,7 +7,7 @@ import { promisify } from "util";
 export const runtime = "nodejs";
 
 const execAsync = promisify(exec);
-const SUPABASE_PROJECT_REF = "SUPABASE_PROJECT_REF_REDACTED";
+const SUPABASE_PROJECT_REF = process.env.SUPABASE_PROJECT_REF;
 
 function appRoot(): string {
   if (process.env.APP_ROOT && fs.existsSync(path.join(process.env.APP_ROOT, ".env.local"))) return process.env.APP_ROOT;
@@ -65,6 +65,10 @@ export async function POST(req: NextRequest) {
   const { mode } = body;
   if (mode !== "live" && mode !== "test")
     return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
+
+  if (!SUPABASE_PROJECT_REF) {
+    return NextResponse.json({ error: "SUPABASE_PROJECT_REF is not configured." }, { status: 500 });
+  }
 
   const appDir = appRoot();
   const envFile = path.resolve(appDir, mode === "live" ? ".env.live" : ".env.test");

@@ -1,6 +1,12 @@
 import { randomBytes, createHmac } from 'crypto';
 
-const SECRET = process.env.LICENSE_HMAC_SECRET ?? 'dev-secret';
+function getLicenseSecret(): string {
+  const secret = process.env.LICENSE_HMAC_SECRET;
+  if (!secret) {
+    throw new Error('LICENSE_HMAC_SECRET is not configured. Set a secure secret in your environment before generating or validating licenses.');
+  }
+  return secret;
+}
 
 /** Generates a license key in format PPL-XXXX-XXXX-XXXX-XXXX */
 export function generateLicenseKey(): string {
@@ -12,7 +18,7 @@ export function generateLicenseKey(): string {
 
 /** Returns a short checksum suffix for a key (for display/verification) */
 export function checksumFor(key: string): string {
-  return createHmac('sha256', SECRET).update(key).digest('hex').slice(0, 8).toUpperCase();
+  return createHmac('sha256', getLicenseSecret()).update(key).digest('hex').slice(0, 8).toUpperCase();
 }
 
 /** Validates format: PPL-XXXX-XXXX-XXXX-XXXX */
