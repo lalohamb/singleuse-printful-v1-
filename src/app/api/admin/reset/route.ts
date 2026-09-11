@@ -10,7 +10,17 @@ const serviceSupabase = () =>
   );
 
 export async function POST(req: NextRequest) {
-  const { type } = await req.json();
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return NextResponse.json({ error: "SUPABASE_SERVICE_ROLE_KEY is not set" }, { status: 500 });
+  }
+
+  let type: string;
+  try {
+    ({ type } = await req.json());
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
   if (type !== "soft" && type !== "full") {
     return NextResponse.json({ error: "Invalid reset type" }, { status: 400 });
   }

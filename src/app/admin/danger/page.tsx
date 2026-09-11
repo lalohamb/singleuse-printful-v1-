@@ -53,7 +53,8 @@ function DangerPanel() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type: option.type }),
     });
-    const data = await res.json();
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : {};
     if (!res.ok) {
       setError(data.error || "Reset failed");
     } else {
