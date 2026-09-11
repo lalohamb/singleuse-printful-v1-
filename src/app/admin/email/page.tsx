@@ -198,10 +198,12 @@ function EmailPanel() {
             </div>
             <button onClick={fetchEvents} className="text-secondary-400 hover:text-secondary-700"><RefreshCw size={16} className={loadingEvents ? "animate-spin" : ""} /></button>
           </div>
-          <div className="p-4 bg-amber-50 border-b border-amber-100 flex items-start gap-2 text-sm text-amber-800">
-            <AlertTriangle size={15} className="flex-shrink-0 mt-0.5 text-amber-500" />
-            <span>Add the webhook URL above in your <a href="https://resend.com/webhooks" target="_blank" rel="noreferrer" className="underline font-medium">Resend dashboard → Webhooks</a> to start receiving delivery events.</span>
-          </div>
+          {events.length === 0 && !loadingEvents && (
+            <div className="p-4 bg-amber-50 border-b border-amber-100 flex items-start gap-2 text-sm text-amber-800">
+              <AlertTriangle size={15} className="flex-shrink-0 mt-0.5 text-amber-500" />
+              <span>Add the webhook URL above in your <a href="https://resend.com/webhooks" target="_blank" rel="noreferrer" className="underline font-medium">Resend dashboard → Webhooks</a> to start receiving delivery events.</span>
+            </div>
+          )}
           {loadingEvents ? <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-6 w-6 border-2 border-secondary-300 border-t-secondary-900" /></div>
             : events.length === 0 ? <div className="p-10 text-center text-secondary-400"><Mail size={36} className="mx-auto mb-2 text-secondary-200" />No events yet — add the webhook in Resend to start tracking</div>
             : (
