@@ -42,9 +42,17 @@ function DangerPanel() {
   const [done, setDone] = useState<"soft" | "full" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmInput, setConfirmInput] = useState<Record<string, string>>({});
+  const [pendingOption, setPendingOption] = useState<ResetOption | null>(null);
 
   const handleReset = async (option: ResetOption) => {
     if (confirmInput[option.type] !== option.confirmText) return;
+    setPendingOption(option);
+  };
+
+  const executeReset = async () => {
+    if (!pendingOption) return;
+    const option = pendingOption;
+    setPendingOption(null);
     setLoading(option.type);
     setError(null);
     setDone(null);
@@ -66,6 +74,46 @@ function DangerPanel() {
 
   return (
     <div className="max-w-2xl space-y-6">
+      {/* Second confirmation modal */}
+      {pendingOption && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle size={20} className="text-red-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-secondary-900">Are you absolutely sure?</p>
+                <p className="text-sm text-secondary-500">This cannot be undone.</p>
+              </div>
+            </div>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700 space-y-1">
+              <p className="font-semibold">{pendingOption.title} will permanently delete:</p>
+              <ul className="space-y-0.5 mt-1">
+                {pendingOption.clears.map((item) => (
+                  <li key={item} className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />{item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setPendingOption(null)}
+                className="px-4 py-2 rounded-lg border border-secondary-200 text-secondary-700 text-sm font-medium hover:bg-secondary-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={executeReset}
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
+              >
+                Yes, delete everything
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Warning banner */}
       <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
         <AlertTriangle size={20} className="text-red-500 flex-shrink-0 mt-0.5" />
