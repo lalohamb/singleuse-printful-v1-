@@ -65,10 +65,12 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <section className="bg-secondary-50 py-16">
+        <section id="mission" className="bg-secondary-50 py-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-12">
-              <h2 className="text-3xl lg:text-4xl font-bold text-secondary-900">What We Stand For</h2>
+              <p className="text-gold-400 uppercase tracking-widest text-sm font-semibold mb-2">Why We Exist</p>
+              <h2 className="text-3xl lg:text-4xl font-bold text-secondary-900">Our Mission</h2>
+              <p className="text-secondary-500 mt-4 max-w-2xl mx-auto text-lg">To create made-to-order apparel that speaks truth, celebrates identity, and empowers every person who wears it — starting with the Black community and radiating outward.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
               {[
@@ -84,6 +86,33 @@ export default function AboutPage() {
                   <p className="text-secondary-500 text-sm mt-2">{v.desc}</p>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="culture" className="py-20 bg-secondary-900">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-14">
+              <p className="text-gold-400 uppercase tracking-widest text-sm font-semibold mb-2">More Than a Brand</p>
+              <h2 className="text-3xl lg:text-4xl font-bold text-white">The Culture</h2>
+              <p className="text-white/60 mt-4 max-w-2xl mx-auto text-lg">Body &amp; Sleeves is rooted in a movement — one that honors where we come from, celebrates who we are, and boldly declares where we&apos;re going.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {[
+                { emoji: "✊🏾", title: "Black Excellence", desc: "Every design is a declaration. We wear our heritage with pride, not apology." },
+                { emoji: "🙏🏾", title: "Faith-Driven", desc: "Rooted in scripture and spiritual conviction — because what you believe shapes what you wear." },
+                { emoji: "🌍", title: "Community First", desc: "From the aunties to the block — we design for the people who show up for each other." },
+              ].map((c) => (
+                <div key={c.title} className="bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
+                  <div className="text-5xl mb-4">{c.emoji}</div>
+                  <h3 className="text-white font-bold text-xl mb-3">{c.title}</h3>
+                  <p className="text-white/60 leading-relaxed">{c.desc}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-14 border-t border-white/10 pt-12 text-center">
+              <p className="text-2xl lg:text-3xl font-display italic text-gold-400 max-w-3xl mx-auto">&ldquo;Empower yourself. Empower the Culture.&rdquo;</p>
+              <p className="text-white/40 mt-4 text-sm">— The Body &amp; Sleeves Creed</p>
             </div>
           </div>
         </section>

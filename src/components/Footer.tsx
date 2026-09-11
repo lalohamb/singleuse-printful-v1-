@@ -143,6 +143,7 @@ export default async function Footer() {
         </div>
         <div className="border-t border-secondary-700 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-sm text-secondary-500">&copy; {new Date().getFullYear()} Body &amp; Sleeves. All rights reserved.</p>
+          <p className="text-sm text-secondary-500">Powered by <a href="https://Atlascloudhosting.com" target="" rel="noopener noreferrer" className="hover:text-white transition-colors">Atlas Cloud Hosting</a>.</p>
           <p className="text-sm text-secondary-500">Made to order. Made with love.</p>
         </div>
       </div>
