@@ -2,7 +2,7 @@
 import { type ReactNode, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingBag, Settings as SettingsIcon, LogOut, Menu, FolderTree, ExternalLink, Mail, CreditCard, Send, Search, Truck, Image, FileText } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag, Settings as SettingsIcon, LogOut, Menu, FolderTree, ExternalLink, Mail, CreditCard, Send, Search, Truck, Image, FileText, AlertTriangle } from "lucide-react";
 import { useAdminAuth } from "@/lib/admin-auth";
 
 const navItems = [
@@ -18,6 +18,7 @@ const navItems = [
   { path: "/admin/media", label: "Media", icon: Image },
   { path: "/admin/policies", label: "Policies", icon: FileText },
   { path: "/admin/settings", label: "Settings", icon: SettingsIcon },
+  { path: "/admin/danger",   label: "Danger Zone", icon: AlertTriangle },
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
@@ -60,7 +61,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           {navItems.map((item) => {
             const isActive = pathname === item.path;
             return (
-              <Link key={item.path} href={item.path} onClick={() => setSidebarOpen(false)} className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm ${isActive ? "bg-secondary-800 text-white font-medium" : "text-secondary-400 hover:bg-secondary-800 hover:text-white"}`}>
+              <Link key={item.path} href={item.path} onClick={() => setSidebarOpen(false)} className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm ${
+                item.path === "/admin/danger"
+                  ? isActive ? "bg-red-900/60 text-red-300 font-medium" : "text-red-400 hover:bg-red-900/40 hover:text-red-300"
+                  : isActive ? "bg-secondary-800 text-white font-medium" : "text-secondary-400 hover:bg-secondary-800 hover:text-white"
+              }`}>
                 <item.icon size={20} />
                 <span className="flex-1">{item.label}</span>
                 {item.path === "/admin/stripe" && stripeMode && (

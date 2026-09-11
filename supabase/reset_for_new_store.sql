@@ -8,6 +8,9 @@
 -- ── 1. ORDERS (all of them) ───────────────────────────────────────────────────
 TRUNCATE TABLE orders RESTART IDENTITY CASCADE;
 
+-- ── 2. EMAIL EVENTS ───────────────────────────────────────────────────────────
+TRUNCATE TABLE email_events RESTART IDENTITY CASCADE;
+
 -- ── 2. PRODUCTS ───────────────────────────────────────────────────────────────
 TRUNCATE TABLE products RESTART IDENTITY CASCADE;
 
@@ -88,6 +91,7 @@ UPDATE settings SET
     "threads":   {"url": "https://threads.net/@bodyandsleeves",     "enabled": true},
     "email":     {"url": "mailto:Hello.BodyandSleeves@gmail.com",   "enabled": true}
   }'::jsonb,
+  favicon_url             = null,
   updated_at              = now()
 WHERE id = (SELECT id FROM settings LIMIT 1);
 

@@ -10,8 +10,8 @@ export const metadata: Metadata = {
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
-// Page cache is purged explicitly via /api/revalidate after any admin save.
-export const revalidate = false;
+// Always fetch fresh data from Supabase on every request.
+export const revalidate = 0;
 
 export default async function HomePage() {
   const [settingsRes, featuredRes, newArrivalsRes, trendingRes, categoriesRes, catImgRes] = await Promise.all([

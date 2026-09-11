@@ -29,4 +29,6 @@ SELECT 'settings',                COUNT(*)         FROM settings
 UNION ALL
 SELECT 'seo_settings',            COUNT(*)         FROM seo_settings
 UNION ALL
+SELECT 'email_events',            COUNT(*)         FROM email_events
+UNION ALL
 SELECT 'admins',                  COUNT(*)         FROM admins;

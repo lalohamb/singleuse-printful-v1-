@@ -153,6 +153,7 @@ CREATE TABLE IF NOT EXISTS orders (
   tracking_number           text,
   tracking_url              text,
   items                     jsonb         NOT NULL,
+  livemode                  boolean       NOT NULL DEFAULT true,
   created_at                timestamptz   DEFAULT now(),
   updated_at                timestamptz   DEFAULT now()
 );
@@ -184,6 +185,7 @@ CREATE POLICY "admin_delete_orders" ON orders FOR DELETE
 CREATE INDEX IF NOT EXISTS idx_orders_status     ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_email      ON orders(email);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_orders_livemode   ON orders(livemode);
 
 
 -- ============================================================================
@@ -248,6 +250,7 @@ CREATE TABLE IF NOT EXISTS settings (
     "threads":   {"url": "https://threads.net/@bodyandsleeves",     "enabled": true},
     "email":     {"url": "mailto:Hello.BodyandSleeves@gmail.com",   "enabled": true}
   }'::jsonb,
+  favicon_url             text,
   updated_at              timestamptz DEFAULT now()
 );
 
@@ -284,7 +287,14 @@ CREATE TABLE IF NOT EXISTS seo_settings (
 ALTER TABLE seo_settings ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "admins_all" ON seo_settings;
-CREATE POLICY "admins_all" ON seo_settings FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "public_read_seo_settings" ON seo_settings;
+DROP POLICY IF EXISTS "admin_update_seo_settings" ON seo_settings;
+CREATE POLICY "public_read_seo_settings" ON seo_settings FOR SELECT
+  TO anon, authenticated USING (true);
+CREATE POLICY "admin_update_seo_settings" ON seo_settings FOR UPDATE
+  TO authenticated
+  USING     (EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()))
+  WITH CHECK(EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()));
 
 
 -- ============================================================================
@@ -315,3 +325,64 @@ INSERT INTO settings (
 INSERT INTO seo_settings (id)
   VALUES ('00000000-0000-0000-0000-000000000001')
   ON CONFLICT (id) DO NOTHING;
+
+
+-- ============================================================================
+-- POLICIES
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS policies (
+  id         text        PRIMARY KEY, -- 'terms' | 'privacy' | 'refund'
+  title      text        NOT NULL,
+  content    text        NOT NULL DEFAULT '',
+  locked     boolean     NOT NULL DEFAULT false,
+  updated_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE policies ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "public_read_policies" ON policies;
+CREATE POLICY "public_read_policies" ON policies FOR SELECT
+  TO anon, authenticated USING (true);
+
+DROP POLICY IF EXISTS "admin_update_policies" ON policies;
+CREATE POLICY "admin_update_policies" ON policies FOR UPDATE
+  TO authenticated
+  USING     (EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()))
+  WITH CHECK(EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()));
+
+DROP POLICY IF EXISTS "admin_insert_policies" ON policies;
+CREATE POLICY "admin_insert_policies" ON policies FOR INSERT
+  TO authenticated WITH CHECK (
+    EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid())
+  );
+
+INSERT INTO policies (id, title, content) VALUES
+  ('terms',   'Terms of Service',          ''),
+  ('privacy', 'Privacy Policy',            ''),
+  ('refund',  'Refund and Returns Policy', '')
+ON CONFLICT (id) DO NOTHING;
+
+
+-- ============================================================================
+-- EMAIL EVENTS
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS email_events (
+  id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  resend_id  text        NOT NULL,
+  to_email   text        NOT NULL,
+  subject    text,
+  event_type text        NOT NULL, -- sent, delivered, opened, clicked, bounced, complained
+  created_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE email_events ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "admin_all_email_events" ON email_events;
+CREATE POLICY "admin_all_email_events" ON email_events FOR ALL
+  TO authenticated USING (
+    EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid())
+  );
+
+CREATE INDEX IF NOT EXISTS idx_email_events_resend_id ON email_events(resend_id);
+CREATE INDEX IF NOT EXISTS idx_email_events_to_email  ON email_events(to_email);
+CREATE INDEX IF NOT EXISTS idx_email_events_type      ON email_events(event_type);
