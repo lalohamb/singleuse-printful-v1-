@@ -13,7 +13,7 @@ git fetch origin
 git reset --hard origin/main
 
 echo "🔧 Installing dependencies..."
-npm ci
+npm install --prefer-offline
 
 echo "🏗️  Building..."
 npm run build
