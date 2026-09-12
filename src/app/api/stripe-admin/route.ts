@@ -11,8 +11,6 @@ export async function GET(req: NextRequest) {
   if (!process.env.STRIPE_SECRET_KEY) {
     return NextResponse.json({ error: "STRIPE_SECRET_KEY not set" }, { status: 500 });
   }
-  // DEBUG — remove after confirming
-  console.log("[stripe-admin] key prefix:", process.env.STRIPE_SECRET_KEY.slice(0, 20));
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2026-08-26.dahlia" });
   const { searchParams } = new URL(req.url);
   const action = searchParams.get("action");

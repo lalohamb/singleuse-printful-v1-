@@ -6,6 +6,7 @@ import { ShoppingBag, Menu, X, Search } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { supabase } from "@/lib/supabase";
 import type { StoreSettings, Category } from "@/types";
+import { DEFAULT_SITE_MENU_SETTINGS, type SiteMenuSettings } from "@/lib/site-menu-settings";
 
 export default function Header() {
   const { itemCount, toggleCart } = useCart();
@@ -14,6 +15,14 @@ export default function Header() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const menuSettings: SiteMenuSettings = { ...DEFAULT_SITE_MENU_SETTINGS, ...((settings as any)?.site_menu_settings || {}) };
+  const menuCategories = menuSettings.categorySlugs.length ? categories.filter((category) => menuSettings.categorySlugs.includes(category.slug)) : categories;
+  const menuTypography = {
+    fontFamily: menuSettings.fontFamily === "display" ? "var(--font-display, Georgia, serif)" : "var(--font-sans, Inter, sans-serif)",
+    fontSize: menuSettings.fontSize === "small" ? "14px" : menuSettings.fontSize === "large" ? "18px" : "16px",
+    fontWeight: menuSettings.fontWeight === "semibold" ? 600 : menuSettings.fontWeight === "normal" ? 400 : 500,
+    letterSpacing: menuSettings.letterSpacing === "wide" ? "0.08em" : menuSettings.letterSpacing === "relaxed" ? "0.025em" : "0",
+  } as const;
 
   useEffect(() => {
     supabase.from("settings").select("*").limit(1).maybeSingle().then(({ data }) => { if (data) setSettings(data as StoreSettings); });
@@ -28,11 +37,11 @@ export default function Header() {
       {settings?.announcement_active && settings?.announcement && (
         <div className="bg-secondary-900 text-white text-center py-2 px-4 text-sm font-medium">{settings.announcement}</div>
       )}
-      <header className={`sticky top-0 z-40 transition-all duration-300 ${scrolled ? "bg-white shadow-md" : "bg-white/95 backdrop-blur-sm"}`}>
+      <header className={`sticky top-0 z-40 transition-all duration-300 ${scrolled ? "shadow-md" : "backdrop-blur-sm"}`} style={{ backgroundColor: menuSettings.backgroundColor, color: menuSettings.textColor }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 lg:h-20">
             <div className="flex items-center gap-4">
-              <button onClick={() => setMobileOpen(true)} className="lg:hidden p-2 -ml-2 text-secondary-700 hover:text-secondary-900" aria-label="Open menu">
+                <button onClick={() => setMobileOpen(true)} className="lg:hidden p-2 -ml-2" style={{ color: menuSettings.textColor }} aria-label="Open menu">
                 <Menu size={24} />
               </button>
               <Link href="/" className="flex items-center gap-2">
@@ -43,16 +52,16 @@ export default function Header() {
                 )}
               </Link>
             </div>
-            <nav className="hidden lg:flex items-center gap-8">
-              <Link href="/shop" className="text-sm font-medium text-secondary-700 hover:text-secondary-900 transition-colors">All Products</Link>
-              {categories.slice(0, 5).map((cat) => (
-                <Link key={cat.id} href={`/shop?category=${cat.slug}`} className="text-sm font-medium text-secondary-700 hover:text-secondary-900 transition-colors">{cat.name}</Link>
+              <nav className="hidden lg:flex items-center gap-8" style={menuTypography}>
+              <Link href="/shop" className="transition-colors" style={{ color: menuSettings.textColor }}>All Products</Link>
+              {menuCategories.slice(0, 5).map((cat) => (
+                <Link key={cat.id} href={`/shop?category=${cat.slug}`} className="transition-colors" style={{ color: menuSettings.textColor }}>{cat.name}</Link>
               ))}
-              <Link href="/about" className="text-sm font-medium text-secondary-700 hover:text-secondary-900 transition-colors">About</Link>
+              <Link href="/about" className="transition-colors" style={{ color: menuSettings.textColor }}>About</Link>
             </nav>
             <div className="flex items-center gap-2 sm:gap-4">
-              <button onClick={() => router.push("/shop")} className="p-2 text-secondary-700 hover:text-secondary-900 transition-colors" aria-label="Search products"><Search size={22} /></button>
-              <button onClick={toggleCart} className="relative p-2 text-secondary-700 hover:text-secondary-900 transition-colors" aria-label="Open cart">
+              <button onClick={() => router.push("/shop")} className="p-2 transition-colors" style={{ color: menuSettings.textColor }} aria-label="Search products"><Search size={22} /></button>
+              <button onClick={toggleCart} className="relative p-2 transition-colors" style={{ color: menuSettings.textColor }} aria-label="Open cart">
                 <ShoppingBag size={22} />
                 {itemCount > 0 && <span className="absolute -top-1 -right-1 bg-accent-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center animate-fade-in">{itemCount}</span>}
               </button>
@@ -63,18 +72,18 @@ export default function Header() {
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-secondary-900/50" onClick={() => setMobileOpen(false)} />
-          <div className="absolute left-0 top-0 bottom-0 w-72 bg-white shadow-xl animate-slide-in-right p-6 overflow-y-auto">
+          <div className="absolute left-0 top-0 bottom-0 w-72 shadow-xl animate-slide-in-right p-6 overflow-y-auto" style={{ backgroundColor: menuSettings.backgroundColor, color: menuSettings.textColor }}>
             <div className="flex items-center justify-between mb-8">
               <span className="font-display text-xl font-bold">Menu</span>
-              <button onClick={() => setMobileOpen(false)} className="p-2"><X size={24} /></button>
+              <button onClick={() => setMobileOpen(false)} className="p-2" style={{ color: menuSettings.textColor }}><X size={24} /></button>
             </div>
-            <nav className="flex flex-col gap-4">
-              <Link href="/shop" onClick={() => setMobileOpen(false)} className="text-base font-medium text-secondary-700 hover:text-secondary-900 py-2">All Products</Link>
-              {categories.map((cat) => (
-                <Link key={cat.id} href={`/shop?category=${cat.slug}`} onClick={() => setMobileOpen(false)} className="text-base font-medium text-secondary-700 hover:text-secondary-900 py-2">{cat.name}</Link>
+            <nav className="flex flex-col gap-4" style={menuTypography}>
+              <Link href="/shop" onClick={() => setMobileOpen(false)} className="py-2" style={{ color: menuSettings.textColor }}>All Products</Link>
+              {menuCategories.map((cat) => (
+                <Link key={cat.id} href={`/shop?category=${cat.slug}`} onClick={() => setMobileOpen(false)} className="py-2" style={{ color: menuSettings.textColor }}>{cat.name}</Link>
               ))}
-              <Link href="/about" onClick={() => setMobileOpen(false)} className="text-base font-medium text-secondary-700 hover:text-secondary-900 py-2">About</Link>
-              <Link href="/admin" onClick={() => setMobileOpen(false)} className="text-base font-medium text-secondary-700 hover:text-secondary-900 py-2">Admin</Link>
+              <Link href="/about" onClick={() => setMobileOpen(false)} className="py-2" style={{ color: menuSettings.textColor }}>About</Link>
+              <Link href="/admin" onClick={() => setMobileOpen(false)} className="py-2" style={{ color: menuSettings.textColor }}>Admin</Link>
             </nav>
           </div>
         </div>

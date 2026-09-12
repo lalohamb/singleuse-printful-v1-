@@ -33,6 +33,11 @@ import {
   DEFAULT_BRAND_VALUES_SETTINGS,
   type BrandValuesSettings,
 } from "@/lib/brand-values-settings";
+import {
+  DEFAULT_SITE_MENU_SETTINGS,
+  type SiteMenuSettings,
+} from "@/lib/site-menu-settings";
+import type { Category } from "@/types";
 
 const TITLES: Record<string, string> = {
   branding: "Branding",
@@ -40,6 +45,7 @@ const TITLES: Record<string, string> = {
   "homepage-hero": "Homepage Hero",
   "new-arrivals": "New Arrivals",
   "brand-values": "Brand Values",
+  "admin-menu": "Menu Bar",
   "our-why": "Our Why",
   "wear-your-story": "Wear Your Story",
   "customer-love": "Customer Love",
@@ -235,6 +241,8 @@ export default function SettingsSectionClient({
   const [brandValues, setBrandValues] = useState<BrandValuesSettings>(
     DEFAULT_BRAND_VALUES_SETTINGS,
   );
+  const [siteMenu, setSiteMenu] = useState<SiteMenuSettings>(DEFAULT_SITE_MENU_SETTINGS);
+  const [menuCategories, setMenuCategories] = useState<Category[]>([]);
   const [promoEmojiOpen, setPromoEmojiOpen] = useState(false);
   const promoTitleRef = useRef<HTMLInputElement>(null);
   const [affirmationEmojiOpen, setAffirmationEmojiOpen] = useState(false);
@@ -267,10 +275,14 @@ export default function SettingsSectionClient({
             ...DEFAULT_BRAND_VALUES_SETTINGS,
             ...(data.brand_values_settings || {}),
           });
+          setSiteMenu({ ...DEFAULT_SITE_MENU_SETTINGS, ...(data.site_menu_settings || {}) });
           if (data.hero_height_vh) setHeroPreviewH(data.hero_height_vh);
           if (data.our_why_height_vh) setOurWhyPreviewH(data.our_why_height_vh);
         }
       });
+    supabase.from("categories").select("id, name, slug").order("name").then(({ data }) => {
+      if (data) setMenuCategories(data as Category[]);
+    });
     fetch("/api/stripe-admin?action=balance")
       .then((response) =>
         setStripeOk(
@@ -430,6 +442,8 @@ export default function SettingsSectionClient({
                 ? { new_arrivals_settings: newArrivals }
                 : section === "brand-values"
                   ? { brand_values_settings: brandValues }
+                  : section === "admin-menu"
+                    ? { site_menu_settings: siteMenu }
                   : section === "our-why"
                     ? {
                         our_why_label: form.our_why_label,
@@ -562,6 +576,44 @@ export default function SettingsSectionClient({
                   className="w-full accent-gold-500"
                 />
               </label>
+            </>
+          )}
+          {section === "admin-menu" && (
+            <>
+              <div>
+                <h2 className="font-semibold text-secondary-800">Menu Bar</h2>
+                <p className="text-xs text-secondary-500 mt-1">
+                  Change the storefront homepage menu colors and typography.
+                </p>
+              </div>
+              <p className="text-sm font-semibold text-secondary-800">Preview</p>
+              <div className="border border-secondary-200 rounded-xl p-4">
+                <div className="rounded-lg p-4" style={{ backgroundColor: siteMenu.backgroundColor, color: siteMenu.textColor, fontFamily: siteMenu.fontFamily === "display" ? "Georgia, serif" : "Inter, sans-serif", fontSize: siteMenu.fontSize === "small" ? "14px" : siteMenu.fontSize === "large" ? "18px" : "16px", fontWeight: siteMenu.fontWeight === "semibold" ? 600 : siteMenu.fontWeight === "normal" ? 400 : 500, letterSpacing: siteMenu.letterSpacing === "wide" ? "0.08em" : siteMenu.letterSpacing === "relaxed" ? "0.025em" : "0" }}>
+                <div className="flex flex-wrap items-center gap-4">
+                  <span>All Products</span>
+                  {(siteMenu.categorySlugs.length ? menuCategories.filter((category) => siteMenu.categorySlugs.includes(category.slug)) : menuCategories).slice(0, 5).map((category) => <span key={category.id}>{category.name}</span>)}
+                  <span>About</span>
+                </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label className="label-text">
+                  Menu background color
+                  <input type="color" value={siteMenu.backgroundColor} onChange={(e) => setSiteMenu((current) => ({ ...current, backgroundColor: e.target.value }))} className="mt-1 h-10 w-full cursor-pointer" />
+                </label>
+                <label className="label-text">
+                  Menu font color
+                  <input type="color" value={siteMenu.textColor} onChange={(e) => setSiteMenu((current) => ({ ...current, textColor: e.target.value }))} className="mt-1 h-10 w-full cursor-pointer" />
+                </label>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                <label className="label-text">Font type<select value={siteMenu.fontFamily} onChange={(e) => setSiteMenu((current) => ({ ...current, fontFamily: e.target.value as SiteMenuSettings["fontFamily"] }))} className="input-field mt-1"><option value="sans">Sans</option><option value="display">Display</option></select></label>
+                <label className="label-text">Font size<select value={siteMenu.fontSize} onChange={(e) => setSiteMenu((current) => ({ ...current, fontSize: e.target.value as SiteMenuSettings["fontSize"] }))} className="input-field mt-1"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></label>
+                <label className="label-text">Font weight<select value={siteMenu.fontWeight} onChange={(e) => setSiteMenu((current) => ({ ...current, fontWeight: e.target.value as SiteMenuSettings["fontWeight"] }))} className="input-field mt-1"><option value="normal">Normal</option><option value="medium">Medium</option><option value="semibold">Semibold</option></select></label>
+                <label className="label-text">Letter spacing<select value={siteMenu.letterSpacing} onChange={(e) => setSiteMenu((current) => ({ ...current, letterSpacing: e.target.value as SiteMenuSettings["letterSpacing"] }))} className="input-field mt-1"><option value="normal">Normal</option><option value="relaxed">Relaxed</option><option value="wide">Wide</option></select></label>
+              </div>
+              <div className="border-t border-secondary-100 pt-4 mt-4"><h3 className="text-sm font-semibold text-secondary-800">Categories shown in menu</h3><p className="text-xs text-secondary-500 mt-1">Leave all unchecked to show categories using the current default menu behavior.</p><div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">{menuCategories.map((category) => <label key={category.id} className="flex items-center gap-2 text-sm text-secondary-700"><input type="checkbox" checked={siteMenu.categorySlugs.includes(category.slug)} onChange={(e) => setSiteMenu((current) => ({ ...current, categorySlugs: e.target.checked ? [...current.categorySlugs, category.slug] : current.categorySlugs.filter((slug) => slug !== category.slug) }))} className="w-4 h-4 rounded text-primary-500 focus:ring-primary-500" />{category.name}</label>)}</div></div>
+              <div className="flex justify-end"><button type="button" onClick={() => setSiteMenu(DEFAULT_SITE_MENU_SETTINGS)} className="btn-outline py-2 text-sm">Reset to Defaults</button></div>
             </>
           )}
           {section === "homepage" && (

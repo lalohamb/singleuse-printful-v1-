@@ -23,6 +23,7 @@ const settingsItems = [
   { path: "/admin/settings/announcements", label: "Announcements", icon: Megaphone },
   { path: "/admin/settings/store-information", label: "Store Information", icon: Store },
   { path: "/admin/settings/branding", label: "Branding", icon: Palette },
+  { path: "/admin/settings/admin-menu", label: "Menu Bar", icon: Menu },
   { path: "/admin/settings/homepage-hero", label: "Homepage Hero", icon: Home },
   { path: "/admin/settings/new-arrivals", label: "New Arrivals", icon: Sparkles },
   { path: "/admin/settings/brand-values", label: "Brand Values", icon: BarChart3 },
@@ -76,7 +77,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           {navItems.map((item) => {
             const isActive = pathname === item.path;
             return (
-              <Link key={item.path} href={item.path} onClick={() => setSidebarOpen(false)} className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm ${
+              <Link key={item.path} href={item.path} className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm ${
                 isActive ? "bg-secondary-800 text-white font-medium" : "text-secondary-400 hover:bg-secondary-800 hover:text-white"
               }`}>
                 <item.icon size={20} />

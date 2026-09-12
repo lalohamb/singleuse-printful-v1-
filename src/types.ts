@@ -82,6 +82,7 @@ export interface StoreSettings {
   affirmations_settings: Record<string, unknown> | null;
   new_arrivals_settings: Record<string, unknown> | null;
   brand_values_settings: Record<string, unknown> | null;
+  site_menu_settings: Record<string, unknown> | null;
   promo_banner_active: boolean;
   promo_banner_title: string | null;
   promo_banner_body: string | null;
