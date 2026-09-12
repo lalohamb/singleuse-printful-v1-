@@ -58,12 +58,9 @@ export async function POST(req: NextRequest) {
 
   // Standalone restart action
   if (body.action === "restart") {
-    try {
-      setTimeout(() => execAsync("/usr/bin/pm2 restart bodyandsleeves --update-env").catch(() => {}), 500);
-      return NextResponse.json({ ok: true, message: "PM2 restarted" });
-    } catch {
-      return NextResponse.json({ error: "PM2 restart failed — not running under PM2" }, { status: 500 });
-    }
+    const appName = process.env.PM2_APP_NAME ?? "myapp";
+    setTimeout(() => execAsync(`/usr/bin/pm2 restart ${appName} --update-env`).catch(() => {}), 500);
+    return NextResponse.json({ ok: true, message: "PM2 restarted" });
   }
 
   const { mode } = body;
@@ -138,7 +135,7 @@ export async function POST(req: NextRequest) {
       steps.push("PM2 restart triggered");
     } catch {
       try {
-        await execAsync("/usr/bin/pm2 restart bodyandsleeves --update-env");
+        await execAsync(`/usr/bin/pm2 restart ${process.env.PM2_APP_NAME ?? "myapp"} --update-env`);
         steps.push("PM2 restart triggered");
       } catch { /* not running under PM2 */ }
     }

@@ -15,9 +15,19 @@ export async function requireAdmin(): Promise<NextResponse | null> {
 
   // Supabase stores the access token in one of these cookie names depending on
   // the client version / SSR setup.
-  const token =
-    cookieStore.get("sb-access-token")?.value ??
-    cookieStore.get(`sb-${process.env.NEXT_PUBLIC_SUPABASE_URL?.split("//")[1]?.split(".")[0]}-auth-token`)?.value;
+  const projectRef = process.env.NEXT_PUBLIC_SUPABASE_URL?.split("//")[1]?.split(".")[0];
+  const cookieKey = `sb-${projectRef}-auth-token`;
+  const raw = cookieStore.get(cookieKey)?.value;
+
+  if (!raw) return unauthorized();
+
+  let token: string;
+  try {
+    const parsed = JSON.parse(decodeURIComponent(raw));
+    token = Array.isArray(parsed) ? parsed[0] : (parsed.access_token ?? parsed);
+  } catch {
+    token = raw;
+  }
 
   if (!token) return unauthorized();
 
