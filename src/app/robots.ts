@@ -15,7 +15,7 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
     .limit(1)
     .maybeSingle();
 
-  const base = (data?.site_url || "https://bodyandsleeves.com").replace(/\/$/, "");
+  const base = (data?.site_url || "https://genderapparel.example").replace(/\/$/, "");
 
   return {
     rules: [

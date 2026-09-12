@@ -3,15 +3,16 @@ import Link from "next/link";
 import { Mail } from "lucide-react";
 import StorefrontLayout from "@/components/StorefrontLayout";
 import { createClient } from "@supabase/supabase-js";
+import { DEFAULT_POLICY_CONTENT } from "@/lib/policy-content";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
-  description: "Body & Sleeves Privacy Policy.",
+  description: "Gender Apparel Privacy Policy.",
 };
 
-const EMAIL = "info@bodyandsleeves.com";
+const EMAIL = "hello@genderapparel.example";
 
-const FALLBACK = `Body & Sleeves ("we," "us," "our") is committed to protecting your privacy. This policy explains how we collect, use, and protect your information.
+const FALLBACK = `Gender Apparel ("we," "us," "our") is committed to protecting your privacy. This policy explains how we collect, use, and protect your information.
 
 Information We Collect
 - Personal information you provide: name, email address, shipping address, and payment information when placing an order.
@@ -50,7 +51,7 @@ export default async function PrivacyPolicyPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
   const { data } = await supabase.from("policies").select("content").eq("id", "privacy").maybeSingle();
-  const content = data?.content || FALLBACK;
+  const content = data?.content || DEFAULT_POLICY_CONTENT.privacy || FALLBACK;
 
   return (
     <StorefrontLayout>
@@ -59,7 +60,7 @@ export default async function PrivacyPolicyPage() {
           <Link href="/" className="hover:text-secondary-700 transition-colors">Home</Link>{" › "}Privacy Policy
         </p>
         <h1 className="text-3xl lg:text-4xl font-bold text-secondary-900 mb-10">Privacy Policy</h1>
-        <div className="space-y-4 text-secondary-600 leading-relaxed whitespace-pre-wrap">{content}</div>
+        <div className="prose prose-sm max-w-none text-secondary-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: content }} />
         <div className="mt-12 bg-secondary-50 rounded-xl p-6">
           <h2 className="text-xl font-semibold text-secondary-900 mb-3">Contact Us</h2>
           <p className="mb-4">Questions about this Privacy Policy? Reach out to us.</p>

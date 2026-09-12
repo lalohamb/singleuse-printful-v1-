@@ -1,24 +1,33 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+// CORS is restricted to the configured site origin.
+// SITE_URL must be set as a Supabase edge function secret, e.g.:
+//   supabase secrets set SITE_URL=https://yourdomain.com
+function corsHeaders(req: Request): Record<string, string> {
+  const siteUrl = Deno.env.get("SITE_URL") ?? "";
+  const allowedOrigin = siteUrl || "http://localhost:3000";
+  const requestOrigin = req.headers.get("origin") ?? "";
+  const origin = requestOrigin === allowedOrigin ? allowedOrigin : "null";
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+  };
+}
 
 const PRINTIFY_API_BASE = "https://api.printify.com/v1";
 
-function jsonResponse(data: unknown, status = 200) {
+function jsonResponse(req: Request, data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }
 
-function errorResponse(message: string, status = 500) {
+function errorResponse(req: Request, message: string, status = 500) {
   return new Response(JSON.stringify({ error: message }), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }
 
@@ -60,7 +69,7 @@ async function printifyFetch(path: string, token: string, options: RequestInit =
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 200, headers: corsHeaders });
+    return new Response(null, { status: 200, headers: corsHeaders(req) });
   }
 
   try {
@@ -79,144 +88,143 @@ Deno.serve(async (req: Request) => {
 
     const token = getPrintifyToken();
     if (!token) {
-      return errorResponse("Printify is not configured. Set the PRINTIFY_API_TOKEN secret.", 400);
+      return errorResponse(req, "Printify is not configured. Set the PRINTIFY_API_TOKEN secret.", 400);
     }
 
     // GET /shops — list connected Printify shops
     if (req.method === "GET" && segments[0] === "shops") {
       const shops = await printifyFetch("/shops.json", token);
-      return jsonResponse(shops);
+      return jsonResponse(req, shops);
     }
 
     // GET /products — list products from a shop
     if (req.method === "GET" && segments[0] === "products" && !segments[1]) {
       const shopId = url.searchParams.get("shop_id");
-      if (!shopId) return errorResponse("shop_id query parameter is required", 400);
+      if (!shopId) return errorResponse(req, "shop_id query parameter is required", 400);
       const page = url.searchParams.get("page") || "1";
       const limit = url.searchParams.get("limit") || "50";
       const products = await printifyFetch(
         `/shops/${shopId}/products.json?page=${page}&limit=${limit}`,
         token
       );
-      return jsonResponse(products);
+      return jsonResponse(req, products);
     }
 
     // GET /products/:id — get a single product
     if (req.method === "GET" && segments[0] === "products" && segments[1]) {
       const shopId = url.searchParams.get("shop_id");
-      if (!shopId) return errorResponse("shop_id query parameter is required", 400);
+      if (!shopId) return errorResponse(req, "shop_id query parameter is required", 400);
       const product = await printifyFetch(
         `/shops/${shopId}/products/${segments[1]}.json`,
         token
       );
-      return jsonResponse(product);
+      return jsonResponse(req, product);
     }
 
     // POST /products — create a product in Printify
     if (req.method === "POST" && segments[0] === "products") {
       const shopId = url.searchParams.get("shop_id");
-      if (!shopId) return errorResponse("shop_id query parameter is required", 400);
+      if (!shopId) return errorResponse(req, "shop_id query parameter is required", 400);
       const body = await req.json();
       const product = await printifyFetch(
         `/shops/${shopId}/products.json`,
         token,
         { method: "POST", body: JSON.stringify(body) }
       );
-      return jsonResponse(product, 201);
+      return jsonResponse(req, product, 201);
     }
 
     // PUT /products/:id — update a product
     if (req.method === "PUT" && segments[0] === "products" && segments[1]) {
       const shopId = url.searchParams.get("shop_id");
-      if (!shopId) return errorResponse("shop_id query parameter is required", 400);
+      if (!shopId) return errorResponse(req, "shop_id query parameter is required", 400);
       const body = await req.json();
       const product = await printifyFetch(
         `/shops/${shopId}/products/${segments[1]}.json`,
         token,
         { method: "PUT", body: JSON.stringify(body) }
       );
-      return jsonResponse(product);
+      return jsonResponse(req, product);
     }
 
     // DELETE /products/:id — delete a product
     if (req.method === "DELETE" && segments[0] === "products" && segments[1]) {
       const shopId = url.searchParams.get("shop_id");
-      if (!shopId) return errorResponse("shop_id query parameter is required", 400);
+      if (!shopId) return errorResponse(req, "shop_id query parameter is required", 400);
       await printifyFetch(
         `/shops/${shopId}/products/${segments[1]}.json`,
         token,
         { method: "DELETE" }
       );
-      return jsonResponse({ success: true });
+      return jsonResponse(req, { success: true });
     }
 
     // POST /orders — submit an order to Printify
     if (req.method === "POST" && segments[0] === "orders") {
       const shopId = url.searchParams.get("shop_id");
-      if (!shopId) return errorResponse("shop_id query parameter is required", 400);
+      if (!shopId) return errorResponse(req, "shop_id query parameter is required", 400);
       const body = await req.json();
       const order = await printifyFetch(
         `/shops/${shopId}/orders.json`,
         token,
         { method: "POST", body: JSON.stringify(body) }
       );
-      return jsonResponse(order, 201);
+      return jsonResponse(req, order, 201);
     }
 
     // GET /orders/:id — get order status from Printify
     if (req.method === "GET" && segments[0] === "orders" && segments[1]) {
       const shopId = url.searchParams.get("shop_id");
-      if (!shopId) return errorResponse("shop_id query parameter is required", 400);
+      if (!shopId) return errorResponse(req, "shop_id query parameter is required", 400);
       const order = await printifyFetch(
         `/shops/${shopId}/orders/${segments[1]}.json`,
         token
       );
-      return jsonResponse(order);
+      return jsonResponse(req, order);
     }
 
     // POST /orders/:id/cancel — cancel an order in Printify
     if (req.method === "POST" && segments[0] === "orders" && segments[1] === "cancel") {
       const { shop_id, printify_order_id } = await req.json();
-      if (!shop_id || !printify_order_id) return errorResponse("shop_id and printify_order_id required", 400);
+      if (!shop_id || !printify_order_id) return errorResponse(req, "shop_id and printify_order_id required", 400);
       const result = await printifyFetch(
         `/shops/${shop_id}/orders/${printify_order_id}/cancellation.json`,
         token,
         { method: "POST" }
       );
-      return jsonResponse(result);
+      return jsonResponse(req, result);
     }
 
     // GET /shipping — calculate shipping options
     if (req.method === "GET" && segments[0] === "shipping") {
       const shopId = url.searchParams.get("shop_id");
-      if (!shopId) return errorResponse("shop_id query parameter is required", 400);
-      // Printify shipping calculation endpoint
+      if (!shopId) return errorResponse(req, "shop_id query parameter is required", 400);
       const products = url.searchParams.get("products");
-      if (!products) return errorResponse("products query parameter is required", 400);
+      if (!products) return errorResponse(req, "products query parameter is required", 400);
       const shippingData = await printifyFetch(
         `/shops/${shopId}/shipping/options.json?${new URLSearchParams({ products })}`,
         token
       );
-      return jsonResponse(shippingData);
+      return jsonResponse(req, shippingData);
     }
 
     // POST /shipping — calculate shipping for a specific address + items
     if (req.method === "POST" && segments[0] === "shipping") {
       const shopId = url.searchParams.get("shop_id");
-      if (!shopId) return errorResponse("shop_id query parameter is required", 400);
+      if (!shopId) return errorResponse(req, "shop_id query parameter is required", 400);
       const body = await req.json();
       const shippingData = await printifyFetch(
         `/shops/${shopId}/shipping/calculations.json`,
         token,
         { method: "POST", body: JSON.stringify(body) }
       );
-      return jsonResponse(shippingData);
+      return jsonResponse(req, shippingData);
     }
 
     // GET /blueprints — list available Printify blueprints (product templates)
     if (req.method === "GET" && segments[0] === "blueprints") {
       const blueprints = await printifyFetch("/catalog/blueprints.json", token);
-      return jsonResponse(blueprints);
+      return jsonResponse(req, blueprints);
     }
 
     // GET /blueprints/:id/providers — list print providers for a blueprint
@@ -225,7 +233,7 @@ Deno.serve(async (req: Request) => {
         `/catalog/blueprints/${segments[1]}/print_providers.json`,
         token
       );
-      return jsonResponse(providers);
+      return jsonResponse(req, providers);
     }
 
     // GET /blueprints/:id/providers/:providerId/variants — list variants
@@ -234,7 +242,7 @@ Deno.serve(async (req: Request) => {
         `/catalog/blueprints/${segments[1]}/print_providers/${segments[3]}/variants.json`,
         token
       );
-      return jsonResponse(variants);
+      return jsonResponse(req, variants);
     }
 
     // GET /blueprints/:id/providers/:providerId/shipping — shipping profiles
@@ -243,13 +251,13 @@ Deno.serve(async (req: Request) => {
         `/catalog/blueprints/${segments[1]}/print_providers/${segments[3]}/shipping.json`,
         token
       );
-      return jsonResponse(shipping);
+      return jsonResponse(req, shipping);
     }
 
     // POST /sync — sync products from Printify to local database
     if (req.method === "POST" && segments[0] === "sync") {
       const shopId = url.searchParams.get("shop_id");
-      if (!shopId) return errorResponse("shop_id query parameter is required", 400);
+      if (!shopId) return errorResponse(req, "shop_id query parameter is required", 400);
 
       const synced: string[] = [];
       const printifyIds = new Set<string>(); // all IDs seen from Printify listing
@@ -485,7 +493,7 @@ Deno.serve(async (req: Request) => {
         if (!delError) deleted = staleIds.length;
       }
 
-      return jsonResponse({
+      return jsonResponse(req, {
         synced: synced.length,
         deleted,
         errors: errors.length,
@@ -496,9 +504,8 @@ Deno.serve(async (req: Request) => {
     // POST /cleanup — delete DB products whose printify_id is no longer in Printify
     if (req.method === "POST" && segments[0] === "cleanup") {
       const shopId = url.searchParams.get("shop_id");
-      if (!shopId) return errorResponse("shop_id query parameter is required", 400);
+      if (!shopId) return errorResponse(req, "shop_id query parameter is required", 400);
 
-      // Collect all current Printify product IDs
       const liveIds = new Set<string>();
       let page = 1, lastPage = 1;
       do {
@@ -508,7 +515,6 @@ Deno.serve(async (req: Request) => {
         page++;
       } while (page <= lastPage);
 
-      // Fetch all DB rows that have a printify_id
       const { data: dbRows } = await supabase
         .from("products")
         .select("id, printify_id")
@@ -518,16 +524,16 @@ Deno.serve(async (req: Request) => {
         .filter((r: any) => !liveIds.has(String(r.printify_id)))
         .map((r: any) => r.id);
 
-      if (!staleIds.length) return jsonResponse({ deleted: 0, message: "Nothing to clean up" });
+      if (!staleIds.length) return jsonResponse(req, { deleted: 0, message: "Nothing to clean up" });
 
       const { error } = await supabase.from("products").delete().in("id", staleIds);
-      if (error) return errorResponse(error.message);
+      if (error) return errorResponse(req, error.message);
 
-      return jsonResponse({ deleted: staleIds.length });
+      return jsonResponse(req, { deleted: staleIds.length });
     }
 
-    return errorResponse("Not found", 404);
+    return errorResponse(req, "Not found", 404);
   } catch (err) {
-    return errorResponse(err.message || "Internal server error", 500);
+    return errorResponse(req, err.message || "Internal server error", 500);
   }
 });

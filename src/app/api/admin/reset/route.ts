@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { requireAdmin } from "@/lib/require-admin";
 
 export const runtime = "nodejs";
 
@@ -17,6 +18,9 @@ async function deleteAll(sb: ReturnType<typeof serviceSupabase>, table: string) 
 }
 
 export async function POST(req: NextRequest) {
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return NextResponse.json({ error: "SUPABASE_SERVICE_ROLE_KEY is not set" }, { status: 500 });
   }
@@ -71,9 +75,10 @@ export async function POST(req: NextRequest) {
       // Reset settings — delete all rows and re-insert one clean row
       await (sb.from("settings") as any).delete().gte("updated_at", "1970-01-01");
       const { error: setErr } = await sb.from("settings").insert({
-        tagline: "Black-Owned. Made to Order.",
-        hero_title: "Empower Yourself. Empower the Culture.",
-        hero_subtitle: "Apparel celebrating Black culture, faith, and family. Every design made with intention, printed on demand, shipped to your door.",
+        store_name: "Gender Apparel",
+        tagline: "Made for Every Body.",
+        hero_title: "Wear What Feels Like You.",
+        hero_subtitle: "Thoughtful apparel designed for every body, every style, and every day. Made to order and shipped to your door.",
         hero_image_url: "https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
         hero_object_position: "center",
         hero_height_vh: 80,
@@ -91,6 +96,14 @@ export async function POST(req: NextRequest) {
         story_gradient_dir: "full",
         logo_url: null,
         logo_size: 40,
+        footer_text: "Made-to-order apparel designed for every body, every style, and every day. Wear what feels like you.",
+        footer_bottom_message: "Made to order. Made with love.",
+        footer_logo_url: null,
+        footer_logo_size: 40,
+        about_settings: null,
+        affirmations_settings: null,
+        new_arrivals_settings: null,
+        brand_values_settings: null,
         favicon_url: null,
         our_why_image_url: null,
         our_why_object_position: "center",
@@ -103,7 +116,7 @@ export async function POST(req: NextRequest) {
         our_why_image_fit: "cover",
         our_why_gradient_opacity: 40,
         our_why_gradient_dir: "to right",
-        announcement: "Made to order. Made with love. — Free shipping on orders over $75",
+        announcement: "Made to order. Made with intention. — Free shipping on orders over $75",
         announcement_active: true,
         orders_paused: false,
         shipping_free_threshold: 75,
@@ -124,13 +137,13 @@ export async function POST(req: NextRequest) {
         ],
         social_links: {
           instagram: { url: "https://instagram.com/body_and_sleeves", enabled: true },
-          tiktok:    { url: "https://tiktok.com/@bodyandsleeves",      enabled: true },
-          facebook:  { url: "https://facebook.com/bodyandsleeves",     enabled: true },
-          youtube:   { url: "https://youtube.com/@bodyandsleeves",     enabled: true },
-          pinterest: { url: "https://pinterest.com/bodyandsleeves",    enabled: true },
-          snapchat:  { url: "https://snapchat.com/add/bodyandsleeves", enabled: true },
-          threads:   { url: "https://threads.net/@bodyandsleeves",     enabled: true },
-          email:     { url: "mailto:Hello.BodyandSleeves@gmail.com",   enabled: true },
+          tiktok:    { url: "https://tiktok.com/@genderapparel", enabled: true },
+          facebook:  { url: "https://facebook.com/genderapparel", enabled: true },
+          youtube:   { url: "https://youtube.com/@genderapparel", enabled: true },
+          pinterest: { url: "https://pinterest.com/genderapparel", enabled: true },
+          snapchat:  { url: "https://snapchat.com/add/genderapparel", enabled: true },
+          threads:   { url: "https://threads.net/@genderapparel", enabled: true },
+          email:     { url: "mailto:hello@genderapparel.example", enabled: true },
         },
         updated_at: new Date().toISOString(),
       });
@@ -138,13 +151,13 @@ export async function POST(req: NextRequest) {
 
       // Reset SEO settings
       const { error: seoErr } = await sb.from("seo_settings").update({
-        site_url: "https://bodyandsleeves.com",
+        site_url: "https://genderapparel.example",
         default_og_image: null,
         sitemap_enabled: true,
         robots_noindex_admin: true,
         jsonld_enabled: true,
         canonical_enabled: true,
-        meta_title_suffix: "| Body & Sleeves",
+        meta_title_suffix: "| Gender Apparel",
         twitter_handle: "@body_and_sleeves",
         google_site_verification: null,
         updated_at: new Date().toISOString(),

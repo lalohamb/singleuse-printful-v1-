@@ -2,7 +2,7 @@
 import { type ReactNode, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingBag, Settings as SettingsIcon, LogOut, Menu, FolderTree, ExternalLink, Mail, CreditCard, Send, Search, Truck, Image, FileText, AlertTriangle } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag, LogOut, Menu, FolderTree, ExternalLink, Mail, CreditCard, Send, Search, Truck, Image, FileText, AlertTriangle, Palette, Home, Users, PanelBottom, Plug, Share2, Megaphone, Store, Sparkles, BarChart3, Heart, BookOpen, MessageCircle } from "lucide-react";
 import { useAdminAuth } from "@/lib/admin-auth";
 
 const navItems = [
@@ -17,8 +17,23 @@ const navItems = [
   { path: "/admin/shipping", label: "Shipping", icon: Truck },
   { path: "/admin/media", label: "Media", icon: Image },
   { path: "/admin/policies", label: "Policies", icon: FileText },
-  { path: "/admin/settings", label: "Settings", icon: SettingsIcon },
-  { path: "/admin/danger",   label: "Danger Zone", icon: AlertTriangle },
+];
+
+const settingsItems = [
+  { path: "/admin/settings/announcements", label: "Announcements", icon: Megaphone },
+  { path: "/admin/settings/store-information", label: "Store Information", icon: Store },
+  { path: "/admin/settings/branding", label: "Branding", icon: Palette },
+  { path: "/admin/settings/homepage-hero", label: "Homepage Hero", icon: Home },
+  { path: "/admin/settings/new-arrivals", label: "New Arrivals", icon: Sparkles },
+  { path: "/admin/settings/brand-values", label: "Brand Values", icon: BarChart3 },
+  { path: "/admin/settings/our-why", label: "Our Why", icon: Heart },
+  { path: "/admin/settings/customer-love", label: "Customer Love", icon: MessageCircle },
+  { path: "/admin/settings/wear-your-story", label: "Wear Your Story", icon: BookOpen },
+  { path: "/admin/settings/about", label: "About, Mission & Culture", icon: Users },
+  { path: "/admin/settings/footer", label: "Footer", icon: PanelBottom },
+  { path: "/admin/settings/integrations", label: "Integrations", icon: Plug },
+  { path: "/admin/settings/social", label: "Social Links", icon: Share2 },
+  { path: "/admin/danger", label: "Danger Zone", icon: AlertTriangle },
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
@@ -57,14 +72,12 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           </Link>
           <p className="text-secondary-400 text-xs mt-1">Admin Panel</p>
         </div>
-        <nav className="flex-1 p-3 space-y-0.5 overflow-hidden">
+        <nav className="flex-1 min-h-0 p-3 space-y-0.5 overflow-y-auto overscroll-contain scrollbar-hide">
           {navItems.map((item) => {
             const isActive = pathname === item.path;
             return (
               <Link key={item.path} href={item.path} onClick={() => setSidebarOpen(false)} className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm ${
-                item.path === "/admin/danger"
-                  ? isActive ? "bg-red-900/60 text-red-300 font-medium" : "text-red-400 hover:bg-red-900/40 hover:text-red-300"
-                  : isActive ? "bg-secondary-800 text-white font-medium" : "text-secondary-400 hover:bg-secondary-800 hover:text-white"
+                isActive ? "bg-secondary-800 text-white font-medium" : "text-secondary-400 hover:bg-secondary-800 hover:text-white"
               }`}>
                 <item.icon size={20} />
                 <span className="flex-1">{item.label}</span>
@@ -81,6 +94,13 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               </Link>
             );
           })}
+          <div className="flex items-center gap-3 px-3 py-2 mt-2 text-sm font-semibold text-secondary-300"><span>Settings</span></div>
+          <div className="ml-4 mb-2 border-l border-secondary-700 pl-2 space-y-0.5">
+            {settingsItems.map((item) => {
+              const active = pathname === item.path;
+              return <Link key={item.path} href={item.path} onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs ${active ? "bg-secondary-800 text-white" : "text-secondary-500 hover:text-white hover:bg-secondary-800"}`}><item.icon size={14} /><span>{item.label}</span></Link>;
+            })}
+          </div>
           <a href="/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-secondary-400 hover:bg-secondary-800 hover:text-white transition-colors"><ExternalLink size={18} />View Store</a>
         </nav>
         <div className="p-4 border-t border-secondary-700 flex-shrink-0">
@@ -99,7 +119,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         <header className="bg-white border-b border-secondary-100 sticky top-0 z-30 flex-shrink-0">
           <div className="flex items-center gap-3">
             <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 text-secondary-700"><Menu size={24} /></button>
-            <h1 className="text-lg font-semibold text-secondary-900">{navItems.find((n) => pathname === n.path)?.label || "Admin"}</h1>
+            <h1 className="text-lg font-semibold text-secondary-900">{navItems.find((n) => pathname === n.path)?.label || settingsItems.find((n) => pathname === n.path)?.label || "Admin"}</h1>
             {pathname === "/admin/dashboard" && ordersPaused !== null && (
               <span className={`text-sm font-semibold ${ordersPaused ? "text-red-500" : "text-green-500"}`}>
                 {ordersPaused ? "orders paused" : "orders open"}

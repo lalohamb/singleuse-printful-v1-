@@ -1,22 +1,18 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import Stripe from "npm:stripe@17.3.1";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+// This function is called server-to-server by Stripe only.
+// No CORS headers are needed or set.
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 200, headers: corsHeaders });
-  }
-
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   try {
@@ -24,10 +20,7 @@ Deno.serve(async (req: Request) => {
     const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
 
     if (!stripeSecretKey) {
-      return new Response(JSON.stringify({ error: "Stripe not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return json({ error: "Stripe not configured" }, 500);
     }
 
     const stripe = new Stripe(stripeSecretKey, {
@@ -39,19 +32,13 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    if (!webhookSecret) return json({ error: "Webhook secret not configured" }, 500);
+
     const body = await req.text();
     const signature = req.headers.get("stripe-signature");
+    if (!signature) return json({ error: "Missing stripe-signature header" }, 400);
 
-    let event: Stripe.Event;
-    if (webhookSecret && signature) {
-      event = await stripe.webhooks.constructEventAsync(
-        body,
-        signature,
-        webhookSecret
-      );
-    } else {
-      event = JSON.parse(body);
-    }
+    const event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
 
     switch (event.type) {
       case "checkout.session.completed": {
@@ -108,7 +95,7 @@ Deno.serve(async (req: Request) => {
             method: "POST",
             headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
             body: JSON.stringify({
-              from: "Body & Sleeves <orders@bodyandsleeves.com>",
+              from: "Gender Apparel <orders@genderapparel.example>",
               to: customerEmail,
               subject: `Order Confirmed – #${session.id.slice(-8).toUpperCase()}`,
               html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
@@ -120,9 +107,9 @@ Deno.serve(async (req: Request) => {
                 <p>We'll send you another email when your order ships.</p>
                 <p></p>
                 <p>If you have any questions, feel free to reply to this email </p>
-                <p>or contact us at <a href="mailto:info@bodyandsleeves.com?subject=Regarding%20Order%20%23${session.id.slice(-8).toUpperCase()}">info@bodyandsleeves.com</a></p>
+                <p>or contact us at <a href="mailto:hello@genderapparel.example?subject=Regarding%20Order%20%23${session.id.slice(-8).toUpperCase()}">hello@genderapparel.example</a></p>
                 <p>Thanks for supporting our small business!</p>
-                <p>— Body & Sleeves</p>
+                <p>— Gender Apparel</p>
               </div>`,
             }),
           }).catch((e: Error) => console.error("Resend error:", e.message));
@@ -209,17 +196,8 @@ Deno.serve(async (req: Request) => {
         break;
     }
 
-    return new Response(JSON.stringify({ received: true }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ received: true });
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: err.message || "Webhook handler error" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return json({ error: err.message || "Webhook handler error" }, 500);
   }
 });

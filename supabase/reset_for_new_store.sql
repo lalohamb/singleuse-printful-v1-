@@ -1,5 +1,5 @@
 -- =============================================================================
--- Body & Sleeves — New Store Reset
+-- Gender Apparel — New Store Reset
 -- Clears all transactional + content data, restores application defaults.
 -- Admins are NOT deleted — you stay logged in.
 -- Run in Supabase SQL Editor.
@@ -30,8 +30,8 @@ UPDATE policies SET content = '', updated_at = now();
 
 -- ── 5. SETTINGS — reset to application defaults ───────────────────────────────
 UPDATE settings SET
-  store_name              = 'Body & Sleeves',
-  tagline                 = 'Black-Owned. Made to Order.',
+  store_name              = 'Gender Apparel',
+  tagline                 = 'Made for Every Body.',
   hero_title              = 'Empower Yourself. Empower the Culture.',
   hero_subtitle           = 'Apparel celebrating Black culture, faith, and family. Every design made with intention, printed on demand, shipped to your door.',
   hero_image_url          = 'https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
@@ -51,6 +51,10 @@ UPDATE settings SET
   story_gradient_dir      = 'full',
   logo_url                = null,
   logo_size               = 40,
+  footer_text             = 'Made-to-order apparel designed for every body, every style, and every day. Wear what feels like you.',
+  footer_bottom_message   = 'Made to order. Made with love.',
+  footer_logo_url        = null,
+  footer_logo_size       = 40,
   our_why_image_url       = null,
   our_why_object_position = '0px 0px',
   our_why_height_vh       = 60,
@@ -83,13 +87,13 @@ UPDATE settings SET
   ]'::jsonb,
   social_links            = '{
     "instagram": {"url": "https://instagram.com/body_and_sleeves", "enabled": true},
-    "tiktok":    {"url": "https://tiktok.com/@bodyandsleeves",      "enabled": true},
-    "facebook":  {"url": "https://facebook.com/bodyandsleeves",     "enabled": true},
-    "youtube":   {"url": "https://youtube.com/@bodyandsleeves",     "enabled": true},
-    "pinterest": {"url": "https://pinterest.com/bodyandsleeves",    "enabled": true},
-    "snapchat":  {"url": "https://snapchat.com/add/bodyandsleeves", "enabled": true},
-    "threads":   {"url": "https://threads.net/@bodyandsleeves",     "enabled": true},
-    "email":     {"url": "mailto:Hello.BodyandSleeves@gmail.com",   "enabled": true}
+    "tiktok":    {"url": "https://tiktok.com/@genderapparel", "enabled": true},
+    "facebook":  {"url": "https://facebook.com/genderapparel", "enabled": true},
+    "youtube":   {"url": "https://youtube.com/@genderapparel", "enabled": true},
+    "pinterest": {"url": "https://pinterest.com/genderapparel", "enabled": true},
+    "snapchat":  {"url": "https://snapchat.com/add/genderapparel", "enabled": true},
+    "threads":   {"url": "https://threads.net/@genderapparel", "enabled": true},
+    "email":     {"url": "mailto:hello@genderapparel.example", "enabled": true}
   }'::jsonb,
   favicon_url             = null,
   updated_at              = now()
@@ -97,13 +101,13 @@ WHERE id = (SELECT id FROM settings LIMIT 1);
 
 -- ── 6. SEO SETTINGS — reset to defaults ──────────────────────────────────────
 UPDATE seo_settings SET
-  site_url                 = 'https://bodyandsleeves.com',
+  site_url                 = 'https://genderapparel.example',
   default_og_image         = null,
   sitemap_enabled          = true,
   robots_noindex_admin     = true,
   jsonld_enabled           = true,
   canonical_enabled        = true,
-  meta_title_suffix        = '| Body & Sleeves',
+  meta_title_suffix        = '| Gender Apparel',
   twitter_handle           = '@body_and_sleeves',
   google_site_verification = null,
   updated_at               = now()

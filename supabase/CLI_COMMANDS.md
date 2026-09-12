@@ -1,4 +1,4 @@
-# Body & Sleeves — Supabase CLI Command Reference
+# Gender Apparel — Supabase CLI Command Reference
 # Project ref: SUPABASE_PROJECT_REF_REDACTED
 # Run all commands from: /var/www/bodyandsleeves
 

@@ -8,8 +8,9 @@ import Reveal from "@/components/Reveal";
 import NewsletterSignup from "@/components/NewsletterSignup";
 import PromoBanner from "@/components/PromoBanner";
 import { formatPrice } from "@/lib/supabase";
-
-const AFFIRMATIONS = ["Empower Yourself", "Empower the Culture", "Wear Your Heritage", "Faith · Family · Culture", "Black-Owned & Made to Order"];
+import { DEFAULT_AFFIRMATIONS_SETTINGS, type AffirmationsSettings } from "@/lib/affirmations-settings";
+import { DEFAULT_NEW_ARRIVALS_SETTINGS, type NewArrivalsSettings } from "@/lib/new-arrivals-settings";
+import { DEFAULT_BRAND_VALUES_SETTINGS, type BrandValuesSettings } from "@/lib/brand-values-settings";
 
 export default function HomeClient({ settings, featured, newArrivals, trending, categories, categoryImages }: {
   settings: StoreSettings | null;
@@ -20,6 +21,9 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
   categoryImages: Record<string, string>;
 }) {
   const [slide, setSlide] = useState(0);
+  const affirmations = { ...DEFAULT_AFFIRMATIONS_SETTINGS, ...((settings?.affirmations_settings || {}) as Partial<AffirmationsSettings>) };
+  const newArrivalsSettings = { ...DEFAULT_NEW_ARRIVALS_SETTINGS, ...((settings?.new_arrivals_settings || {}) as Partial<NewArrivalsSettings>) };
+  const brandValues = { ...DEFAULT_BRAND_VALUES_SETTINGS, ...((settings?.brand_values_settings || {}) as Partial<BrandValuesSettings>) };
   const slideCount = newArrivals.length;
   const goSlide = (dir: number) => setSlide((s) => (s + dir + slideCount) % slideCount);
 
@@ -30,7 +34,7 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
         <div className="absolute inset-0 bg-secondary-900">
           {/* LINE BELOW TO SET HERO IMAGE BACKGROUND TO FULL PIC>> :style={{ objectPosition: "100% " }} <<;END 09-04-2026*/}
           {/* https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/object-position*/ } 
-          <img src={settings?.hero_image_url || "https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"} alt="Body and Sleeves apparel" className={`absolute inset-0 w-full h-full ${settings?.hero_image_fit === "contain" ? "object-contain" : (settings?.hero_image_scale ?? 100) === 100 ? "object-cover" : "object-contain"}`} style={{ objectPosition: settings?.hero_object_position || "center", transform: settings?.hero_image_flip ? "scaleX(-1)" : undefined, scale: `${settings?.hero_image_scale ?? 100}%` }} />
+          <img src={settings?.hero_image_url || "https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"} alt="Gender Apparel clothing" className={`absolute inset-0 w-full h-full ${settings?.hero_image_fit === "contain" ? "object-contain" : (settings?.hero_image_scale ?? 100) === 100 ? "object-cover" : "object-contain"}`} style={{ objectPosition: settings?.hero_object_position || "center", transform: settings?.hero_image_flip ? "scaleX(-1)" : undefined, scale: `${settings?.hero_image_scale ?? 100}%` }} />
           {(() => {
             const op = (settings?.hero_gradient_opacity ?? 70) / 100;
             const dir = settings?.hero_gradient_dir ?? "left";
@@ -48,9 +52,9 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
         </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
           <div className="max-w-2xl animate-slide-up">
-            <p className="text-gold-400 font-medium text-sm tracking-wider uppercase mb-4">{settings?.tagline || "Black-Owned. Made to Order."}</p>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight">{settings?.hero_title || "Empower Yourself. Empower the Culture."}</h1>
-            <p className="text-lg text-white/80 mt-6 max-w-lg">{settings?.hero_subtitle || "Apparel celebrating Black culture, faith, and family. Every design made with intention, printed on demand, shipped to your door."}</p>
+            <p className="text-gold-400 font-medium text-sm tracking-wider uppercase mb-4">{settings?.tagline || "Made for Every Body."}</p>
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight">{settings?.hero_title || "Wear What Feels Like You."}</h1>
+            <p className="text-lg text-white/80 mt-6 max-w-lg">{settings?.hero_subtitle || "Thoughtful apparel designed for every body, every style, and every day. Made to order and shipped to your door."}</p>
             <div className="flex flex-wrap gap-4 mt-8">
               <Link href="/shop" className="btn-gold">Shop Collection <ArrowRight size={20} className="ml-2" /></Link>
               <Link href="/about" className="btn-outline border-white text-white hover:bg-white hover:text-secondary-900">Our Story</Link>
@@ -63,9 +67,9 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-2 lg:grid-cols-4 gap-6">
           {[
             { icon: Truck, title: "Made to Order", desc: "Printed fresh for you" },
-            { icon: Heart, title: "Black-Owned", desc: "Built with love & purpose" },
+            { icon: Heart, title: "Made With Intention", desc: "Built for real life" },
             { icon: Shield, title: "Size Inclusive", desc: "Empowerment has no size limit" },
-            { icon: Sparkles, title: "Culture First", desc: "Designed with intention" },
+            { icon: Sparkles, title: "Style Without Limits", desc: "Designed for self-expression" },
           ].map((f) => (
             <div key={f.title} className="flex items-center gap-3">
               <f.icon size={28} className="text-gold-400 flex-shrink-0" />
@@ -75,20 +79,20 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
         </div>
       </section>
 
-      <section aria-hidden className="bg-secondary-900 bg-weave text-white py-4 overflow-hidden border-y border-white/10">
+      {affirmations.active && affirmations.phrases.length > 0 && <section aria-hidden className="bg-weave text-white py-4 overflow-hidden border-y border-white/10" style={{ backgroundColor: affirmations.backgroundColor, color: affirmations.textColor }}>
         <div className="flex w-max animate-marquee">
           {[0, 1].map((dup) => (
             <div key={dup} className="flex items-center shrink-0">
-              {AFFIRMATIONS.map((t, i) => (
+              {affirmations.phrases.map((t, i) => (
                 <span key={i} className="flex items-center">
                   <span className="mx-6 text-lg sm:text-2xl font-display font-semibold tracking-wide whitespace-nowrap">{t}</span>
-                  <span className="text-gold-400 text-xl">✦</span>
+                  <span className="text-xl" style={{ color: affirmations.accentColor }}>✦</span>
                 </span>
               ))}
             </div>
           ))}
         </div>
-      </section>
+      </section>}
 
  <section className="w-full pt-0 pb-16 px-1">
         <div className="text-center mb-2">
@@ -127,7 +131,7 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
       </section>
 
       {slideCount > 0 && (
-        <section className="relative w-full bg-secondary-900 overflow-hidden" style={{ minHeight: 600 }}>
+        <section className="relative w-full overflow-hidden" style={{ minHeight: 600, backgroundColor: newArrivalsSettings.backgroundColor, color: newArrivalsSettings.textColor }}>
           {/* background image layer */}
           <div className="absolute inset-0 transition-opacity duration-700">
             <img src={newArrivals[slide]?.image_url || ""} alt="" className="w-full h-full object-cover opacity-20 blur-sm scale-105" />
@@ -138,15 +142,15 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
             {/* left — editorial text */}
             <div className="flex-1 py-16 lg:py-24 flex flex-col justify-center z-10">
               <div className="flex items-center gap-3 mb-6">
-                <div className="kente-bar h-0.5 w-12 rounded-full" />
-                <span className="text-gold-400 text-xs font-medium tracking-[0.25em] uppercase">Drop {String(slide + 1).padStart(2, "0")} / {String(slideCount).padStart(2, "0")}</span>
+                {newArrivalsSettings.showAccent && <div className="kente-bar h-0.5 w-12 rounded-full" style={{ backgroundColor: newArrivalsSettings.accentColor }} />}
+                <span className="text-xs font-medium tracking-[0.25em] uppercase" style={{ color: newArrivalsSettings.accentColor }}>{newArrivalsSettings.dropLabel} {String(slide + 1).padStart(2, "0")} / {String(slideCount).padStart(2, "0")}</span>
               </div>
-              <p className="text-white/40 text-xs tracking-widest uppercase mb-3">New Arrival</p>
+              <p className="text-white/40 text-xs tracking-widest uppercase mb-3">{newArrivalsSettings.eyebrow}</p>
               <h2 className="text-4xl sm:text-5xl lg:text-6xl font-display font-bold text-white leading-none mb-6">{newArrivals[slide]?.title}</h2>
-              <p className="text-2xl font-semibold text-gold-400 mb-8">{formatPrice(newArrivals[slide]?.price)}</p>
+              <p className="text-2xl font-semibold mb-8" style={{ color: newArrivalsSettings.accentColor }}>{formatPrice(newArrivals[slide]?.price)}</p>
               <div className="flex items-center gap-4">
-                <Link href={`/product/${newArrivals[slide]?.id}`} className="btn-gold">Shop Now <ArrowRight size={18} className="ml-2" /></Link>
-                <Link href="/shop" className="text-white/60 hover:text-white text-sm font-medium transition-colors">View All Arrivals →</Link>
+                <Link href={`/product/${newArrivals[slide]?.id}`} className="btn-gold">{newArrivalsSettings.shopButtonLabel} <ArrowRight size={18} className="ml-2" /></Link>
+                <Link href="/shop" className="text-white/60 hover:text-white text-sm font-medium transition-colors">{newArrivalsSettings.viewAllLabel} →</Link>
               </div>
               {slideCount > 1 && (
                 <div className="flex items-center gap-6 mt-12">
@@ -184,16 +188,13 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
 
       {/* D — Brand Values Band */}
       <Reveal>
-        <section className="bg-secondary-900 bg-weave text-white py-16">
+        <section className={`bg-weave text-white ${brandValues.advanced ? brandValues.padding === "compact" ? "py-8" : brandValues.padding === "comfortable" ? "py-12" : "py-16" : "py-16"}`} style={{ backgroundColor: brandValues.backgroundColor, color: brandValues.textColor, backgroundImage: brandValues.advanced && brandValues.backgroundImage ? `linear-gradient(rgba(17,17,17,0.55), rgba(17,17,17,0.55)), url(${brandValues.backgroundImage})` : undefined, backgroundSize: "cover", backgroundPosition: "center" }}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-0 divide-y md:divide-y-0 md:divide-x divide-white/10">
-              {[
-                { stat: "100%", label: "Black-Owned & Operated", sub: "Built from the ground up with purpose" },
-                { stat: "0 Waste", label: "Made to Order", sub: "Every piece printed fresh — nothing sits on a shelf" },
-                { stat: "XS–5XL", label: "Size Inclusive", sub: "Empowerment has no size limit" },
-              ].map((v) => (
-                <div key={v.stat} className="flex flex-col items-center text-center px-8 py-10">
-                  <span className="text-5xl lg:text-6xl font-display font-bold text-gold-400 mb-3">{v.stat}</span>
+            <div className={`grid grid-cols-1 ${brandValues.advanced && brandValues.columns === 4 ? "md:grid-cols-4" : brandValues.advanced && brandValues.columns === 2 ? "md:grid-cols-2" : "md:grid-cols-3"} gap-0 ${brandValues.advanced && brandValues.divider === "vertical" ? "md:divide-x" : brandValues.advanced && brandValues.divider === "horizontal" ? "divide-y" : ""}`} style={{ ...(brandValues.advanced ? { borderColor: brandValues.dividerColor } : {}) }}>
+              {brandValues.values.filter((v) => !brandValues.advanced || v.enabled !== false).map((v, index) => (
+                <div key={`${v.stat}-${index}`} className={`flex flex-col px-8 py-10 ${brandValues.advanced && brandValues.alignment === "left" ? "items-start text-left" : "items-center text-center"} ${brandValues.advanced && brandValues.animate ? "animate-slide-up" : ""}`} style={{ backgroundColor: brandValues.advanced ? brandValues.cardBackgroundColor : undefined, borderColor: brandValues.advanced ? brandValues.cardBorderColor : undefined }}>
+                  {brandValues.advanced && v.icon && <span className="text-3xl mb-3" aria-hidden>{v.icon}</span>}
+                  <span className="text-5xl lg:text-6xl font-display font-bold mb-3" style={{ color: brandValues.accentColor }}>{v.stat}</span>
                   <p className="font-semibold text-lg text-white mb-1">{v.label}</p>
                   <p className="text-secondary-400 text-sm max-w-xs">{v.sub}</p>
                 </div>
@@ -226,7 +227,7 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
               <div className="kente-bar h-1 w-24 mb-8 rounded-full" />
               <p className="text-gold-400 text-sm font-medium tracking-widest uppercase mb-4">{settings?.our_why_label || "Our Why"}</p>
               <h2 className="text-3xl lg:text-5xl font-bold text-white leading-tight mb-6">&ldquo;{settings?.our_why_quote || "We don\u2019t just sell clothes. We tell stories."}&rdquo;</h2>
-              <p className="text-white/60 text-lg leading-relaxed mb-8">{settings?.our_why_body || "Body & Sleeves was born from a desire to see our culture celebrated, not just represented. Every thread, every design, every drop is an act of love for Black culture, faith, and family."}</p>
+              <p className="text-white/60 text-lg leading-relaxed mb-8">{settings?.our_why_body || "Gender Apparel was created for people who want clothing that feels personal, expressive, and easy to live in. Every design is made with intention and every piece is printed to order."}</p>
               <Link href="/about" className="btn-gold self-start">Read Our Story <ArrowRight size={18} className="ml-2" /></Link>
             </div>
             <div className="relative min-h-[400px] bg-secondary-800" style={{ minHeight: settings?.our_why_height_vh ? `${settings.our_why_height_vh}px` : 400 }}>

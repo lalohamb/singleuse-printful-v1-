@@ -3,11 +3,11 @@ import fs from "fs";
 import path from "path";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { requireAdmin } from "@/lib/require-admin";
 
 export const runtime = "nodejs";
 
 const execAsync = promisify(exec);
-const SUPABASE_PROJECT_REF = process.env.SUPABASE_PROJECT_REF;
 
 function appRoot(): string {
   if (process.env.APP_ROOT && fs.existsSync(path.join(process.env.APP_ROOT, ".env.local"))) return process.env.APP_ROOT;
@@ -31,8 +31,9 @@ function parseEnvFile(filePath: string): Record<string, string> {
 }
 
 async function pushSupabaseSecrets(secretKey: string, webhookSecret: string, supabaseToken: string) {
+  const projectRef = process.env.SUPABASE_PROJECT_REF;
   const res = await fetch(
-    `https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/secrets`,
+    `https://api.supabase.com/v1/projects/${projectRef}/secrets`,
     {
       method: "POST",
       headers: {
@@ -50,6 +51,9 @@ async function pushSupabaseSecrets(secretKey: string, webhookSecret: string, sup
 
 // POST — body: { mode: "live" | "test" } or { action: "restart" }
 export async function POST(req: NextRequest) {
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
   const body = await req.json();
 
   // Standalone restart action
@@ -65,10 +69,6 @@ export async function POST(req: NextRequest) {
   const { mode } = body;
   if (mode !== "live" && mode !== "test")
     return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
-
-  if (!SUPABASE_PROJECT_REF) {
-    return NextResponse.json({ error: "SUPABASE_PROJECT_REF is not configured." }, { status: 500 });
-  }
 
   const appDir = appRoot();
   const envFile = path.resolve(appDir, mode === "live" ? ".env.live" : ".env.test");
@@ -101,7 +101,8 @@ export async function POST(req: NextRequest) {
 
   // 2. Push to Supabase via Management API
   const supabaseToken = process.env.SUPABASE_ACCESS_TOKEN;
-  if (supabaseToken) {
+  const projectRef = process.env.SUPABASE_PROJECT_REF;
+  if (supabaseToken && projectRef) {
     try {
       await pushSupabaseSecrets(secretKey, webhookSecret, supabaseToken);
       steps.push("Supabase secrets updated");
@@ -109,12 +110,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: e.message, steps }, { status: 500 });
     }
   } else {
-    steps.push("Supabase secrets skipped (SUPABASE_ACCESS_TOKEN not set)");
+    steps.push(`Supabase secrets skipped (${!supabaseToken ? "SUPABASE_ACCESS_TOKEN" : "SUPABASE_PROJECT_REF"} not set)`);
   }
 
-  // 3. Update ecosystem.config.js (always at repo root) and restart PM2 after response
+  // 3. Update ecosystem.config.js and restart PM2 after response
+  const appRoot_ = process.env.APP_ROOT ?? appDir;
   const repoPaths = [
-    "/var/www/bodyandsleeves/ecosystem.config.js",
+    path.resolve(appRoot_, "ecosystem.config.js"),
     path.resolve(appDir, "ecosystem.config.js"),
     path.resolve(process.cwd(), "ecosystem.config.js"),
   ];
@@ -129,12 +131,18 @@ export async function POST(req: NextRequest) {
     } catch { /* try next */ }
   }
 
-  // Delayed restart — fires after response is sent
-  // Use startOrReload to force PM2 to re-read ecosystem.config.js with new keys
-  setTimeout(() => execAsync("/usr/bin/pm2 startOrReload /var/www/bodyandsleeves/ecosystem.config.js --update-env").catch(() =>
-    execAsync("/usr/bin/pm2 restart bodyandsleeves --update-env").catch(() => {})
-  ), 300);
-  steps.push("PM2 restarted — new keys are live");
+  // Delayed restart — step only added on success
+  setTimeout(async () => {
+    try {
+      await execAsync(`/usr/bin/pm2 startOrReload ${path.resolve(appRoot_, "ecosystem.config.js")} --update-env`);
+      steps.push("PM2 restart triggered");
+    } catch {
+      try {
+        await execAsync("/usr/bin/pm2 restart bodyandsleeves --update-env");
+        steps.push("PM2 restart triggered");
+      } catch { /* not running under PM2 */ }
+    }
+  }, 300);
 
   return NextResponse.json({ ok: true, mode, steps });
 }

@@ -74,6 +74,14 @@ export interface StoreSettings {
   logo_url: string | null;
   logo_size: number | null;
   favicon_url: string | null;
+  footer_text: string | null;
+  footer_bottom_message: string | null;
+  footer_logo_url: string | null;
+  footer_logo_size: number | null;
+  about_settings: Record<string, unknown> | null;
+  affirmations_settings: Record<string, unknown> | null;
+  new_arrivals_settings: Record<string, unknown> | null;
+  brand_values_settings: Record<string, unknown> | null;
   promo_banner_active: boolean;
   promo_banner_title: string | null;
   promo_banner_body: string | null;

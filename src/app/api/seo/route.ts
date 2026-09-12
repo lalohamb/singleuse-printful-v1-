@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { requireAdmin } from "@/lib/require-admin";
 
 export const runtime = "nodejs";
-import { createClient } from "@supabase/supabase-js";
 
+// Public read client — used for GET (sitemap + admin reads)
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
+
+// Service role client — used for POST writes
+const serviceSupabase = () =>
+  createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
 
 export async function GET(req: NextRequest) {
   const action = req.nextUrl.searchParams.get("action");
@@ -29,8 +39,12 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
+  const sb = serviceSupabase();
   const body = await req.json();
-  const { error } = await supabase
+  const { error } = await sb
     .from("seo_settings")
     .update({ ...body, updated_at: new Date().toISOString() })
     .eq("id", "00000000-0000-0000-0000-000000000001");

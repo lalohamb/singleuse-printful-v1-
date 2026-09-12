@@ -72,27 +72,31 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number }>> = {
 };
 
 const DEFAULT_SOCIAL: StoreSettings["social_links"] = {
-  instagram: { url: "https://instagram.com/body_and_sleeves", enabled: true },
-  tiktok:    { url: "https://tiktok.com/@bodyandsleeves",      enabled: true },
-  facebook:  { url: "https://facebook.com/bodyandsleeves",     enabled: true },
-  youtube:   { url: "https://youtube.com/@bodyandsleeves",     enabled: true },
-  pinterest: { url: "https://pinterest.com/bodyandsleeves",    enabled: true },
-  snapchat:  { url: "https://snapchat.com/add/bodyandsleeves", enabled: true },
-  threads:   { url: "https://threads.net/@bodyandsleeves",     enabled: true },
-  email:     { url: "mailto:Hello.BodyandSleeves@gmail.com",   enabled: true },
+  instagram: { url: "https://instagram.com/genderapparel", enabled: true },
+  tiktok:    { url: "https://tiktok.com/@genderapparel", enabled: true },
+  facebook:  { url: "https://facebook.com/genderapparel", enabled: true },
+  youtube:   { url: "https://youtube.com/@genderapparel", enabled: true },
+  pinterest: { url: "https://pinterest.com/genderapparel", enabled: true },
+  snapchat:  { url: "https://snapchat.com/add/genderapparel", enabled: true },
+  threads:   { url: "https://threads.net/@genderapparel", enabled: true },
+  email:     { url: "mailto:hello@genderapparel.example", enabled: true },
 };
 
 export default async function Footer() {
-  const { data } = await supabase.from("settings").select("social_links").limit(1).maybeSingle();
+  const { data } = await supabase.from("settings").select("social_links, logo_url, logo_size, footer_logo_url, footer_logo_size, footer_text, footer_bottom_message").limit(1).maybeSingle();
   const social: StoreSettings["social_links"] = data?.social_links ?? DEFAULT_SOCIAL;
+  const logoUrl = data?.footer_logo_url || data?.logo_url || "/genderapparel.png";
+  const logoSize = data?.footer_logo_size ?? data?.logo_size ?? 40;
+  const footerText = data?.footer_text || "Made-to-order apparel designed for every body, every style, and every day. Wear what feels like you.";
+  const footerBottomMessage = data?.footer_bottom_message || "Made to order. Made with love.";
 
   return (
     <footer className="bg-secondary-900 text-secondary-300 mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-12">
           <div className="col-span-1 md:col-span-2">
-            <span className="font-display text-3xl font-bold text-white">Body<span className="text-gold-500">&amp;</span>Sleeves</span>
-            <p className="mt-4 text-secondary-400 max-w-md">A Black-owned, made-to-order apparel brand celebrating the richness of Black culture, faith, and family. Empower yourself. Empower the Culture.</p>
+            <img src={logoUrl} alt="Gender Apparel" style={{ height: `${logoSize}px`, width: "auto" }} />
+            <p className="mt-4 text-secondary-400 max-w-md">{footerText}</p>
             <div className="flex items-center gap-4 mt-6 flex-wrap">
               {(Object.keys(ICON_MAP) as Array<keyof typeof ICON_MAP>).map((key) => {
                 const entry = social[key as keyof StoreSettings["social_links"]];
@@ -126,7 +130,7 @@ export default async function Footer() {
               <li><Link href="/refund-policy" className="hover:text-white transition-colors">Refund &amp; Returns</Link></li>
               <li><Link href="/terms-of-service" className="hover:text-white transition-colors">Terms of Service</Link></li>
               <li><Link href="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
-              <li><a href="mailto:Hello.BodyandSleeves@gmail.com" className="hover:text-white transition-colors">Contact Us</a></li>
+              <li><a href="mailto:hello@genderapparel.example" className="hover:text-white transition-colors">Contact Us</a></li>
             </ul>
           </div>
           <div>
@@ -142,9 +146,9 @@ export default async function Footer() {
           <NewsletterSignup variant="footer" />
         </div>
         <div className="border-t border-secondary-700 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-secondary-500">&copy; {new Date().getFullYear()} Body &amp; Sleeves. All rights reserved.</p>
+          <p className="text-sm text-secondary-500">&copy; {new Date().getFullYear()} Gender Apparel. All rights reserved.</p>
           <p className="text-sm text-secondary-500">Powered by <a href="https://Atlascloudhosting.com" target="" rel="noopener noreferrer" className="hover:text-white transition-colors">Atlas Cloud Hosting</a>.</p>
-          <p className="text-sm text-secondary-500">Made to order. Made with love.</p>
+          <p className="text-sm text-secondary-500">{footerBottomMessage}</p>
         </div>
       </div>
     </footer>

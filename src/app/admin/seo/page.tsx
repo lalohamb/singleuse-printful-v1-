@@ -44,13 +44,13 @@ function SeoStatusBadge({ enabled }: { enabled: boolean }) {
 
 function SeoPanel() {
   const [form, setForm] = useState<SeoSettings>({
-    site_url: "https://bodyandsleeves.com",
+    site_url: "https://genderapparel.example",
     default_og_image: "",
     sitemap_enabled: true,
     robots_noindex_admin: true,
     jsonld_enabled: true,
     canonical_enabled: true,
-    meta_title_suffix: "| Body & Sleeves",
+    meta_title_suffix: "| Gender Apparel",
     twitter_handle: "@body_and_sleeves",
     google_site_verification: "",
     updated_at: "",
@@ -116,12 +116,12 @@ function SeoPanel() {
         <div className="space-y-4">
           <div>
             <label className="label-text">Production URL</label>
-            <input value={form.site_url} onChange={(e) => set("site_url", e.target.value)} className="input-field" placeholder="https://bodyandsleeves.com" />
+            <input value={form.site_url} onChange={(e) => set("site_url", e.target.value)} className="input-field" placeholder="https://your-domain.com" />
             <p className="text-xs text-secondary-400 mt-1">Used in sitemap, canonical URLs, and JSON-LD. No trailing slash.</p>
           </div>
           <div>
             <label className="label-text">Meta Title Suffix</label>
-            <input value={form.meta_title_suffix} onChange={(e) => set("meta_title_suffix", e.target.value)} className="input-field" placeholder="| Body & Sleeves" />
+            <input value={form.meta_title_suffix} onChange={(e) => set("meta_title_suffix", e.target.value)} className="input-field" placeholder="| Gender Apparel" />
             <p className="text-xs text-secondary-400 mt-1">Appended to page titles — e.g. &ldquo;Black Excellence Tee | Body &amp; Sleeves&rdquo;</p>
           </div>
           <div>
@@ -142,7 +142,7 @@ function SeoPanel() {
         <p className="text-sm text-secondary-500 mb-6">Controls how links appear when shared on Facebook, Twitter, iMessage, etc. Product pages automatically use the product image.</p>
         <div>
           <label className="label-text">Default OG Image URL</label>
-          <input value={form.default_og_image} onChange={(e) => set("default_og_image", e.target.value)} className="input-field" placeholder="https://bodyandsleeves.com/og-default.jpg" />
+          <input value={form.default_og_image} onChange={(e) => set("default_og_image", e.target.value)} className="input-field" placeholder="https://your-domain.com/og-default.jpg" />
           <p className="text-xs text-secondary-400 mt-1">Used on pages without a specific image (home, shop, about). Recommended: 1200×630px.</p>
         </div>
         {form.default_og_image && (

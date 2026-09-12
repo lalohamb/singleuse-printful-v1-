@@ -1,4 +1,4 @@
-# Body & Sleeves — Application Schema & Relationships
+# Gender Apparel — Application Schema & Relationships
 
 ## Database Tables
 

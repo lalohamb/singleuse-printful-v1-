@@ -1,4 +1,4 @@
-# Body & Sleeves — Feature Inventory
+# Gender Apparel — Feature Inventory
 
 ## Stack
 | Layer | Technology |
@@ -24,7 +24,7 @@
 | `/product/[id]` | Product detail |
 | `/checkout` | Checkout form + order summary |
 | `/checkout/success` | Post-payment confirmation |
-| `/about` | Brand story (Demetria, founder) |
+| `/about` | Brand story and founder information |
 | `/refund-policy` | 30-day returns policy |
 | `/terms-of-service` | Full ToS (13 sections, Illinois law) |
 
@@ -109,11 +109,11 @@
   - Configurable height (vh), image, position (X/Y px), zoom %, flip, gradient direction (left/right/center/top/bottom/full/none), gradient opacity, fit (cover/contain)
   - Title, subtitle, tagline from `settings`
   - "Shop Collection" + "Our Story" CTAs
-- **Value props band** — Made to Order, Black-Owned, Size Inclusive, Culture First
+- **Value props band** — Made to Order, Size Inclusive, Confidence First
 - **Affirmations marquee** — rotating ticker with 5 brand phrases + gold dividers
 - **Shop by Category grid** — full-width scrollable row, each tile shows representative product image, category name, "Shop now →" hover reveal, kente-bar accent, links to `/shop?category=slug`
 - **New Arrivals editorial carousel** — full-bleed dark section, blurred background image, drop number indicator, prev/next buttons, dot navigation, product image + title + price + "Shop Now" CTA
-- **Brand Values band** — 100% Black-Owned, 0 Waste Made to Order, XS–5XL Size Inclusive
+- **Brand Values band** — 0 Waste Made to Order, XS–5XL Size Inclusive, Designed for Every Body
 - **Featured Picks grid** — up to 8 products, randomized each ISR cycle
 - **"Our Why" split panel** — dark left panel with brand quote + "Read Our Story" CTA; right panel with configurable image + position
 - **Social proof / reviews** — 3 static customer quote cards with 5-star ratings
@@ -156,7 +156,7 @@
 
 ## Storefront — Cart
 
-- Persisted to `localStorage` under key `bodyandsleeves_cart`
+- Persisted to `localStorage` under key `genderapparel_cart`
 - Hydrated on mount (survives page refresh / navigation)
 - State managed via React Context + `useReducer`
 - Actions: ADD (merges quantity if same product+variant), REMOVE, UPDATE_QTY (removes at 0), CLEAR, OPEN, CLOSE, TOGGLE, HYDRATE
@@ -195,7 +195,7 @@
 
 ### About (`/about`)
 - Hero split: dark panel with founder quote + founder photo (`/deeandlalo1.png`)
-- Founder story (Demetria) — full narrative copy
+- Founder story — full narrative copy
 - Sticky product image panel on desktop
 - "What We Stand For" cards: Black Culture, Faith, Family, Freedom, Excellence
 - Connect section: email link + Instagram link + Shop CTA

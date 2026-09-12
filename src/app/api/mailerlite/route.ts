@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/require-admin";
 
 export const runtime = "nodejs";
 
@@ -18,6 +19,9 @@ async function safeJson(res: Response) {
 }
 
 export async function GET(req: NextRequest) {
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
   if (!key) return NextResponse.json({ error: "MAILER_LITE_API_KEY not set" }, { status: 500 });
   const { searchParams } = new URL(req.url);
   const action = searchParams.get("action");
@@ -89,6 +93,13 @@ export async function POST(req: NextRequest) {
   if (!key) return NextResponse.json({ error: "MAILER_LITE_API_KEY not set" }, { status: 500 });
   const body = await req.json();
   const { action } = body;
+
+  // add_subscriber is called by the public newsletter signup form — no auth required.
+  // All other actions are admin-only.
+  if (action !== "add_subscriber") {
+    const authError = await requireAdmin();
+    if (authError) return authError;
+  }
 
   try {
     if (action === "add_subscriber") {

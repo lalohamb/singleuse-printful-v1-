@@ -34,7 +34,7 @@ export default function AdminLoginPage() {
               <label className="label-text">Email</label>
               <div className="relative">
                 <Mail size={18} className="absolute left-3 top-3 text-secondary-400" />
-                <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="input-field pl-10" placeholder="admin@bodyandsleeves.com" />
+                <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="input-field pl-10" placeholder="admin@genderapparel.example" />
               </div>
             </div>
             <div>

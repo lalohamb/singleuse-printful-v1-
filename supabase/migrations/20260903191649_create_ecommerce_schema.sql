@@ -1,5 +1,5 @@
 /*
-# Body & Sleeves E-Commerce Schema
+# Gender Apparel E-Commerce Schema
 
 ## Overview
 Creates the full database schema for an apparel e-commerce site celebrating Black culture.
@@ -244,8 +244,16 @@ CREATE POLICY "admin_delete_orders" ON orders FOR DELETE
 -- ============ SETTINGS ============
 CREATE TABLE IF NOT EXISTS settings (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  store_name text NOT NULL DEFAULT 'Body & Sleeves',
+  store_name text NOT NULL DEFAULT 'Gender Apparel',
   tagline text DEFAULT 'Wear Your Heritage',
+  footer_text text DEFAULT 'Made-to-order apparel designed for every body, every style, and every day. Wear what feels like you.',
+  footer_bottom_message text DEFAULT 'Made to order. Made with love.',
+  footer_logo_url text,
+  footer_logo_size numeric DEFAULT 40,
+  about_settings jsonb,
+  affirmations_settings jsonb,
+  new_arrivals_settings jsonb,
+  brand_values_settings jsonb,
   hero_image_url text,
   hero_title text,
   hero_subtitle text,
@@ -284,7 +292,7 @@ ON CONFLICT (slug) DO NOTHING;
 
 INSERT INTO settings (store_name, tagline, hero_title, hero_subtitle, hero_image_url, announcement, announcement_active)
 VALUES (
-  'Body & Sleeves',
+  'Gender Apparel',
   'Wear Your Heritage',
   'Culture. Style. Heritage.',
   'Premium apparel celebrating Black culture, designed by us, printed on demand, shipped to your door.',

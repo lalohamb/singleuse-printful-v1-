@@ -44,10 +44,16 @@ export default function CheckoutPage() {
     setLoading(true); setError(null);
     try {
       const result = await createStripeCheckout({
-        items: items.map((i) => ({ product_id: i.product_id, title: i.title?.slice(0, 60), price: i.price, image_url: i.image_url, quantity: i.quantity, variant_id: i.variant_id, variant_label: i.variant_label, printify_id: i.printify_id, personalization_text: i.personalization_text || undefined })),
+        items: items.map((i) => ({
+          product_id: i.product_id,
+          quantity: i.quantity,
+          variant_id: i.variant_id,
+          personalization_text: i.personalization_text || undefined,
+        })),
         shipping_address: { line1: form.address1, line2: form.address2 || undefined, city: form.city, state: form.state, zip: form.zip, country: form.country },
         shipping_name: `${form.firstName} ${form.lastName}`,
-        email: form.email, shipping_cost: resolvedShipping, subtotal, total,
+        email: form.email,
+        shipping_cost: resolvedShipping,
       });
       clearCart();
       window.location.href = result.url;

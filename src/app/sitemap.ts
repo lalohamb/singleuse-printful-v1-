@@ -14,7 +14,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     supabase.from("products").select("id, updated_at").eq("status", "active"),
   ]);
 
-  const base = (seoRes.data?.site_url || "https://bodyandsleeves.com").replace(/\/$/, "");
+  const base = (seoRes.data?.site_url || "https://genderapparel.example").replace(/\/$/, "");
   if (!seoRes.data?.sitemap_enabled) return [];
 
   const staticRoutes: MetadataRoute.Sitemap = [

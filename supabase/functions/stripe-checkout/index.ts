@@ -1,35 +1,45 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import Stripe from "npm:stripe@17.3.1";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+// CORS is restricted to the configured site origin.
+// SITE_URL must be set as a Supabase edge function secret, e.g.:
+//   supabase secrets set SITE_URL=https://yourdomain.com
+function corsHeaders(req: Request): Record<string, string> {
+  const siteUrl = Deno.env.get("SITE_URL") ?? "";
+  const allowedOrigin = siteUrl || "http://localhost:3000";
+  const requestOrigin = req.headers.get("origin") ?? "";
+  // Only reflect the origin header when it matches the allowed origin
+  const origin = requestOrigin === allowedOrigin ? allowedOrigin : "null";
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+  };
+}
 
-function jsonResponse(data: unknown, status = 200) {
+function jsonResponse(req: Request, data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }
 
-function errorResponse(message: string, status = 500) {
+function errorResponse(req: Request, message: string, status = 500) {
   return new Response(JSON.stringify({ error: message }), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 200, headers: corsHeaders });
+    return new Response(null, { status: 200, headers: corsHeaders(req) });
   }
 
   try {
     const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeSecretKey) {
-      return errorResponse("Stripe is not configured. Set the STRIPE_SECRET_KEY secret.", 500);
+      return errorResponse(req, "Stripe is not configured. Set the STRIPE_SECRET_KEY secret.", 500);
     }
 
     const supabase = createClient(
@@ -42,17 +52,90 @@ Deno.serve(async (req: Request) => {
     });
 
     const body = await req.json();
-    const { items, shipping_address, shipping_name, email, shipping_cost, subtotal, total } = body;
+    const { items, shipping_address, shipping_name, email, shipping_cost } = body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
-      return errorResponse("Items are required", 400);
+      return errorResponse(req, "Items are required", 400);
     }
 
     // Determine origin for success/cancel URLs
     const origin = body.origin || req.headers.get("origin") || "http://localhost:5173";
 
-    // Create Stripe checkout session with line items
-    const lineItems = items.map((item: any) => ({
+    // ── Server-side price lookup ──────────────────────────────────────────────
+    // Never trust client-supplied prices. Fetch authoritative price/variant data
+    // from the database and use those values exclusively.
+    const productIds: string[] = [...new Set(items.map((i: any) => String(i.product_id)))];
+    const { data: dbProducts, error: dbError } = await supabase
+      .from("products")
+      .select("id, title, image_url, images, printify_id, variants")
+      .in("id", productIds)
+      .eq("status", "active");
+
+    if (dbError) return errorResponse(req, "Failed to load products", 500);
+
+    const productMap = new Map<string, any>();
+    for (const p of dbProducts ?? []) productMap.set(String(p.id), p);
+
+    // Build verified line items using only DB prices
+    type VerifiedItem = {
+      product_id: string;
+      printify_id: string | null;
+      variant_id: string;
+      variant_label: string;
+      title: string;
+      image_url: string;
+      price: number;        // authoritative, from DB
+      quantity: number;
+      personalization_text?: string;
+    };
+
+    const verifiedItems: VerifiedItem[] = [];
+
+    for (const item of items) {
+      const product = productMap.get(String(item.product_id));
+      if (!product) {
+        return errorResponse(req, `Product not found or unavailable: ${item.product_id}`, 400);
+      }
+
+      const variants: any[] = Array.isArray(product.variants) ? product.variants : [];
+      const variant = variants.find((v: any) => String(v.id) === String(item.variant_id));
+      if (!variant) {
+        return errorResponse(req, `Variant not found: ${item.variant_id} for product ${item.product_id}`, 400);
+      }
+
+      const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
+      const price: number = Number(variant.price);   // dollars, from DB
+      if (!price || price <= 0) {
+        return errorResponse(req, `Invalid price for variant ${item.variant_id}`, 400);
+      }
+
+      // Prefer the variant-specific image, fall back to product hero image
+      const image_url: string = variant.image_url || product.images?.[0] || product.image_url || "";
+
+      verifiedItems.push({
+        product_id: String(item.product_id),
+        printify_id: product.printify_id ?? null,
+        variant_id: String(item.variant_id),
+        variant_label: variant.label || "",
+        title: product.title,
+        image_url,
+        price,
+        quantity,
+        personalization_text: typeof item.personalization_text === "string"
+          ? item.personalization_text.slice(0, 200)
+          : undefined,
+      });
+    }
+
+    // Compute authoritative subtotal and total from verified items
+    const verifiedSubtotal = Math.round(
+      verifiedItems.reduce((sum, i) => sum + i.price * i.quantity, 0) * 100
+    ) / 100;
+    const resolvedShipping = Math.max(0, Number(shipping_cost) || 0);
+    const verifiedTotal = Math.round((verifiedSubtotal + resolvedShipping) * 100) / 100;
+    // ─────────────────────────────────────────────────────────────────────────
+
+    const lineItems = verifiedItems.map((item) => ({
       quantity: item.quantity,
       price_data: {
         currency: "usd",
@@ -61,24 +144,21 @@ Deno.serve(async (req: Request) => {
           name: `${item.title}${item.variant_label ? ` (${item.variant_label})` : ""}`,
           images: item.image_url ? [item.image_url] : [],
           metadata: {
-            product_id: item.product_id || "",
+            product_id: item.product_id,
             printify_product_id: item.printify_id || "",
-            printify_variant_id: item.variant_id || "",
+            printify_variant_id: item.variant_id,
           },
         },
       },
     }));
 
-    // Add shipping as a line item if applicable
-    if (shipping_cost && shipping_cost > 0) {
+    if (resolvedShipping > 0) {
       lineItems.push({
         quantity: 1,
         price_data: {
           currency: "usd",
-          unit_amount: Math.round(shipping_cost * 100),
-          product_data: {
-            name: "Shipping",
-          },
+          unit_amount: Math.round(resolvedShipping * 100),
+          product_data: { name: "Shipping" },
         },
       });
     }
@@ -93,15 +173,18 @@ Deno.serve(async (req: Request) => {
         email,
         shipping_name,
         shipping_address: JSON.stringify(shipping_address),
-        shipping_cost: String(shipping_cost || 0),
-        subtotal: String(subtotal),
-        total: String(total),
-        items: JSON.stringify(items.map((item: any) => ({
+        shipping_cost: String(resolvedShipping),
+        subtotal: String(verifiedSubtotal),
+        total: String(verifiedTotal),
+        items: JSON.stringify(verifiedItems.map((item) => ({
           printify_id: item.printify_id,
           variant_id: item.variant_id,
           quantity: item.quantity,
-          title: item.title?.slice(0, 60),
+          title: item.title.slice(0, 60),
           price: item.price,
+          image_url: item.image_url,
+          variant_label: item.variant_label,
+          personalization_text: item.personalization_text,
         }))),
       },
       shipping_address_collection: {
@@ -112,25 +195,25 @@ Deno.serve(async (req: Request) => {
       },
     });
 
-    // Create a pending order in the database
+    // Create a pending order using verified server-side values only
     const { error: orderError } = await supabase.from("orders").insert({
       stripe_session_id: session.id,
       email,
       shipping_name,
-      shipping_address: shipping_address,
-      shipping_cost: shipping_cost || 0,
-      subtotal,
-      total,
+      shipping_address,
+      shipping_cost: resolvedShipping,
+      subtotal: verifiedSubtotal,
+      total: verifiedTotal,
       status: "pending",
-      items: items,
+      items: verifiedItems,
     });
 
     if (orderError) {
       console.error("Failed to create order:", orderError.message);
     }
 
-    return jsonResponse({ url: session.url, session_id: session.id });
+    return jsonResponse(req, { url: session.url, session_id: session.id });
   } catch (err) {
-    return errorResponse(err.message || "Internal server error", 500);
+    return errorResponse(req, err.message || "Internal server error", 500);
   }
 });

@@ -1,0 +1,117 @@
+Prompt: Stripe Live/Test Mode Switch System
+Build a Stripe live/test mode switching system for a Next.js 14 (App Router) e-commerce store. The system has three layers: shell scripts, API routes, and an admin UI component.
+
+Architecture Overview
+.env.live — stores live Stripe keys
+
+.env.test — stores test Stripe keys
+
+.env.local — the active env file (copied from live or test)
+
+ecosystem.config.js — PM2 config, also patched with active keys on switch
+
+Active mode is detected by reading STRIPE_SECRET_KEY from .env.local — if it starts with sk_live → live mode, otherwise → test mode
+
+1. Shell Scripts (local dev convenience)
+switch-to-live.sh — copies .env.live → .env.local, pushes secrets to Supabase, redeploys edge functions:
+
+#!/bin/bash
+set -e
+cp .env.live .env.local
+npx supabase secrets set \
+  STRIPE_SECRET_KEY=<live_secret_key> \
+  STRIPE_WEBHOOK_SECRET=<live_webhook_secret> \
+  --project-ref <supabase_project_ref>
+npx supabase functions deploy stripe-webhook stripe-checkout --project-ref <supabase_project_ref>
+
+Copy
+bash
+switch-to-test.sh — same pattern but copies .env.test and uses test keys.
+
+2. API Routes
+GET /api/stripe-mode
+Returns key hints and active mode:
+
+{
+  "live": { "hasKeys": true, "secret_key_hint": "sk_live_51UC...", "webhook_hint": "whsec_08V5..." },
+  "test": { "hasKeys": true, "secret_key_hint": "sk_test_51UC...", "webhook_hint": "whsec_j0pX..." },
+  "active_mode": "test"
+}
+
+Copy
+json
+Reads .env.live and .env.test for key hints (masked: first 12 + last 4 chars)
+
+Reads process.cwd()/.env.local to determine active_mode (check if STRIPE_SECRET_KEY starts with sk_live)
+
+POST /api/stripe-mode
+Body: { action: "save-keys", mode: "live"|"test", secret_key, webhook_secret }
+
+Writes/updates STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET into .env.live or .env.test
+
+Preserves all other existing vars in the file
+
+POST /api/stripe-switch
+Body: { mode: "live"|"test" } or { action: "restart" }
+
+Switch flow:
+
+Read keys from .env.live or .env.test
+
+Patch .env.local (and standalone .env.local at process.cwd() if different) with new Stripe keys, preserving all other vars
+
+If SUPABASE_ACCESS_TOKEN is set, push STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET to Supabase Management API: POST https://api.supabase.com/v1/projects/<ref>/secrets
+
+Patch ecosystem.config.js — regex-replace the STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET values in the env block
+
+After sending the response, trigger delayed PM2 restart: pm2 startOrReload /var/www/bodyandsleeves/ecosystem.config.js --update-env (fallback: pm2 restart bodyandsleeves --update-env)
+
+Return { ok: true, mode, steps: string[] } where steps lists each completed action
+
+All routes use export const runtime = "nodejs" and a shared appRoot() helper that resolves the app directory by checking APP_ROOT env var, then process.cwd(), then walking up from __dirname looking for .env.local.
+
+3. Admin UI (/admin/stripe page)
+StripeKeyManager component
+Fetches GET /api/stripe-mode on mount
+
+Renders two cards side by side: LIVE (green border) and TEST (amber border)
+
+Each card has:
+
+Mode badge (LIVE / TEST)
+
+SwitchButton — shows "Active" checkmark if this is the current mode, otherwise a "Switch to LIVE/TEST" button
+
+KeyForm — collapsible section to save API keys for that mode
+
+SwitchButton behavior
+On click: POST /api/stripe-switch with { mode }
+
+After success: polls GET /api/stripe-mode every 1.5s until the server responds (server restarts after switch)
+
+Shows "Server restarting…" spinner during poll
+
+On server back up: window.location.reload()
+
+KeyForm behavior
+Collapsed by default, shows "Saved" or "Not set" status
+
+When open: shows masked key hints if saved, link to Stripe dashboard for that mode, inputs for secret key and webhook secret
+
+On save: POST /api/stripe-mode with { action: "save-keys", mode, secret_key, webhook_secret }
+
+Active mode banner
+Above the key manager, show a banner: "Active mode: LIVE" (green) or "Active mode: TEST" (amber), with a subtitle explaining whether real payments are being processed.
+
+Key implementation details
+appRoot() must handle both local dev (process.cwd() has .env.local) and production standalone bundle (.next/standalone/server.js runs from a different cwd — walk up __dirname up to 8 levels)
+
+parseEnvFile() — parse KEY=VALUE lines, skip comments (#), trim whitespace
+
+writeEnvFile() — write all entries as KEY=VALUE\n lines
+
+The Supabase project ref is hardcoded: SUPABASE_PROJECT_REF_REDACTED
+
+PM2 binary path: /usr/bin/pm2
+
+The switch is non-destructive — only STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET are changed in .env.local; all other vars (Supabase, Printify, Resend, MailerLite, etc.) are preserved

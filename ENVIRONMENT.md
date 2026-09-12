@@ -1,4 +1,4 @@
-# Body & Sleeves — Environment & Technology Stack
+# Gender Apparel — Environment & Technology Stack
 
 ---
 
@@ -88,7 +88,7 @@ Set via `supabase secrets set <KEY>=<VALUE>` — never stored in `.env.local`.
 
 | Variable | Value |
 |---|---|
-| `TEST_ADMIN_EMAIL` | admin@bodyandsleeves.com |
+| `TEST_ADMIN_EMAIL` | admin@genderapparel.example |
 | `TEST_ADMIN_PASSWORD` | changeme |
 
 ---

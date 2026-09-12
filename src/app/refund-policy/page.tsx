@@ -3,13 +3,14 @@ import Link from "next/link";
 import { Mail } from "lucide-react";
 import StorefrontLayout from "@/components/StorefrontLayout";
 import { createClient } from "@supabase/supabase-js";
+import { DEFAULT_POLICY_CONTENT } from "@/lib/policy-content";
 
 export const metadata: Metadata = {
   title: "Refund and Returns Policy",
-  description: "Body & Sleeves refund and returns policy.",
+  description: "Gender Apparel refund and returns policy.",
 };
 
-const EMAIL = "info@bodyandsleeves.com";
+const EMAIL = "hello@genderapparel.example";
 
 const FALLBACK = `Our refund and returns policy lasts 30 days from purchase. If 30 days have passed, we can't offer a full refund or exchange.
 
@@ -41,7 +42,7 @@ export default async function RefundPolicyPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
   const { data } = await supabase.from("policies").select("content").eq("id", "refund").maybeSingle();
-  const content = data?.content || FALLBACK;
+  const content = data?.content || DEFAULT_POLICY_CONTENT.refund || FALLBACK;
 
   return (
     <StorefrontLayout>
@@ -50,7 +51,7 @@ export default async function RefundPolicyPage() {
           <Link href="/" className="hover:text-secondary-700 transition-colors">Home</Link>{" › "}Refund and Returns Policy
         </p>
         <h1 className="text-3xl lg:text-4xl font-bold text-secondary-900 mb-10">Refund and Returns Policy</h1>
-        <div className="space-y-4 text-secondary-600 leading-relaxed whitespace-pre-wrap">{content}</div>
+        <div className="prose prose-sm max-w-none text-secondary-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: content }} />
         <div className="mt-12 bg-secondary-50 rounded-xl p-6">
           <h2 className="text-xl font-semibold text-secondary-900 mb-3">Need Help?</h2>
           <p className="mb-4">Contact us for questions related to refunds and returns.</p>

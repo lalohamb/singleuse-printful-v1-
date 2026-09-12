@@ -66,11 +66,15 @@ export async function getShippingQuote({
 }
 export async function createStripeCheckout(payload: {
   items: Array<{
-    product_id: string; title: string; price: number; image_url?: string;
-    quantity: number; variant_id: string; variant_label: string; printify_id: string | null;
+    product_id: string;
+    quantity: number;
+    variant_id: string;
+    personalization_text?: string;
   }>;
   shipping_address: { line1: string; line2?: string; city: string; state: string; zip: string; country: string };
-  shipping_name: string; email: string; shipping_cost: number; subtotal: number; total: number;
+  shipping_name: string;
+  email: string;
+  shipping_cost: number;
 }): Promise<{ url: string; session_id: string }> {
   const apiUrl = `${supabaseUrl}/functions/v1/stripe-checkout`;
   const res = await fetch(apiUrl, {

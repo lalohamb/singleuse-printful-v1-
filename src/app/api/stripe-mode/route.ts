@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { requireAdmin } from "@/lib/require-admin";
 
 export const runtime = "nodejs";
 
@@ -34,6 +35,9 @@ function writeEnvFile(filePath: string, env: Record<string, string>) {
 
 // POST — body: { action: "save-keys", mode: "live"|"test", secret_key, webhook_secret }
 export async function POST(req: NextRequest) {
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
   const { action, mode, secret_key, webhook_secret } = await req.json();
   if (action !== "save-keys") return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   if (mode !== "live" && mode !== "test") return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
@@ -46,7 +50,10 @@ export async function POST(req: NextRequest) {
 }
 
 // GET — return saved key hints
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
   const root = appRoot();
   const liveEnv = parseEnvFile(path.resolve(root, ".env.live"));
   const testEnv = parseEnvFile(path.resolve(root, ".env.test"));

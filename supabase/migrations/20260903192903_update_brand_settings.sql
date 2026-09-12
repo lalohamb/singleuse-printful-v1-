@@ -1,16 +1,16 @@
 /*
 # Update store settings with real brand voice
 
-Updates the settings table with Demetria's real brand tagline, hero text,
-and announcement bar content matching the Body & Sleeves brand identity.
+Updates the settings table with Gender Apparel's template tagline, hero text,
+and announcement bar content.
 */
 
 UPDATE settings
 SET
-  tagline = 'Black-Owned. Made to Order.',
-  hero_title = 'Empower Yourself. Empower the Culture.',
-  hero_subtitle = 'Apparel celebrating Black culture, faith, and family. Every design made with intention, printed on demand, shipped to your door.',
-  announcement = 'Made to order. Made with love. — Free shipping on orders over $75',
+  tagline = 'Made for Every Body.',
+  hero_title = 'Wear What Feels Like You.',
+  hero_subtitle = 'Thoughtful apparel designed for every body, every style, and every day. Made to order and shipped to your door.',
+  announcement = 'Made to order. Made with intention. — Free shipping on orders over $75',
   announcement_active = true,
   updated_at = now()
 WHERE id = (SELECT id FROM settings LIMIT 1);

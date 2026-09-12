@@ -15,9 +15,9 @@ export async function generateMetadata(): Promise<Metadata> {
     supabase.from("settings").select("favicon_url").limit(1).maybeSingle(),
   ]);
   return {
-    title: { default: "Body & Sleeves", template: "%s | Body & Sleeves" },
-    description: "A Black-owned, made-to-order apparel brand celebrating the richness of Black culture, faith, and family. Empower yourself. Empower the Culture.",
-    openGraph: { siteName: "Body & Sleeves", type: "website" },
+    title: { default: "Gender Apparel", template: "%s | Gender Apparel" },
+    description: "Made-to-order apparel designed for every body, every style, and every day.",
+    openGraph: { siteName: "Gender Apparel", type: "website" },
     ...(seo?.twitter_handle && { twitter: { card: "summary_large_image", site: seo.twitter_handle } }),
     ...(seo?.google_site_verification && { verification: { google: seo.google_site_verification } }),
     ...(settings?.favicon_url && { icons: { icon: "/api/favicon", shortcut: "/api/favicon" } }),

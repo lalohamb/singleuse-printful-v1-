@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   ]);
   if (!productRes.data) return { title: "Product Not Found" };
   const { title, description, image_url } = productRes.data;
-  const base = (seo?.site_url || "https://bodyandsleeves.com").replace(/\/$/, "");
+  const base = (seo?.site_url || "https://genderapparel.example").replace(/\/$/, "");
   const ogImage = image_url || seo?.default_og_image || null;
   return {
     title,
@@ -47,7 +47,7 @@ export default async function ProductPage({ params }: { params: { id: string } }
 
   if (!productRes.data) notFound();
   const product = productRes.data as Product;
-  const base = (seo?.site_url || "https://bodyandsleeves.com").replace(/\/$/, "");
+  const base = (seo?.site_url || "https://genderapparel.example").replace(/\/$/, "");
 
   const jsonLd = seo?.jsonld_enabled ? {
     "@context": "https://schema.org",
@@ -63,7 +63,7 @@ export default async function ProductPage({ params }: { params: { id: string } }
       availability: "https://schema.org/InStock",
       url: `${base}/product/${product.id}`,
     },
-    brand: { "@type": "Brand", name: "Body & Sleeves" },
+    brand: { "@type": "Brand", name: "Gender Apparel" },
   } : null;
 
   return (

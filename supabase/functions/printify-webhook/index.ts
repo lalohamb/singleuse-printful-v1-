@@ -117,16 +117,12 @@ async function mapAndUpsertProduct(supabase: any, detail: any, token: string, is
   return supabase.from("products").upsert(payload, { onConflict: "printify_id" }).select("id");
 }
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
-
+// This function is called server-to-server by Printify only.
+// No CORS headers are needed or set.
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json" },
   });
 }
 
@@ -155,13 +151,13 @@ async function sendShippingEmail(resendKey: string, order: {
     method: "POST",
     headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      from: "Body & Sleeves <orders@bodyandsleeves.com>",
+      from: "Gender Apparel <orders@genderapparel.example>",
       to: order.email,
       subject: `Your order #${orderRef} has shipped! 📦`,
       html: `
         <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#1a1a1a">
           <div style="background:#1a1a1a;padding:24px;text-align:center">
-            <h1 style="color:#fff;margin:0;font-size:22px;letter-spacing:2px">BODY & SLEEVES</h1>
+            <h1 style="color:#fff;margin:0;font-size:22px;letter-spacing:2px">GENDER APPAREL</h1>
           </div>
           <div style="padding:32px 24px">
             <h2 style="margin-top:0">Your order is on its way, ${firstName}! 🎉</h2>
@@ -169,8 +165,8 @@ async function sendShippingEmail(resendKey: string, order: {
             ${trackingHtml}
             <h3 style="margin-top:32px;margin-bottom:8px;font-size:14px;text-transform:uppercase;letter-spacing:1px;color:#888">Items Shipped</h3>
             <table style="width:100%;border-collapse:collapse;font-size:14px">${itemsHtml}</table>
-            <p style="margin-top:32px;color:#888;font-size:13px">Questions? Reply to this email or reach us at Hello.BodyandSleeves@gmail.com</p>
-            <p style="color:#888;font-size:13px">— The Body & Sleeves Team</p>
+            <p style="margin-top:32px;color:#888;font-size:13px">Questions? Reply to this email or reach us at hello@genderapparel.example</p>
+            <p style="color:#888;font-size:13px">— The Gender Apparel Team</p>
           </div>
         </div>
       `,
@@ -179,7 +175,6 @@ async function sendShippingEmail(resendKey: string, order: {
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { status: 200, headers: corsHeaders });
   if (req.method === "GET") return json({ received: true });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 

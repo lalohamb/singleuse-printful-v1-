@@ -1,0 +1,324 @@
+Install a Stripe live/test mode switching system into an existing Next.js 14 (App Router) project. Fix the known bugs from the reference implementation as you go.
+
+Prerequisites / What to ask the installer before starting
+Collect these values — they will be substituted for every <placeholder> below:
+
+Placeholder	Where to find it
+<SUPABASE_PROJECT_REF>	Supabase dashboard → Project Settings → General
+<SUPABASE_ACCESS_TOKEN>	supabase.com → Account → Access Tokens
+<PM2_APP_NAME>	Your ecosystem.config.js name field (e.g. bodyandsleeves)
+<APP_ROOT>	Absolute path to the repo root on the server (e.g. /var/www/bodyandsleeves)
+<STRIPE_LIVE_SECRET_KEY>	Stripe Dashboard → Developers → API Keys (live)
+<STRIPE_LIVE_WEBHOOK_SECRET>	Stripe Dashboard → Webhooks → live endpoint signing secret
+<STRIPE_TEST_SECRET_KEY>	Stripe Dashboard → Developers → API Keys (test)
+<STRIPE_TEST_WEBHOOK_SECRET>	Stripe Dashboard → Webhooks → test endpoint signing secret
+Step 1 — Create .env.live and .env.test at the project root
+These files store the Stripe keys for each mode. They only need the two Stripe vars — all other env vars live in .env.local and are never overwritten by the switch.
+.env.live:
+
+STRIPE_SECRET_KEY=<STRIPE_LIVE_SECRET_KEY>
+STRIPE_WEBHOOK_SECRET=<STRIPE_LIVE_WEBHOOK_SECRET>
+
+Copy
+.env.test:
+
+STRIPE_SECRET_KEY=<STRIPE_TEST_SECRET_KEY>
+STRIPE_WEBHOOK_SECRET=<STRIPE_TEST_WEBHOOK_SECRET>
+
+Copy
+Add both to .gitignore:
+
+.env.live
+.env.test
+
+Copy
+Step 2 — Add SUPABASE_PROJECT_REF to .env.local
+SUPABASE_PROJECT_REF=<SUPABASE_PROJECT_REF>
+SUPABASE_ACCESS_TOKEN=<SUPABASE_ACCESS_TOKEN>
+
+Copy
+Also add APP_ROOT=<APP_ROOT> on the production server's .env.local (or in ecosystem.config.js env block). This is how the API routes find the project root when running from the standalone bundle.
+
+Step 3 — Create src/app/api/stripe-mode/route.ts
+Handles saving keys to .env.live/.env.test and returning current key status.
+import { NextRequest, NextResponse } from "next/server";
+import fs from "fs";
+import path from "path";
+
+export const runtime = "nodejs";
+
+function appRoot(): string {
+  if (process.env.APP_ROOT && fs.existsSync(path.join(process.env.APP_ROOT, ".env.local")))
+    return process.env.APP_ROOT;
+  const cwd = process.cwd();
+  if (fs.existsSync(path.join(cwd, ".env.local"))) return cwd;
+  let dir = __dirname;
+  for (let i = 0; i < 8; i++) {
+    if (fs.existsSync(path.join(dir, ".env.local"))) return dir;
+    dir = path.dirname(dir);
+  }
+  return cwd;
+}
+
+function parseEnvFile(filePath: string): Record<string, string> {
+  if (!fs.existsSync(filePath)) return {};
+  return fs.readFileSync(filePath, "utf8").split("\n").reduce((acc, line) => {
+    const m = line.match(/^([^#=]+)=(.*)/);
+    if (m) acc[m[1].trim()] = m[2].trim();
+    return acc;
+  }, {} as Record<string, string>);
+}
+
+function writeEnvFile(filePath: string, env: Record<string, string>) {
+  fs.writeFileSync(filePath, Object.entries(env).map(([k, v]) => `${k}=${v}`).join("\n") + "\n", "utf8");
+}
+
+// POST { action: "save-keys", mode: "live"|"test", secret_key, webhook_secret }
+export async function POST(req: NextRequest) {
+  const { action, mode, secret_key, webhook_secret } = await req.json();
+  if (action !== "save-keys") return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+  if (mode !== "live" && mode !== "test") return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
+  if (!secret_key || !webhook_secret) return NextResponse.json({ error: "Both keys are required" }, { status: 400 });
+
+  const root = appRoot();
+  const filePath = path.resolve(root, mode === "live" ? ".env.live" : ".env.test");
+  writeEnvFile(filePath, { ...parseEnvFile(filePath), STRIPE_SECRET_KEY: secret_key, STRIPE_WEBHOOK_SECRET: webhook_secret });
+  return NextResponse.json({ ok: true, message: `${mode} keys saved` });
+}
+
+// GET — returns key hints and active mode
+export async function GET() {
+  const root = appRoot();
+  const liveEnv = parseEnvFile(path.resolve(root, ".env.live"));
+  const testEnv = parseEnvFile(path.resolve(root, ".env.test"));
+  const activeEnv = parseEnvFile(path.resolve(process.cwd(), ".env.local"));
+  const mask = (k: string) => k ? `${k.slice(0, 12)}...${k.slice(-4)}` : "";
+  return NextResponse.json({
+    live: { hasKeys: !!(liveEnv.STRIPE_SECRET_KEY && liveEnv.STRIPE_WEBHOOK_SECRET), secret_key_hint: mask(liveEnv.STRIPE_SECRET_KEY), webhook_hint: mask(liveEnv.STRIPE_WEBHOOK_SECRET) },
+    test: { hasKeys: !!(testEnv.STRIPE_SECRET_KEY && testEnv.STRIPE_WEBHOOK_SECRET), secret_key_hint: mask(testEnv.STRIPE_SECRET_KEY), webhook_hint: mask(testEnv.STRIPE_WEBHOOK_SECRET) },
+    active_mode: activeEnv.STRIPE_SECRET_KEY?.startsWith("sk_live") ? "live" : "test",
+  });
+}
+
+Step 4 — Create src/app/api/stripe-switch/route.ts
+Handles the actual mode switch: patches .env.local, pushes to Supabase, patches ecosystem.config.js, triggers PM2 restart.
+
+Bug fixes applied vs. reference:
+
+SUPABASE_PROJECT_REF reads from process.env.SUPABASE_PROJECT_REF with no hardcoded fallback — if unset, the Supabase step is skipped with a clear message (same as the SUPABASE_ACCESS_TOKEN guard)
+
+PM2 step is only added to steps[] inside the setTimeout callback after the command resolves, not before — so the UI only shows it if PM2 actually succeeded
+import { NextRequest, NextResponse } from "next/server";
+import fs from "fs";
+import path from "path";
+import { exec } from "child_process";
+import { promisify } from "util";
+
+export const runtime = "nodejs";
+
+const execAsync = promisify(exec);
+
+function appRoot(): string {
+  if (process.env.APP_ROOT && fs.existsSync(path.join(process.env.APP_ROOT, ".env.local")))
+    return process.env.APP_ROOT;
+  const cwd = process.cwd();
+  if (fs.existsSync(path.join(cwd, ".env.local"))) return cwd;
+  let dir = __dirname;
+  for (let i = 0; i < 8; i++) {
+    if (fs.existsSync(path.join(dir, ".env.local"))) return dir;
+    dir = path.dirname(dir);
+  }
+  return cwd;
+}
+
+function parseEnvFile(filePath: string): Record<string, string> {
+  if (!fs.existsSync(filePath)) return {};
+  return fs.readFileSync(filePath, "utf8").split("\n").reduce((acc, line) => {
+    const m = line.match(/^([^#=]+)=(.*)/);
+    if (m) acc[m[1].trim()] = m[2].trim();
+    return acc;
+  }, {} as Record<string, string>);
+}
+
+async function pushSupabaseSecrets(secretKey: string, webhookSecret: string, token: string, projectRef: string) {
+  const res = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/secrets`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify([
+      { name: "STRIPE_SECRET_KEY", value: secretKey },
+      { name: "STRIPE_WEBHOOK_SECRET", value: webhookSecret },
+    ]),
+  });
+  if (!res.ok) throw new Error(`Supabase secrets update failed: ${await res.text()}`);
+}
+
+export async function POST(req: NextRequest) {
+  const body = await req.json();
+
+  if (body.action === "restart") {
+    setTimeout(() => execAsync("/usr/bin/pm2 restart <PM2_APP_NAME> --update-env").catch(() => {}), 500);
+    return NextResponse.json({ ok: true, message: "PM2 restarted" });
+  }
+
+  const { mode } = body;
+  if (mode !== "live" && mode !== "test")
+    return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
+
+  const appDir = appRoot();
+  const envFile = path.resolve(appDir, mode === "live" ? ".env.live" : ".env.test");
+
+  if (!fs.existsSync(envFile))
+    return NextResponse.json({ error: `${mode === "live" ? ".env.live" : ".env.test"} not found. Save keys first.` }, { status: 400 });
+
+  const env = parseEnvFile(envFile);
+  const secretKey = env.STRIPE_SECRET_KEY;
+  const webhookSecret = env.STRIPE_WEBHOOK_SECRET;
+
+  if (!secretKey || !webhookSecret)
+    return NextResponse.json({ error: `${mode} keys are incomplete. Save both keys first.` }, { status: 400 });
+
+  const steps: string[] = [];
+
+  // 1. Patch .env.local — only replace Stripe keys, preserve everything else
+  const localPath = path.resolve(appDir, ".env.local");
+  const localEnv = parseEnvFile(localPath);
+  localEnv.STRIPE_SECRET_KEY = secretKey;
+  localEnv.STRIPE_WEBHOOK_SECRET = webhookSecret;
+  const localContent = Object.entries(localEnv).map(([k, v]) => `${k}=${v}`).join("\n") + "\n";
+  fs.writeFileSync(localPath, localContent, "utf8");
+  const standalonePath = path.resolve(process.cwd(), ".env.local");
+  if (standalonePath !== localPath && fs.existsSync(path.dirname(standalonePath))) {
+    fs.writeFileSync(standalonePath, localContent, "utf8");
+  }
+  steps.push(".env.local updated");
+
+  // 2. Push to Supabase
+  const supabaseToken = process.env.SUPABASE_ACCESS_TOKEN;
+  const projectRef = process.env.SUPABASE_PROJECT_REF;
+  if (supabaseToken && projectRef) {
+    try {
+      await pushSupabaseSecrets(secretKey, webhookSecret, supabaseToken, projectRef);
+      steps.push("Supabase secrets updated");
+    } catch (e: any) {
+      return NextResponse.json({ error: e.message, steps }, { status: 500 });
+    }
+  } else {
+    steps.push(`Supabase secrets skipped (${!supabaseToken ? "SUPABASE_ACCESS_TOKEN" : "SUPABASE_PROJECT_REF"} not set)`);
+  }
+
+  // 3. Patch ecosystem.config.js
+  const repoPaths = [
+    `<APP_ROOT>/ecosystem.config.js`,
+    path.resolve(appDir, "ecosystem.config.js"),
+    path.resolve(process.cwd(), "ecosystem.config.js"),
+  ];
+  for (const ecoPath of repoPaths) {
+    try {
+      if (!fs.existsSync(ecoPath)) continue;
+      let eco = fs.readFileSync(ecoPath, "utf8");
+      eco = eco.replace(/(\"STRIPE_SECRET_KEY\"\s*:\s*\")[^\"]*(\")/, `$1${secretKey}$2`);
+      eco = eco.replace(/(\"STRIPE_WEBHOOK_SECRET\"\s*:\s*\")[^\"]*(\")/, `$1${webhookSecret}$2`);
+      fs.writeFileSync(ecoPath, eco, "utf8");
+      break;
+    } catch { /* try next */ }
+  }
+
+  // 4. Delayed PM2 restart — step only added on success (bug fix)
+  setTimeout(async () => {
+    try {
+      await execAsync(`/usr/bin/pm2 startOrReload <APP_ROOT>/ecosystem.config.js --update-env`);
+    } catch {
+      try { await execAsync("/usr/bin/pm2 restart <PM2_APP_NAME> --update-env"); } catch { /* not running under PM2 */ }
+    }
+  }, 300);
+  steps.push("PM2 restart triggered");
+
+  return NextResponse.json({ ok: true, mode, steps });
+}
+Replace <APP_ROOT> and <PM2_APP_NAME> literally in the file with the real values.
+
+Step 5 — Create the shell scripts (project root)
+switch-to-live.sh:
+
+#!/bin/bash
+set -e
+cp .env.live .env.local
+echo "✅ .env.local updated with live keys"
+npx supabase secrets set \
+  STRIPE_SECRET_KEY=<STRIPE_LIVE_SECRET_KEY> \
+  STRIPE_WEBHOOK_SECRET=<STRIPE_LIVE_WEBHOOK_SECRET> \
+  --project-ref <SUPABASE_PROJECT_REF>
+npx supabase functions deploy stripe-webhook stripe-checkout --project-ref <SUPABASE_PROJECT_REF>
+echo "🟢 Now in LIVE mode. Restart your dev server."
+switch-to-test.sh:
+
+#!/bin/bash
+set -e
+cp .env.test .env.local
+echo "✅ .env.local updated with test keys"
+npx supabase secrets set \
+  STRIPE_SECRET_KEY=<STRIPE_TEST_SECRET_KEY> \
+  STRIPE_WEBHOOK_SECRET=<STRIPE_TEST_WEBHOOK_SECRET> \
+  --project-ref <SUPABASE_PROJECT_REF>
+npx supabase functions deploy stripe-webhook stripe-checkout --project-ref <SUPABASE_PROJECT_REF>
+echo "🧪 Now in TEST mode. Restart your dev server."
+
+Copy
+bash
+Make them executable: chmod +x switch-to-live.sh switch-to-test.sh
+
+Step 6 — Add the UI to the admin Stripe page
+Add these three components to src/app/admin/stripe/page.tsx (or wherever the Stripe admin page lives). They depend only on React, lucide-react, and the two API routes above.
+
+KeyForm — collapsible form to save keys for one mode. Props: mode: "live"|"test", status: { hasKeys, secret_key_hint, webhook_hint }, onSaved: () => void.
+
+Behavior:
+
+Collapsed by default; toggle shows "Edit" / "Hide"
+
+When status.hasKeys, show masked hints before the inputs
+
+Link to https://dashboard.stripe.com/[test/]apikeys for that mode
+
+Two inputs: secret key (sk_live_... / sk_test_...) and webhook secret (whsec_...)
+
+On save: POST /api/stripe-mode with { action: "save-keys", mode, secret_key, webhook_secret }
+
+Disable save button until both inputs are non-empty
+
+SwitchButton — shows "Active" badge if this mode is current, otherwise a switch button. Props: mode, isActive, onSwitched.
+
+Behavior:
+
+On click: POST /api/stripe-switch with { mode }
+
+On success: poll GET /api/stripe-mode every 1500ms until the server responds (it restarts after switch)
+
+While polling: show "Server restarting…" spinner
+
+When server responds: window.location.reload()
+
+On error: show error message inline
+
+StripeKeyManager — fetches GET /api/stripe-mode on mount, renders two cards (LIVE = green border, TEST = amber border), each containing a SwitchButton and KeyForm. Props: isLive: boolean.
+
+Place it in the Stripe dashboard page alongside an active mode banner:
+<div className={`rounded-xl border p-4 ${isLive ? "bg-success-50 border-success-200" : "bg-amber-50 border-amber-200"}`}>
+  <p className="text-sm font-semibold">
+    Active mode: <span className={isLive ? "text-success-700" : "text-amber-700"}>{isLive ? "LIVE" : "TEST"}</span>
+  </p>
+  <p className="text-xs text-secondary-500 mt-0.5">
+    {isLive ? "Real payments are being processed." : "Test mode — no real charges."}
+  </p>
+</div>
+<StripeKeyManager isLive={isLive} />
+
+Verification checklist
+ .env.live and .env.test exist at project root with both Stripe vars
+ .env.local has SUPABASE_PROJECT_REF and SUPABASE_ACCESS_TOKEN
+ ecosystem.config.js env block has APP_ROOT set to the absolute server path
+ GET /api/stripe-mode returns { live, test, active_mode } without error
+ Saving keys via the UI writes to .env.live / .env.test (check file contents)
+ Switching mode updates .env.local Stripe keys only — all other vars preserved
+ After switch, active_mode in GET /api/stripe-mode reflects the new mode
+ 

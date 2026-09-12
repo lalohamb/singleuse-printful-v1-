@@ -1,4 +1,4 @@
-# Body & Sleeves — Admin User Instructions
+# Gender Apparel — Admin User Instructions
 
 > **Access:** `/admin` — requires an authorized admin account. All pages are protected and redirect to login if unauthenticated.
 
@@ -397,8 +397,8 @@ Manage the three legal policy pages. Changes are published live to the public-fa
 
 | Field | Description |
 |---|---|
-| Production URL | Your live domain (e.g. `https://bodyandsleeves.com`). Used in sitemap, canonical URLs, and JSON-LD. No trailing slash |
-| Meta Title Suffix | Appended to all page titles (e.g. `| Body & Sleeves`) |
+| Production URL | Your live domain (e.g. `https://your-domain.com`). Used in sitemap, canonical URLs, and JSON-LD. No trailing slash |
+| Meta Title Suffix | Appended to all page titles (e.g. `| Gender Apparel`) |
 | Twitter / X Handle | Used in Twitter card meta tags |
 | Google Search Console Verification | Paste the content value from Google's HTML meta tag verification method |
 
@@ -574,4 +574,4 @@ All variables go in `.env.local` at the project root. Never commit this file.
 
 ---
 
-*Last updated: Body & Sleeves Admin — full feature set as of current build.*
+*Last updated: Gender Apparel Admin — full feature set as of current build.*

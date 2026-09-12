@@ -3,21 +3,22 @@ import Link from "next/link";
 import { Mail } from "lucide-react";
 import StorefrontLayout from "@/components/StorefrontLayout";
 import { createClient } from "@supabase/supabase-js";
+import { DEFAULT_POLICY_CONTENT } from "@/lib/policy-content";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
-  description: "Body & Sleeves Terms of Service.",
+  description: "Gender Apparel Terms of Service.",
 };
 
-const EMAIL = "info@bodyandsleeves.com";
+const EMAIL = "hello@genderapparel.example";
 
-const FALLBACK = `Welcome to Body & Sleeves ("we," "us," "our"). By accessing or purchasing from our site, you agree to the following Terms of Service. Please read them carefully.
+const FALLBACK = `Welcome to Gender Apparel ("we," "us," "our"). By accessing or purchasing from our site, you agree to the following Terms of Service. Please read them carefully.
 
 1. General
 By using this website and placing an order, you confirm that you are at least 18 years of age (or have parental consent), are authorized to use the payment method provided, and that all information you provide is accurate and complete.
 
 2. Products
-All Body & Sleeves products are made to order through our print-on-demand partner, Printify. Product images are for illustration purposes — actual colors may vary slightly. We reserve the right to discontinue any product at any time.
+All Gender Apparel products are made to order through our print-on-demand partner, Printify. Product images are for illustration purposes — actual colors may vary slightly. We reserve the right to discontinue any product at any time.
 
 3. Pricing
 All prices are listed in US Dollars (USD). We reserve the right to change prices at any time. The price charged will be the price displayed at the time of your order.
@@ -32,7 +33,7 @@ All orders enter production within 2–7 business days. Once in production, orde
 Full details are available in our Refund and Returns Policy. We accept return requests for sizing issues, misprints or defects, and accidental duplicate orders.
 
 7. Intellectual Property
-All designs, graphics, logos, and content on this site are the property of Body & Sleeves. You may not copy, reproduce, or distribute any content without express written permission.
+All designs, graphics, logos, and content on this site are the property of Gender Apparel. You may not copy, reproduce, or distribute any content without express written permission.
 
 8. Governing Law
 These Terms are governed by the laws of the State of Illinois, United States.
@@ -46,7 +47,7 @@ export default async function TermsOfServicePage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
   const { data } = await supabase.from("policies").select("content").eq("id", "terms").maybeSingle();
-  const content = data?.content || FALLBACK;
+  const content = data?.content || DEFAULT_POLICY_CONTENT.terms || FALLBACK;
 
   return (
     <StorefrontLayout>
@@ -55,7 +56,7 @@ export default async function TermsOfServicePage() {
           <Link href="/" className="hover:text-secondary-700 transition-colors">Home</Link>{" › "}Terms of Service
         </p>
         <h1 className="text-3xl lg:text-4xl font-bold text-secondary-900 mb-10">Terms of Service</h1>
-        <div className="space-y-4 text-secondary-600 leading-relaxed whitespace-pre-wrap">{content}</div>
+        <div className="prose prose-sm max-w-none text-secondary-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: content }} />
         <div className="mt-12 bg-secondary-50 rounded-xl p-6">
           <h2 className="text-xl font-semibold text-secondary-900 mb-3">Contact Us</h2>
           <p className="mb-4">Questions about these Terms? Reach out to us.</p>

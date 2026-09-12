@@ -37,9 +37,9 @@ export default function Header() {
               </button>
               <Link href="/" className="flex items-center gap-2">
                 {settings?.logo_url ? (
-                  <img src={settings.logo_url} alt={settings.store_name || "Body & Sleeves"} style={{ height: `${settings.logo_size ?? 40}px`, width: "auto" }} />
+                  <img src={settings.logo_url} alt={settings.store_name || "Gender Apparel"} style={{ height: `${settings.logo_size ?? 40}px`, width: "auto" }} />
                 ) : (
-                  <img src="/logo.png" alt="Body & Sleeves" style={{ height: `${settings?.logo_size ?? 40}px`, width: "auto" }} />
+                  <img src="/genderapparel.png" alt="Gender Apparel" style={{ height: `${settings?.logo_size ?? 40}px`, width: "auto" }} />
                 )}
               </Link>
             </div>

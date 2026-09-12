@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/require-admin";
 
 export const runtime = "nodejs";
 
@@ -6,6 +7,9 @@ const RESEND_API = "https://api.resend.com";
 const key = process.env.RESEND_API_KEY;
 
 export async function POST(req: NextRequest) {
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
   if (!key) return NextResponse.json({ error: "RESEND_API_KEY not set" }, { status: 500 });
   const body = await req.json();
   const res = await fetch(`${RESEND_API}/emails`, {
@@ -17,10 +21,16 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(data, { status: res.status });
 }
 
+const ALLOWED_PATHS = new Set(["/emails", "/domains", "/api-keys"]);
+
 export async function GET(req: NextRequest) {
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
   if (!key) return NextResponse.json({ error: "RESEND_API_KEY not set" }, { status: 500 });
-  const { searchParams } = new URL(req.url);
-  const path = searchParams.get("path") || "/emails";
+  const path = new URL(req.url).searchParams.get("path") ?? "/emails";
+  if (!ALLOWED_PATHS.has(path))
+    return NextResponse.json({ error: "Invalid path" }, { status: 400 });
   const res = await fetch(`${RESEND_API}${path}`, {
     headers: { Authorization: `Bearer ${key}` },
   });

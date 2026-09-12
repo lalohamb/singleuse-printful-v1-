@@ -95,7 +95,7 @@ function EditSubscriberModal({ subscriber, groups, onClose, onDone }: { subscrib
 }
 
 function CreateCampaignModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () => void; onDone: () => void }) {
-  const [form, setForm] = useState({ name: "", subject: "", from_name: "Body and Sleeves", from_email: "orders@bodyandsleeves.com", html: "", group: "", send_now: false });
+  const [form, setForm] = useState({ name: "", subject: "", from_name: "Gender Apparel", from_email: "orders@genderapparel.example", html: "", group: "", send_now: false });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -304,7 +304,7 @@ function MailerLiteDashboard() {
         <ul className="space-y-2 text-sm text-secondary-600">
           <li className="flex items-start gap-2">
             <span className="text-primary-500 mt-0.5 flex-shrink-0">✦</span>
-            <span><strong>Verified custom domain required</strong> — campaigns cannot be sent from Gmail, Yahoo, or other free email addresses. Use a domain you own (e.g. <code className="bg-white px-1 rounded text-xs">orders@bodyandsleeves.com</code>) and verify it under <a href="https://app.mailerlite.com/settings/domains" target="_blank" rel="noopener noreferrer" className="text-primary-600 underline hover:text-primary-700">MailerLite → Settings → Domains</a>.</span>
+            <span><strong>Verified custom domain required</strong> — campaigns cannot be sent from Gmail, Yahoo, or other free email addresses. Use a domain you own (e.g. <code className="bg-white px-1 rounded text-xs">orders@your-domain.com</code>) and verify it under <a href="https://app.mailerlite.com/settings/domains" target="_blank" rel="noopener noreferrer" className="text-primary-600 underline hover:text-primary-700">MailerLite → Settings → Domains</a>.</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-primary-500 mt-0.5 flex-shrink-0">✦</span>

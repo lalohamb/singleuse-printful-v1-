@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from "react";
 import { Save, Loader2, Check, Store, CreditCard, Printer, Send, Mail, Share2, AlertTriangle, Eye, EyeOff } from "lucide-react";
 import type { StoreSettings } from "@/types";
+import { DEFAULT_ABOUT_SETTINGS, type AboutSettings } from "@/lib/about-settings";
 
 type SocialKey = keyof StoreSettings["social_links"];
 
@@ -24,13 +25,13 @@ const DEFAULT_TESTIMONIALS: NonNullable<StoreSettings["testimonials"]> = [
 
 const DEFAULT_SOCIAL: StoreSettings["social_links"] = {
   instagram: { url: "https://instagram.com/body_and_sleeves", enabled: true },
-  tiktok:    { url: "https://tiktok.com/@bodyandsleeves",      enabled: true },
-  facebook:  { url: "https://facebook.com/bodyandsleeves",     enabled: true },
-  youtube:   { url: "https://youtube.com/@bodyandsleeves",     enabled: true },
-  pinterest: { url: "https://pinterest.com/bodyandsleeves",    enabled: true },
-  snapchat:  { url: "https://snapchat.com/add/bodyandsleeves", enabled: true },
-  threads:   { url: "https://threads.net/@bodyandsleeves",     enabled: true },
-  email:     { url: "mailto:Hello.BodyandSleeves@gmail.com",   enabled: true },
+  tiktok:    { url: "https://tiktok.com/@genderapparel", enabled: true },
+  facebook:  { url: "https://facebook.com/genderapparel", enabled: true },
+  youtube:   { url: "https://youtube.com/@genderapparel", enabled: true },
+  pinterest: { url: "https://pinterest.com/genderapparel", enabled: true },
+  snapchat:  { url: "https://snapchat.com/add/genderapparel", enabled: true },
+  threads:   { url: "https://threads.net/@genderapparel", enabled: true },
+  email:     { url: "mailto:hello@genderapparel.example", enabled: true },
 };
 import { supabase } from "@/lib/supabase";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
@@ -200,7 +201,60 @@ function Settings() {
 
   const handleSave = async () => {
     setSaving(true);
-    const { error } = await supabase.from("settings").update({ store_name: form.store_name, tagline: form.tagline, logo_url: form.logo_url, logo_size: form.logo_size ?? 40, favicon_url: form.favicon_url ?? null, hero_title: form.hero_title, hero_subtitle: form.hero_subtitle, hero_image_url: form.hero_image_url, story_image_url: form.story_image_url, story_object_position: form.story_object_position, story_image_scale: form.story_image_scale ?? 100, story_image_flip: form.story_image_flip, story_image_fit: form.story_image_fit ?? "cover", story_gradient_opacity: form.story_gradient_opacity ?? 40, story_gradient_dir: form.story_gradient_dir ?? "full", hero_object_position: form.hero_object_position, hero_height_vh: heroPreviewH, hero_image_flip: form.hero_image_flip, hero_image_scale: form.hero_image_scale ?? 100, hero_gradient_opacity: form.hero_gradient_opacity ?? 70, hero_gradient_dir: form.hero_gradient_dir ?? "left", hero_image_fit: form.hero_image_fit ?? "cover", our_why_image_url: form.our_why_image_url, our_why_object_position: form.our_why_object_position, our_why_height_vh: ourWhyPreviewH, our_why_label: form.our_why_label, our_why_quote: form.our_why_quote, our_why_body: form.our_why_body, our_why_image_scale: form.our_why_image_scale ?? 100, our_why_image_flip: form.our_why_image_flip, our_why_image_fit: form.our_why_image_fit ?? "cover", our_why_gradient_opacity: form.our_why_gradient_opacity ?? 70, our_why_gradient_dir: form.our_why_gradient_dir ?? "left", announcement: form.announcement, announcement_active: form.announcement_active, promo_banner_active: form.promo_banner_active ?? false, promo_banner_title: form.promo_banner_title, promo_banner_body: form.promo_banner_body, promo_banner_cta_label: form.promo_banner_cta_label, promo_banner_cta_url: form.promo_banner_cta_url, promo_banner_bg_color: form.promo_banner_bg_color, shipping_free_threshold: form.shipping_free_threshold, default_shipping_cost: form.default_shipping_cost, printify_shop_id: form.printify_shop_id, stripe_connected: form.stripe_connected, testimonials: form.testimonials ?? DEFAULT_TESTIMONIALS, updated_at: new Date().toISOString() }).eq("id", settings?.id);
+    const { error } = await supabase.from("settings").update({
+      store_name: form.store_name,
+      tagline: form.tagline,
+      logo_url: form.logo_url,
+      logo_size: form.logo_size ?? 40,
+      footer_logo_url: form.footer_logo_url,
+      footer_logo_size: form.footer_logo_size ?? 40,
+      favicon_url: form.favicon_url ?? null,
+      footer_text: form.footer_text,
+      footer_bottom_message: form.footer_bottom_message,
+      hero_title: form.hero_title,
+      hero_subtitle: form.hero_subtitle,
+      hero_image_url: form.hero_image_url,
+      story_image_url: form.story_image_url,
+      story_object_position: form.story_object_position,
+      story_image_scale: form.story_image_scale ?? 100,
+      story_image_flip: form.story_image_flip,
+      story_image_fit: form.story_image_fit ?? "cover",
+      story_gradient_opacity: form.story_gradient_opacity ?? 40,
+      story_gradient_dir: form.story_gradient_dir ?? "full",
+      hero_object_position: form.hero_object_position,
+      hero_height_vh: heroPreviewH,
+      hero_image_flip: form.hero_image_flip,
+      hero_image_scale: form.hero_image_scale ?? 100,
+      hero_gradient_opacity: form.hero_gradient_opacity ?? 70,
+      hero_gradient_dir: form.hero_gradient_dir ?? "left",
+      hero_image_fit: form.hero_image_fit ?? "cover",
+      our_why_image_url: form.our_why_image_url,
+      our_why_object_position: form.our_why_object_position,
+      our_why_height_vh: ourWhyPreviewH,
+      our_why_label: form.our_why_label,
+      our_why_quote: form.our_why_quote,
+      our_why_body: form.our_why_body,
+      our_why_image_scale: form.our_why_image_scale ?? 100,
+      our_why_image_flip: form.our_why_image_flip,
+      our_why_image_fit: form.our_why_image_fit ?? "cover",
+      our_why_gradient_opacity: form.our_why_gradient_opacity ?? 70,
+      our_why_gradient_dir: form.our_why_gradient_dir ?? "left",
+      announcement: form.announcement,
+      announcement_active: form.announcement_active,
+      promo_banner_active: form.promo_banner_active ?? false,
+      promo_banner_title: form.promo_banner_title,
+      promo_banner_body: form.promo_banner_body,
+      promo_banner_cta_label: form.promo_banner_cta_label,
+      promo_banner_cta_url: form.promo_banner_cta_url,
+      promo_banner_bg_color: form.promo_banner_bg_color,
+      shipping_free_threshold: form.shipping_free_threshold,
+      default_shipping_cost: form.default_shipping_cost,
+      printify_shop_id: form.printify_shop_id,
+      stripe_connected: form.stripe_connected,
+      testimonials: form.testimonials ?? DEFAULT_TESTIMONIALS,
+      about_settings: about,
+      updated_at: new Date().toISOString(),
+    }).eq("id", settings?.id);
     if (!error) { setSaved(true); setSaveError(null); fetch("/api/revalidate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths: ["/", "/shop", "/about"] }) }); setTimeout(() => setSaved(false), 2000); }
     else { setSaveError(error.message); }
     setSaving(false);
@@ -216,6 +270,10 @@ function Settings() {
   const setSocialField = (key: SocialKey, field: "url" | "enabled", value: string | boolean) =>
     setSocial((prev) => ({ ...prev, [key]: { ...prev[key], [field]: value } }));
 
+  const about = { ...DEFAULT_ABOUT_SETTINGS, ...((form.about_settings || {}) as Partial<AboutSettings>) };
+  const setAbout = <K extends keyof AboutSettings>(key: K, value: AboutSettings[K]) =>
+    setForm((prev) => ({ ...prev, about_settings: { ...about, [key]: value } }));
+
   if (loading) return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-2 border-secondary-300 border-t-secondary-900" /></div>;
 
   return (
@@ -227,14 +285,30 @@ function Settings() {
           <div><label className="label-text">Tagline</label><input value={form.tagline || ""} onChange={(e) => setForm({ ...form, tagline: e.target.value })} className="input-field" /></div>
           <ImageUpload label="Logo" value={form.logo_url || ""} onChange={(url) => setForm({ ...form, logo_url: url })} folder="settings/logo" preview={false} />
           <div className="flex items-center gap-4">
-            <div className="flex-shrink-0 h-12 flex items-center justify-center bg-secondary-50 rounded-lg px-4 border border-secondary-100">
-              <img src={form.logo_url || "/logo.png"} alt="Logo preview" style={{ height: `${form.logo_size ?? 40}px`, width: "auto" }} />
+            <div className="flex-shrink-0 min-h-12 flex items-center justify-center bg-secondary-50 rounded-lg px-4 py-2 border border-secondary-100">
+              <img src={form.logo_url || "/genderapparel.png"} alt="Logo preview" style={{ height: `${form.logo_size ?? 40}px`, width: "auto" }} />
             </div>
             <div className="flex-1">
               <label className="label-text">Logo Size: {form.logo_size ?? 40}px</label>
-              <input type="range" min={20} max={80} value={form.logo_size ?? 40} onChange={(e) => setForm({ ...form, logo_size: parseInt(e.target.value) })} className="w-full accent-gold-500 mt-1" />
+              <input type="range" min={20} max={160} value={form.logo_size ?? 40} onChange={(e) => setForm({ ...form, logo_size: parseInt(e.target.value) })} className="w-full accent-gold-500 mt-1" />
             </div>
           </div>
+          <div className="border-t border-secondary-100 pt-4 mt-4">
+            <p className="text-sm font-semibold text-secondary-900 mb-3">Footer Logo</p>
+            <ImageUpload label="Footer Logo Image" value={form.footer_logo_url || ""} onChange={(url) => setForm({ ...form, footer_logo_url: url })} folder="settings/footer-logo" preview={false} />
+            <div className="flex items-center gap-4 mt-3">
+              <div className="flex-shrink-0 min-h-12 flex items-center justify-center bg-secondary-50 rounded-lg px-4 py-2 border border-secondary-100">
+                <img src={form.footer_logo_url || form.logo_url || "/genderapparel.png"} alt="Footer logo preview" style={{ height: `${form.footer_logo_size ?? form.logo_size ?? 40}px`, width: "auto" }} />
+              </div>
+              <div className="flex-1">
+                <label className="label-text">Footer Logo Size: {form.footer_logo_size ?? form.logo_size ?? 40}px</label>
+                <input type="range" min={20} max={160} value={form.footer_logo_size ?? form.logo_size ?? 40} onChange={(e) => setForm({ ...form, footer_logo_size: parseInt(e.target.value) })} className="w-full accent-gold-500 mt-1" />
+              </div>
+            </div>
+            <p className="text-xs text-secondary-400 mt-2">Leave the image blank to use the main store logo in the footer.</p>
+          </div>
+          <div><label className="label-text">Top Footer Text</label><textarea value={form.footer_text || ""} onChange={(e) => setForm({ ...form, footer_text: e.target.value })} className="input-field min-h-[80px]" placeholder="Made-to-order apparel designed for every body, every style, and every day." /></div>
+          <div><label className="label-text">Bottom Footer Message</label><input value={form.footer_bottom_message || ""} onChange={(e) => setForm({ ...form, footer_bottom_message: e.target.value })} className="input-field" placeholder="Made to order. Made with love." /></div>
           <div>
             <ImageUpload label="Favicon" value={form.favicon_url || ""} onChange={(url) => setForm({ ...form, favicon_url: url })} folder="settings/logo" preview={false} />
             <p className="text-xs text-secondary-400 mt-1">Use a square image (.png or .ico recommended, 32×32 or 64×64px). Shown in browser tabs.</p>
@@ -244,6 +318,48 @@ function Settings() {
                 <span className="text-xs text-secondary-500">Browser tab preview</span>
               </div>
             )}
+          </div>
+        </div>
+      </section>
+      <section className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6 space-y-6">
+        <div>
+          <h2 className="text-lg font-semibold text-secondary-900">About, Mission &amp; Culture</h2>
+          <p className="text-sm text-secondary-500 mt-1">Customize the About page sections. Existing page content is prefilled as the default.</p>
+        </div>
+        <div className="space-y-4">
+          <h3 className="font-semibold text-secondary-800">About hero</h3>
+          <div><label className="label-text">Eyebrow</label><input value={about.heroEyebrow} onChange={(e) => setAbout("heroEyebrow", e.target.value)} className="input-field" /></div>
+          <div><label className="label-text">Title</label><input value={about.heroTitle} onChange={(e) => setAbout("heroTitle", e.target.value)} className="input-field" /></div>
+          <div><label className="label-text">Subtitle</label><input value={about.heroSubtitle} onChange={(e) => setAbout("heroSubtitle", e.target.value)} className="input-field" /></div>
+          <div><label className="label-text">Quote</label><input value={about.heroQuote} onChange={(e) => setAbout("heroQuote", e.target.value)} className="input-field" /></div>
+          <div><label className="label-text">Credit</label><input value={about.heroCredit} onChange={(e) => setAbout("heroCredit", e.target.value)} className="input-field" /></div>
+          <ImageUpload label="Hero Image" value={about.heroImageUrl} onChange={(url) => setAbout("heroImageUrl", url)} folder="settings/about" preview={false} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label className="label-text">Hero background<input type="color" value={about.heroBackground} onChange={(e) => setAbout("heroBackground", e.target.value)} className="mt-1 h-10 w-full cursor-pointer" /></label>
+            <label className="label-text">Hero text color<input type="color" value={about.heroTextColor} onChange={(e) => setAbout("heroTextColor", e.target.value)} className="mt-1 h-10 w-full cursor-pointer" /></label>
+          </div>
+          <ImageUpload label="Story Image" value={about.storyImageUrl} onChange={(url) => setAbout("storyImageUrl", url)} folder="settings/about" preview={false} />
+          <div><label className="label-text">Story image alt text</label><input value={about.storyImageAlt} onChange={(e) => setAbout("storyImageAlt", e.target.value)} className="input-field" /></div>
+        </div>
+        <div className="border-t border-secondary-100 pt-5 space-y-4">
+          <h3 className="font-semibold text-secondary-800">Our Mission</h3>
+          <div><label className="label-text">Eyebrow</label><input value={about.missionEyebrow} onChange={(e) => setAbout("missionEyebrow", e.target.value)} className="input-field" /></div>
+          <div><label className="label-text">Title</label><input value={about.missionTitle} onChange={(e) => setAbout("missionTitle", e.target.value)} className="input-field" /></div>
+          <div><label className="label-text">Body</label><textarea value={about.missionBody} onChange={(e) => setAbout("missionBody", e.target.value)} className="input-field min-h-[100px]" /></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label className="label-text">Background<input type="color" value={about.missionBackground} onChange={(e) => setAbout("missionBackground", e.target.value)} className="mt-1 h-10 w-full cursor-pointer" /></label>
+            <label className="label-text">Text color<input type="color" value={about.missionTextColor} onChange={(e) => setAbout("missionTextColor", e.target.value)} className="mt-1 h-10 w-full cursor-pointer" /></label>
+          </div>
+        </div>
+        <div className="border-t border-secondary-100 pt-5 space-y-4">
+          <h3 className="font-semibold text-secondary-800">The Culture</h3>
+          <div><label className="label-text">Eyebrow</label><input value={about.cultureEyebrow} onChange={(e) => setAbout("cultureEyebrow", e.target.value)} className="input-field" /></div>
+          <div><label className="label-text">Title</label><input value={about.cultureTitle} onChange={(e) => setAbout("cultureTitle", e.target.value)} className="input-field" /></div>
+          <div><label className="label-text">Body</label><textarea value={about.cultureBody} onChange={(e) => setAbout("cultureBody", e.target.value)} className="input-field min-h-[100px]" /></div>
+          <div><label className="label-text">Closing statement</label><input value={about.cultureCreed} onChange={(e) => setAbout("cultureCreed", e.target.value)} className="input-field" /></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label className="label-text">Background<input type="color" value={about.cultureBackground} onChange={(e) => setAbout("cultureBackground", e.target.value)} className="mt-1 h-10 w-full cursor-pointer" /></label>
+            <label className="label-text">Text color<input type="color" value={about.cultureTextColor} onChange={(e) => setAbout("cultureTextColor", e.target.value)} className="mt-1 h-10 w-full cursor-pointer" /></label>
           </div>
         </div>
       </section>
@@ -414,7 +530,6 @@ function Settings() {
                   )}
 
                   <div className="flex items-center justify-between">
-                    <p className="text-xs text-secondary-400">Position: <code>{form.hero_object_position || "0px 0px"}</code></p>
                     <div className="flex items-center gap-3">
                       <button type="button" onClick={() => setForm({ ...form, hero_image_flip: !form.hero_image_flip })} className={`text-xs px-2 py-1 rounded border transition-colors ${form.hero_image_flip ? "bg-gold-500 border-gold-500 text-white" : "border-secondary-300 text-secondary-500 hover:border-secondary-400"}`}>⇄ Flip</button>
                       <button type="button" onClick={() => { setForm({ ...form, hero_object_position: "center", hero_image_scale: 100, hero_image_flip: false, hero_gradient_opacity: 70, hero_gradient_dir: "left", hero_image_fit: "cover" }); setHeroPreviewH(70); }} className="btn-outline py-2 text-sm">Reset</button>
@@ -432,7 +547,7 @@ function Settings() {
         <div className="space-y-4">
           <div><label className="label-text">Label (above quote)</label><input value={form.our_why_label || ""} onChange={(e) => setForm({ ...form, our_why_label: e.target.value })} className="input-field" placeholder="Our Why" /></div>
           <div><label className="label-text">Quote</label><input value={form.our_why_quote || ""} onChange={(e) => setForm({ ...form, our_why_quote: e.target.value })} className="input-field" placeholder="We don't just sell clothes. We tell stories." /></div>
-          <div><label className="label-text">Body Text</label><textarea value={form.our_why_body || ""} onChange={(e) => setForm({ ...form, our_why_body: e.target.value })} className="input-field min-h-[80px]" placeholder="Body & Sleeves was born from..." /></div>
+          <div><label className="label-text">Body Text</label><textarea value={form.our_why_body || ""} onChange={(e) => setForm({ ...form, our_why_body: e.target.value })} className="input-field min-h-[80px]" placeholder="Gender Apparel was created for..." /></div>
           <ImageUpload label="Image URL" value={form.our_why_image_url || ""} onChange={(url) => setForm({ ...form, our_why_image_url: url })} folder="settings/our-why" preview={false} />
           <button type="button" onClick={() => setShowOurWhyPicker(true)} className="btn-outline py-2 text-sm">📷 Pick from Product Library</button>
           {showOurWhyPicker && <ProductImagePicker onSelect={(url) => { setForm({ ...form, our_why_image_url: url }); setShowOurWhyPicker(false); }} onClose={() => setShowOurWhyPicker(false)} />}
@@ -515,7 +630,6 @@ function Settings() {
                     </div>
                   )}
                   <div className="flex items-center justify-between">
-                    <p className="text-xs text-secondary-400">Position: <code>{form.our_why_object_position || "0px 0px"}</code></p>
                     <div className="flex items-center gap-3">
                       <button type="button" onClick={() => setForm({ ...form, our_why_image_flip: !form.our_why_image_flip })} className={`text-xs px-2 py-1 rounded border transition-colors ${form.our_why_image_flip ? "bg-gold-500 border-gold-500 text-white" : "border-secondary-300 text-secondary-500 hover:border-secondary-400"}`}>⇄ Flip</button>
                       <button type="button" onClick={() => setForm({ ...form, our_why_object_position: "0px 0px", our_why_image_scale: 100, our_why_image_flip: false, our_why_gradient_opacity: 70, our_why_gradient_dir: "left", our_why_image_fit: "cover" })} className="btn-outline py-2 text-sm">Reset</button>
@@ -595,7 +709,6 @@ function Settings() {
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
-                  <p className="text-xs text-secondary-400">Position: <code>{form.story_object_position || "0px 0px"}</code></p>
                   <div className="flex items-center gap-3">
                     <button type="button" onClick={() => setForm({ ...form, story_image_flip: !form.story_image_flip })} className={`text-xs px-2 py-1 rounded border transition-colors ${form.story_image_flip ? "bg-gold-500 border-gold-500 text-white" : "border-secondary-300 text-secondary-500 hover:border-secondary-400"}`}>⇄ Flip</button>
                     <button type="button" onClick={() => setForm({ ...form, story_object_position: "0px 0px", story_image_scale: 100, story_image_flip: false, story_gradient_opacity: 40, story_gradient_dir: "full", story_image_fit: "cover" })} className="btn-outline py-2 text-sm">Reset</button>

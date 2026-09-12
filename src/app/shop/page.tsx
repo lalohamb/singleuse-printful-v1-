@@ -6,7 +6,7 @@ import ShopClient from "./ShopClient";
 
 export const metadata: Metadata = {
   title: "Shop",
-  description: "Browse all Body & Sleeves made-to-order apparel — T-shirts, hoodies, hats, and more.",
+  description: "Browse Gender Apparel made-to-order clothing — T-shirts, hoodies, hats, and more.",
 };
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);

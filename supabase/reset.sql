@@ -1,5 +1,5 @@
 -- =============================================================================
--- Body & Sleeves — Reset Script
+-- Gender Apparel — Reset Script
 -- Clears all transactional/product data for a fresh install.
 -- Preserves: settings row, categories, seo_settings, admins.
 -- Run in Supabase SQL Editor.

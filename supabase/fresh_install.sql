@@ -1,5 +1,5 @@
 -- =============================================================================
--- Body & Sleeves — Full Install Script
+-- Gender Apparel — Full Install Script
 -- Run this in Supabase SQL Editor on a fresh project.
 -- =============================================================================
 
@@ -193,8 +193,8 @@ CREATE INDEX IF NOT EXISTS idx_orders_livemode   ON orders(livemode);
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS settings (
   id                      uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  store_name              text        NOT NULL DEFAULT 'Body & Sleeves',
-  tagline                 text        DEFAULT 'Black-Owned. Made to Order.',
+  store_name              text        NOT NULL DEFAULT 'Gender Apparel',
+  tagline                 text        DEFAULT 'Made for Every Body.',
   hero_image_url          text,
   hero_object_position    text        DEFAULT '0px 0px',
   hero_title              text,
@@ -214,6 +214,14 @@ CREATE TABLE IF NOT EXISTS settings (
   story_gradient_dir      text        DEFAULT 'full',
   logo_url                text,
   logo_size               numeric     DEFAULT 40,
+  footer_text             text        DEFAULT 'Made-to-order apparel designed for every body, every style, and every day. Wear what feels like you.',
+  footer_bottom_message   text        DEFAULT 'Made to order. Made with love.',
+  footer_logo_url         text,
+  footer_logo_size        numeric     DEFAULT 40,
+  about_settings          jsonb,
+  affirmations_settings   jsonb,
+  new_arrivals_settings   jsonb,
+  brand_values_settings   jsonb,
   testimonials            jsonb       DEFAULT '[{"quote":"I wore my shirt to a family reunion and got so many compliments. This brand truly gets us.","name":"Jasmine T.","location":"Atlanta, GA","product":"Culture First Tee"},{"quote":"The quality is unmatched. Soft, true to size, and the design is everything. Will be ordering again.","name":"Marcus W.","location":"Houston, TX","product":"Faith Over Fear Hoodie"},{"quote":"Finally a brand that celebrates who we are. Every piece feels intentional and powerful.","name":"Aaliyah R.","location":"Chicago, IL","product":"Heritage Collection"}]'::jsonb,
   promo_banner_active     boolean     DEFAULT false,
   promo_banner_title      text,
@@ -242,13 +250,13 @@ CREATE TABLE IF NOT EXISTS settings (
   stripe_connected        boolean     DEFAULT false,
   social_links            jsonb       NOT NULL DEFAULT '{
     "instagram": {"url": "https://instagram.com/body_and_sleeves", "enabled": true},
-    "tiktok":    {"url": "https://tiktok.com/@bodyandsleeves",      "enabled": true},
-    "facebook":  {"url": "https://facebook.com/bodyandsleeves",     "enabled": true},
-    "youtube":   {"url": "https://youtube.com/@bodyandsleeves",     "enabled": true},
-    "pinterest": {"url": "https://pinterest.com/bodyandsleeves",    "enabled": true},
-    "snapchat":  {"url": "https://snapchat.com/add/bodyandsleeves", "enabled": true},
-    "threads":   {"url": "https://threads.net/@bodyandsleeves",     "enabled": true},
-    "email":     {"url": "mailto:Hello.BodyandSleeves@gmail.com",   "enabled": true}
+    "tiktok":    {"url": "https://tiktok.com/@genderapparel", "enabled": true},
+    "facebook":  {"url": "https://facebook.com/genderapparel", "enabled": true},
+    "youtube":   {"url": "https://youtube.com/@genderapparel", "enabled": true},
+    "pinterest": {"url": "https://pinterest.com/genderapparel", "enabled": true},
+    "snapchat":  {"url": "https://snapchat.com/add/genderapparel", "enabled": true},
+    "threads":   {"url": "https://threads.net/@genderapparel", "enabled": true},
+    "email":     {"url": "mailto:hello@genderapparel.example", "enabled": true}
   }'::jsonb,
   favicon_url             text,
   updated_at              timestamptz DEFAULT now()
@@ -272,13 +280,13 @@ CREATE POLICY "admin_update_settings" ON settings FOR UPDATE
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS seo_settings (
   id                      uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  site_url                text        NOT NULL DEFAULT 'https://bodyandsleeves.com',
+  site_url                text        NOT NULL DEFAULT 'https://genderapparel.example',
   default_og_image        text,
   sitemap_enabled         boolean     NOT NULL DEFAULT true,
   robots_noindex_admin    boolean     NOT NULL DEFAULT true,
   jsonld_enabled          boolean     NOT NULL DEFAULT true,
   canonical_enabled       boolean     NOT NULL DEFAULT true,
-  meta_title_suffix       text        NOT NULL DEFAULT '| Body & Sleeves',
+  meta_title_suffix       text        NOT NULL DEFAULT '| Gender Apparel',
   twitter_handle          text        DEFAULT '@body_and_sleeves',
   google_site_verification text,
   updated_at              timestamptz NOT NULL DEFAULT now()
@@ -313,8 +321,8 @@ INSERT INTO settings (
   store_name, tagline, hero_title, hero_subtitle, hero_image_url,
   announcement, announcement_active
 ) VALUES (
-  'Body & Sleeves',
-  'Black-Owned. Made to Order.',
+  'Gender Apparel',
+  'Made for Every Body.',
   'Empower Yourself. Empower the Culture.',
   'Apparel celebrating Black culture, faith, and family. Every design made with intention, printed on demand, shipped to your door.',
   'https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
