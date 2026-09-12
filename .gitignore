@@ -38,3 +38,4 @@ coverage/
 
 # Temporary files
 *.log
+ecosystem.config.js
