@@ -1,18 +1,26 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import ImageUpload from "@/components/ImageUpload";
 import { useSettings } from "./useSettings";
 import { SaveBar } from "./SaveBar";
 import { DEFAULT_BRAND_VALUES_SETTINGS, type BrandValuesSettings } from "@/lib/brand-values-settings";
 
 export default function BrandValues() {
-  const { save, saved, error } = useSettings();
+  const { form, save, saved, error } = useSettings();
   const [s, setS] = useState<BrandValuesSettings>(DEFAULT_BRAND_VALUES_SETTINGS);
+
+  // Load saved settings from DB once form is ready
+  useEffect(() => {
+    if (form?.brand_values_settings) {
+      setS({ ...DEFAULT_BRAND_VALUES_SETTINGS, ...(form.brand_values_settings as Partial<BrandValuesSettings>) });
+    }
+  }, [form?.brand_values_settings]);
+
   const upd = (k: keyof BrandValuesSettings, v: any) => setS((prev) => ({ ...prev, [k]: v }));
   const updValue = (i: number, field: string, v: any) =>
     setS((prev) => ({ ...prev, values: prev.values.map((item, idx) => idx === i ? { ...item, [field]: v } : item) }));
   const moveValue = (i: number, dir: -1 | 1) =>
-    setS((prev) => { const vals = [...prev.values]; [vals[i], vals[i+dir]] = [vals[i+dir], vals[i]]; return { ...prev, values: vals }; });
+    setS((prev) => { const vals = [...prev.values]; [vals[i], vals[i + dir]] = [vals[i + dir], vals[i]]; return { ...prev, values: vals }; });
 
   return (
     <div className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6 space-y-4">
@@ -47,6 +55,14 @@ export default function BrandValues() {
             <label className="label-text">Alignment<select value={s.alignment} onChange={(e) => upd("alignment", e.target.value)} className="input-field mt-1"><option value="center">Center</option><option value="left">Left</option></select></label>
             <label className="label-text">Divider<select value={s.divider} onChange={(e) => upd("divider", e.target.value)} className="input-field mt-1"><option value="none">None</option><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></label>
             <label className="label-text">Padding<select value={s.padding} onChange={(e) => upd("padding", e.target.value)} className="input-field mt-1"><option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="spacious">Spacious</option></select></label>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            {(["cardBackgroundColor", "cardBorderColor", "dividerColor"] as const).map((k) => (
+              <label key={k} className="label-text">
+                {k === "cardBackgroundColor" ? "Card background" : k === "cardBorderColor" ? "Card border" : "Divider color"}
+                <input type="color" value={(s as any)[k]} onChange={(e) => upd(k, e.target.value)} className="mt-1 h-10 w-full cursor-pointer" />
+              </label>
+            ))}
           </div>
           <label className="flex items-center gap-3 cursor-pointer">
             <input type="checkbox" checked={s.animate} onChange={(e) => upd("animate", e.target.checked)} className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500" />
