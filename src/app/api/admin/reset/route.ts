@@ -158,7 +158,7 @@ export async function POST(req: NextRequest) {
         jsonld_enabled: true,
         canonical_enabled: true,
         meta_title_suffix: "| Gender Apparel",
-        twitter_handle: "@body_and_sleeves",
+        twitter_handle: "@gender_apparel",
         google_site_verification: null,
         updated_at: new Date().toISOString(),
       }).eq("id", "00000000-0000-0000-0000-000000000001");

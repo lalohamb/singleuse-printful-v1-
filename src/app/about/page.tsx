@@ -163,7 +163,7 @@ export default async function AboutPage() {
           <p className="text-secondary-500 mb-8">Have a question, a custom design idea, or just want to say hello?</p>
           <div className="flex flex-wrap gap-4 justify-center">
             <a href="mailto:hello@genderapparel.example" className="btn-outline"><Mail size={20} className="mr-2" />hello@genderapparel.example</a>
-            <a href="https://instagram.com/body_and_sleeves" target="_blank" rel="noopener noreferrer" className="btn-outline"><InstagramIcon size={20} /><span className="ml-2">@body_and_sleeves</span></a>
+            <a href="https://@gender_apparel" target="_blank" rel="noopener noreferrer" className="btn-outline"><InstagramIcon size={20} /><span className="ml-2">@gender_apparel</span></a>
           </div>
           <Link href="/shop" className="btn-gold mt-8 inline-flex">Shop the Collection</Link>
         </section>

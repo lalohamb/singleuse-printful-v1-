@@ -51,7 +51,7 @@ function SeoPanel() {
     jsonld_enabled: true,
     canonical_enabled: true,
     meta_title_suffix: "| Gender Apparel",
-    twitter_handle: "@body_and_sleeves",
+    twitter_handle: "@gender_apparel",
     google_site_verification: "",
     updated_at: "",
   });
@@ -122,11 +122,11 @@ function SeoPanel() {
           <div>
             <label className="label-text">Meta Title Suffix</label>
             <input value={form.meta_title_suffix} onChange={(e) => set("meta_title_suffix", e.target.value)} className="input-field" placeholder="| Gender Apparel" />
-            <p className="text-xs text-secondary-400 mt-1">Appended to page titles — e.g. &ldquo;Black Excellence Tee | Body &amp; Sleeves&rdquo;</p>
+            <p className="text-xs text-secondary-400 mt-1">Appended to page titles — e.g. &ldquo;Classic Tee | Gender Apparel&rdquo;</p>
           </div>
           <div>
             <label className="label-text">Twitter / X Handle</label>
-            <input value={form.twitter_handle} onChange={(e) => set("twitter_handle", e.target.value)} className="input-field" placeholder="@body_and_sleeves" />
+            <input value={form.twitter_handle} onChange={(e) => set("twitter_handle", e.target.value)} className="input-field" placeholder="@gender_apparel" />
           </div>
           <div>
             <label className="label-text">Google Search Console Verification Code</label>

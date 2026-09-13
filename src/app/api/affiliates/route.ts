@@ -18,7 +18,7 @@ async function sendEmail(to: string, subject: string, html: string) {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      from: "Body & Sleeves <no-reply@genderapparel.example>",
+      from: "Gender Apparel <no-reply@genderapparel.example>",
       to,
       subject,
       html,
@@ -49,10 +49,10 @@ export async function POST(req: NextRequest) {
     const dashUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "https://genderapparel.example"}/affiliates/dashboard`;
     await sendEmail(
       aff.email,
-      "You're approved! Welcome to the Body & Sleeves Affiliate Program 🎉",
+      "You're approved! Welcome to the Gender Apparel Affiliate Program 🎉",
       `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px">
         <h2 style="color:#111">Welcome to the team, ${aff.name.split(" ")[0]}!</h2>
-        <p>Your affiliate application has been <strong>approved</strong>. You're now part of the Body &amp; Sleeves affiliate program.</p>
+        <p>Your affiliate application has been <strong>approved</strong>. You're now part of the Gender Apparel affiliate program.</p>
         <h3 style="color:#111;margin-top:24px">Your Details</h3>
         <ul>
           <li>Your referral code: <strong>${aff.code}</strong></li>
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
           </a>
         </p>
         <p style="color:#666;font-size:13px;margin-top:32px">Questions? Reply to this email and we'll get back to you.</p>
-        <p style="color:#666;font-size:13px">— The Body &amp; Sleeves Team</p>
+        <p style="color:#666;font-size:13px">— The Gender Apparel Team</p>
       </div>`
     );
 
@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
           </a>
         </p>
         <p style="color:#666;font-size:13px;margin-top:32px">Keep sharing your link — next payout is on the 1st of next month.</p>
-        <p style="color:#666;font-size:13px">— The Body &amp; Sleeves Team</p>
+        <p style="color:#666;font-size:13px">— The Gender Apparel Team</p>
       </div>`
     );
 

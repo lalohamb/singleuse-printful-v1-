@@ -12,7 +12,7 @@ const supabase = createClient(
 
 export const metadata: Metadata = {
   title: "Affiliate Program",
-  description: "Partner with us. Earn 10% on every sale you drive. Apply to join the Body & Sleeves affiliate program.",
+  description: "Partner with us. Earn 10% on every sale you drive. Apply to join the Gender Apparel affiliate program.",
 };
 
 const perks = [
@@ -52,7 +52,7 @@ export default async function AffiliatesPage() {
             Create Content.<br />Earn Real Money.
           </h1>
           <p className="text-white/70 text-lg mt-6 max-w-2xl mx-auto leading-relaxed">
-            Join the Body &amp; Sleeves affiliate program. Share your unique link, earn 10% on every sale, and get paid monthly — straight to your Cash App, PayPal, Venmo, or Zelle.
+            Join the Gender Apparel affiliate program. Share your unique link, earn 10% on every sale, and get paid monthly — straight to your Cash App, PayPal, Venmo, or Zelle.
           </p>
           <div className="flex flex-wrap gap-4 justify-center mt-10">
             <Link href="/affiliates/signup" className="btn-gold text-lg px-8 py-4">
