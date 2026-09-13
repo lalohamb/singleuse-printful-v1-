@@ -158,6 +158,13 @@ CREATE TABLE IF NOT EXISTS products (
   images jsonb DEFAULT '[]'::jsonb,
   status text NOT NULL DEFAULT 'active',
   featured boolean NOT NULL DEFAULT false,
+  is_personalizable boolean NOT NULL DEFAULT false,
+  is_new_arrival boolean NOT NULL DEFAULT false,
+  is_trending boolean NOT NULL DEFAULT false,
+  is_bestseller boolean NOT NULL DEFAULT false,
+  is_on_sale boolean NOT NULL DEFAULT false,
+  content_locked boolean NOT NULL DEFAULT false,
+  personalization_label text,
   print_provider_id text,
   blueprint_id text,
   variants jsonb DEFAULT '[]'::jsonb,
@@ -307,21 +314,21 @@ INSERT INTO products (title, description, category_id, price, cost, image_url, i
     'Heritage Crown Tee',
     'A statement piece celebrating the richness of Black heritage. Crafted from premium cotton for all-day comfort.',
     (SELECT id FROM categories WHERE slug = 't-shirts'),
-    32.00, 12.50,
+    29.99, 12.50,
     'https://images.pexels.com/photos/33258841/pexels-photo-33258841.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
     '["https://images.pexels.com/photos/33258841/pexels-photo-33258841.jpeg?auto=compress&cs=tinysrgb&h=650&w=940","https://images.pexels.com/photos/35625406/pexels-photo-35625406.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"]'::jsonb,
     'active', true,
-    '[{"id":"S","label":"Small","color":"Black"},{"id":"M","label":"Medium","color":"Black"},{"id":"L","label":"Large","color":"Black"},{"id":"XL","label":"X-Large","color":"Black"},{"id":"2XL","label":"2X-Large","color":"Black"}]'::jsonb
+    '[{"id":"S","label":"Small","color":"Black","price":29.99},{"id":"M","label":"Medium","color":"Black","price":29.99},{"id":"L","label":"Large","color":"Black","price":29.99},{"id":"XL","label":"X-Large","color":"Black","price":29.99},{"id":"2XL","label":"2X-Large","color":"Black","price":29.99}]'::jsonb
   ),
   (
     'Urban Pride Hoodie',
     'Stay warm and stylish with this premium hoodie featuring bold cultural designs. Perfect for year-round wear.',
     (SELECT id FROM categories WHERE slug = 'hoodies'),
-    58.00, 22.00,
+    29.99, 22.00,
     'https://images.pexels.com/photos/18016399/pexels-photo-18016399.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
     '["https://images.pexels.com/photos/18016399/pexels-photo-18016399.jpeg?auto=compress&cs=tinysrgb&h=650&w=940","https://images.pexels.com/photos/6311644/pexels-photo-6311644.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"]'::jsonb,
     'active', true,
-    '[{"id":"S","label":"Small","color":"Black"},{"id":"M","label":"Medium","color":"Black"},{"id":"L","label":"Large","color":"Black"},{"id":"XL","label":"X-Large","color":"Black"},{"id":"2XL","label":"2X-Large","color":"Black"}]'::jsonb
+    '[{"id":"S","label":"Small","color":"Black","price":29.99},{"id":"M","label":"Medium","color":"Black","price":29.99},{"id":"L","label":"Large","color":"Black","price":29.99},{"id":"XL","label":"X-Large","color":"Black","price":29.99},{"id":"2XL","label":"2X-Large","color":"Black","price":29.99}]'::jsonb
   ),
   (
     'Street Culture Cap',
@@ -331,47 +338,47 @@ INSERT INTO products (title, description, category_id, price, cost, image_url, i
     'https://images.pexels.com/photos/13447017/pexels-photo-13447017.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
     '["https://images.pexels.com/photos/13447017/pexels-photo-13447017.jpeg?auto=compress&cs=tinysrgb&h=650&w=940","https://images.pexels.com/photos/16234507/pexels-photo-16234507.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"]'::jsonb,
     'active', true,
-    '[{"id":"OS","label":"One Size","color":"Black"},{"id":"OS","label":"One Size","color":"White"}]'::jsonb
+    '[{"id":"OS","label":"One Size","color":"Black","price":28.00},{"id":"OS","label":"One Size","color":"White","price":28.00}]'::jsonb
   ),
   (
     'Movement Sweatpants',
     'Premium joggers designed for comfort and style. Features a tapered fit with cultural accent detailing.',
     (SELECT id FROM categories WHERE slug = 'sweatpants'),
-    48.00, 18.00,
+    29.99, 18.00,
     'https://images.pexels.com/photos/6311619/pexels-photo-6311619.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
     '["https://images.pexels.com/photos/6311619/pexels-photo-6311619.jpeg?auto=compress&cs=tinysrgb&h=650&w=940","https://images.pexels.com/photos/25457430/pexels-photo-25457430.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"]'::jsonb,
     'active', true,
-    '[{"id":"S","label":"Small","color":"Black"},{"id":"M","label":"Medium","color":"Black"},{"id":"L","label":"Large","color":"Black"},{"id":"XL","label":"X-Large","color":"Black"}]'::jsonb
+    '[{"id":"S","label":"Small","color":"Black","price":29.99},{"id":"M","label":"Medium","color":"Black","price":29.99},{"id":"L","label":"Large","color":"Black","price":29.99},{"id":"XL","label":"X-Large","color":"Black","price":29.99}]'::jsonb
   ),
   (
     'Roots & Culture Tee',
     'A tribute to the roots that ground us. Lightweight, breathable, and perfect for making a statement.',
     (SELECT id FROM categories WHERE slug = 't-shirts'),
-    30.00, 12.50,
+    29.99, 12.50,
     'https://images.pexels.com/photos/8794470/pexels-photo-8794470.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
     '["https://images.pexels.com/photos/8794470/pexels-photo-8794470.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"]'::jsonb,
     'active', true,
-    '[{"id":"S","label":"Small","color":"White"},{"id":"M","label":"Medium","color":"White"},{"id":"L","label":"Large","color":"White"},{"id":"XL","label":"X-Large","color":"White"}]'::jsonb
+    '[{"id":"S","label":"Small","color":"White","price":29.99},{"id":"M","label":"Medium","color":"White","price":29.99},{"id":"L","label":"Large","color":"White","price":29.99},{"id":"XL","label":"X-Large","color":"White","price":29.99}]'::jsonb
   ),
   (
     'Night City Hoodie',
     'Effortless style meets cultural pride. This hoodie features a relaxed fit and premium fleece interior.',
     (SELECT id FROM categories WHERE slug = 'hoodies'),
-    55.00, 22.00,
+    29.99, 22.00,
     'https://images.pexels.com/photos/7061864/pexels-photo-7061864.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
     '["https://images.pexels.com/photos/7061864/pexels-photo-7061864.jpeg?auto=compress&cs=tinysrgb&h=650&w=940","https://images.pexels.com/photos/7061927/pexels-photo-7061927.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"]'::jsonb,
     'active', false,
-    '[{"id":"S","label":"Small","color":"Gray"},{"id":"M","label":"Medium","color":"Gray"},{"id":"L","label":"Large","color":"Gray"},{"id":"XL","label":"X-Large","color":"Gray"}]'::jsonb
+    '[{"id":"S","label":"Small","color":"Gray","price":29.99},{"id":"M","label":"Medium","color":"Gray","price":29.99},{"id":"L","label":"Large","color":"Gray","price":29.99},{"id":"XL","label":"X-Large","color":"Gray","price":29.99}]'::jsonb
   ),
   (
     'Pineapple Vibes Hoodie',
     'Fun, fresh, and full of personality. A standout hoodie for those who lead with joy.',
     (SELECT id FROM categories WHERE slug = 'hoodies'),
-    52.00, 22.00,
+    29.99, 22.00,
     'https://images.pexels.com/photos/859058/pexels-photo-859058.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
     '["https://images.pexels.com/photos/859058/pexels-photo-859058.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"]'::jsonb,
     'active', false,
-    '[{"id":"S","label":"Small","color":"Green"},{"id":"M","label":"Medium","color":"Green"},{"id":"L","label":"Large","color":"Green"}]'::jsonb
+    '[{"id":"S","label":"Small","color":"Green","price":29.99},{"id":"M","label":"Medium","color":"Green","price":29.99},{"id":"L","label":"Large","color":"Green","price":29.99}]'::jsonb
   ),
   (
     'Classic Black Tee',
@@ -381,17 +388,17 @@ INSERT INTO products (title, description, category_id, price, cost, image_url, i
     'https://images.pexels.com/photos/35625406/pexels-photo-35625406.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
     '["https://images.pexels.com/photos/35625406/pexels-photo-35625406.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"]'::jsonb,
     'active', false,
-    '[{"id":"S","label":"Small","color":"Black"},{"id":"M","label":"Medium","color":"Black"},{"id":"L","label":"Large","color":"Black"},{"id":"XL","label":"X-Large","color":"Black"}]'::jsonb
+    '[{"id":"S","label":"Small","color":"Black","price":25.00},{"id":"M","label":"Medium","color":"Black","price":25.00},{"id":"L","label":"Large","color":"Black","price":25.00},{"id":"XL","label":"X-Large","color":"Black","price":25.00}]'::jsonb
   ),
   (
     'Statement Royal Tee',
     'Bold design meets premium quality. This tee makes a statement without saying a word.',
     (SELECT id FROM categories WHERE slug = 't-shirts'),
-    34.00, 12.50,
+    29.99, 12.50,
     'https://images.pexels.com/photos/34433423/pexels-photo-34433423.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
     '["https://images.pexels.com/photos/34433423/pexels-photo-34433423.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"]'::jsonb,
     'active', false,
-    '[{"id":"S","label":"Small","color":"White"},{"id":"M","label":"Medium","color":"White"},{"id":"L","label":"Large","color":"White"}]'::jsonb
+    '[{"id":"S","label":"Small","color":"White","price":29.99},{"id":"M","label":"Medium","color":"White","price":29.99},{"id":"L","label":"Large","color":"White","price":29.99}]'::jsonb
   ),
   (
     'Streetwear Set Hat',
@@ -401,7 +408,7 @@ INSERT INTO products (title, description, category_id, price, cost, image_url, i
     'https://images.pexels.com/photos/33882157/pexels-photo-33882157.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
     '["https://images.pexels.com/photos/33882157/pexels-photo-33882157.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"]'::jsonb,
     'active', false,
-    '[{"id":"OS","label":"One Size","color":"Black"}]'::jsonb
+    '[{"id":"OS","label":"One Size","color":"Black","price":26.00}]'::jsonb
   )
 ON CONFLICT (printify_id) DO NOTHING;
 

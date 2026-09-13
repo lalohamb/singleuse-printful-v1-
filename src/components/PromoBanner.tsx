@@ -5,15 +5,15 @@ import { X } from "lucide-react";
 import type { StoreSettings } from "@/types";
 
 const STORAGE_KEY = "promo_banner_count";
-const MAX_SHOWS = 2;
 
 export default function PromoBanner({ settings }: { settings: StoreSettings | null }) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     if (!settings?.promo_banner_active) return;
+    const maxShows = (settings as any).promo_banner_max_shows ?? 2;
     const count = parseInt(sessionStorage.getItem(STORAGE_KEY) ?? "0", 10);
-    if (count < MAX_SHOWS) {
+    if (count < maxShows) {
       sessionStorage.setItem(STORAGE_KEY, String(count + 1));
       // slight delay so the drop-down animation plays after mount
       const t = setTimeout(() => setVisible(true), 300);

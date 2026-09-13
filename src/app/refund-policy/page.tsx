@@ -51,7 +51,7 @@ export default async function RefundPolicyPage() {
           <Link href="/" className="hover:text-secondary-700 transition-colors">Home</Link>{" › "}Refund and Returns Policy
         </p>
         <h1 className="text-3xl lg:text-4xl font-bold text-secondary-900 mb-10">Refund and Returns Policy</h1>
-        <div className="prose prose-sm max-w-none text-secondary-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: content }} />
+        <div className="prose prose-sm max-w-none text-secondary-600 leading-relaxed [&_p]:mb-4 [&_h2]:mt-8 [&_h2]:mb-3" dangerouslySetInnerHTML={{ __html: content }} />
         <div className="mt-12 bg-secondary-50 rounded-xl p-6">
           <h2 className="text-xl font-semibold text-secondary-900 mb-3">Need Help?</h2>
           <p className="mb-4">Contact us for questions related to refunds and returns.</p>

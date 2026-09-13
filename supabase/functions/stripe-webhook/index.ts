@@ -46,7 +46,7 @@ Deno.serve(async (req: Request) => {
         const paymentIntentId = session.payment_intent as string;
 
         // Update the order from pending to paid
-        await supabase
+        const { data: updatedOrder } = await supabase
           .from("orders")
           .update({
             status: "paid",
@@ -54,7 +54,57 @@ Deno.serve(async (req: Request) => {
             livemode: event.livemode,
             updated_at: new Date().toISOString(),
           })
-          .eq("stripe_session_id", session.id);
+          .eq("stripe_session_id", session.id)
+          .select("id, subtotal, affiliate_code")
+          .maybeSingle();
+
+        // Record affiliate conversion
+        const affiliateCode = updatedOrder?.affiliate_code || session.metadata?.affiliate_code;
+        if (affiliateCode && updatedOrder?.subtotal) {
+          const { data: affiliate } = await supabase
+            .from("affiliates")
+            .select("id, commission_rate, email")
+            .eq("code", affiliateCode)
+            .eq("status", "active")
+            .maybeSingle();
+
+          if (affiliate) {
+            const commission = Math.round(updatedOrder.subtotal * affiliate.commission_rate * 100) / 100;
+            await supabase.from("affiliate_conversions").insert({
+              affiliate_id: affiliate.id,
+              order_id: updatedOrder.id,
+              order_subtotal: updatedOrder.subtotal,
+              commission_amount: commission,
+              status: "pending",
+            });
+
+            // Notify affiliate of new conversion
+            const resendKey = Deno.env.get("RESEND_API_KEY");
+            const siteUrl = Deno.env.get("SITE_URL") || "https://genderapparel.example";
+            if (resendKey && affiliate.email) {
+              await fetch("https://api.resend.com/emails", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  from: "Body & Sleeves <no-reply@genderapparel.example>",
+                  to: affiliate.email,
+                  subject: `You earned ${commission.toFixed(2)} — new sale through your link! 🎉`,
+                  html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px">
+                    <h2 style="color:#111">New Sale!</h2>
+                    <p>Someone just purchased through your referral link.</p>
+                    <table style="width:100%;border-collapse:collapse;margin:24px 0">
+                      <tr><td style="padding:8px 0;color:#666">Order Value</td><td style="padding:8px 0;font-weight:600;text-align:right">$${updatedOrder.subtotal.toFixed(2)}</td></tr>
+                      <tr><td style="padding:8px 0;color:#666">Your Commission</td><td style="padding:8px 0;font-weight:700;color:#16a34a;text-align:right">$${commission.toFixed(2)}</td></tr>
+                      <tr><td style="padding:8px 0;color:#666">Status</td><td style="padding:8px 0;text-align:right">Pending (14-day review)</td></tr>
+                    </table>
+                    <p><a href="${siteUrl}/affiliates/dashboard" style="background:#d4af37;color:#111;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block">View Dashboard →</a></p>
+                    <p style="color:#666;font-size:13px;margin-top:32px">— The Body &amp; Sleeves Team</p>
+                  </div>`,
+                }),
+              }).catch((e: Error) => console.error("Affiliate notification error:", e.message));
+            }
+          }
+        }
 
         // Add customer to MailerLite
         const mailerLiteKey = Deno.env.get("MAILER_LITE_API_KEY");

@@ -2,27 +2,30 @@
 # supabase.sh — Supabase API helpers
 
 # Run SQL via psql if available, otherwise via Supabase Management API
+# Usage: run_sql "$sql" "$project_ref" "$service_role_key" "$db_url" "$access_token"
 run_sql() {
   local sql="$1"
   local project_ref="$2"
   local service_role_key="$3"
   local db_url="$4"
+  local access_token="${5:-}"
 
   if [[ -n "$db_url" ]] && command -v psql &>/dev/null; then
     echo "$sql" | psql "$db_url" -q
     return $?
   fi
 
-  # Fallback: Supabase Management API
+  # Fallback: Supabase Management API (requires access token, not service role key)
+  local token="${access_token:-$service_role_key}"
   local response
   response=$(curl -s -w "\n%{http_code}" \
     -X POST "https://api.supabase.com/v1/projects/${project_ref}/database/query" \
-    -H "Authorization: Bearer ${service_role_key}" \
+    -H "Authorization: Bearer ${token}" \
     -H "Content-Type: application/json" \
     -d "{\"query\": $(echo "$sql" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')}")
   local http_code
   http_code=$(echo "$response" | tail -1)
-  if [[ "$http_code" != "200" ]]; then
+  if [[ "$http_code" != "200" && "$http_code" != "201" ]]; then
     echo "❌ SQL execution failed (HTTP $http_code)"
     echo "$response" | head -1
     return 1
@@ -31,18 +34,20 @@ run_sql() {
 }
 
 # Run a SQL file
+# Usage: run_sql_file "$file" "$project_ref" "$service_role_key" "$db_url" "$access_token"
 run_sql_file() {
   local file="$1"
   local project_ref="$2"
   local service_role_key="$3"
   local db_url="$4"
+  local access_token="${5:-}"
 
   if [[ -n "$db_url" ]] && command -v psql &>/dev/null; then
     psql "$db_url" -q -f "$file"
     return $?
   fi
 
-  run_sql "$(cat "$file")" "$project_ref" "$service_role_key" "$db_url"
+  run_sql "$(cat "$file")" "$project_ref" "$service_role_key" "$db_url" "$access_token"
 }
 
 # Create a Supabase auth user via Admin API

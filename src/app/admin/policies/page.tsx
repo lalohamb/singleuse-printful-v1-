@@ -125,6 +125,15 @@ export default function PoliciesPage() {
                     contentEditable={!isLocked}
                     suppressContentEditableWarning
                     onInput={(e) => onChange(id, e.currentTarget.innerHTML)}
+                    onPaste={(e) => {
+                      e.preventDefault();
+                      const html = e.clipboardData.getData("text/html");
+                      const text = e.clipboardData.getData("text/plain");
+                      const content = html || text.replace(/\n\n+/g, "</p><p>").replace(/\n/g, "<br>").replace(/^/, "<p>").replace(/$/, "</p>");
+                      document.execCommand("insertHTML", false, content);
+                      const editor = document.querySelector(`[data-policy-editor="${id}"]`);
+                      if (editor) onChange(id, editor.innerHTML);
+                    }}
                     dangerouslySetInnerHTML={{ __html: drafts[id] || "" }}
                     className="w-full min-h-[360px] p-4 prose prose-sm max-w-none text-secondary-700 leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary-200"
                     data-placeholder={`Enter ${title} content here...`}

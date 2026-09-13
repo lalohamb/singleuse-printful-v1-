@@ -1,11 +1,19 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, Check, Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 export default function NewsletterSignup({ variant = "section" }: { variant?: "section" | "footer" }) {
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [groupId, setGroupId] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.from("settings").select("newsletter_group_id").limit(1).maybeSingle().then(({ data }) => {
+      if (data?.newsletter_group_id) setGroupId(data.newsletter_group_id);
+    });
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -14,7 +22,7 @@ export default function NewsletterSignup({ variant = "section" }: { variant?: "s
       const res = await fetch("/api/mailerlite", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "add_subscriber", email, groups: ["182701481182365511"] }),
+        body: JSON.stringify({ action: "add_subscriber", email, groups: groupId ? [groupId] : [] }),
       });
       const data = await res.json();
       if (!res.ok || data.error || data.message) {

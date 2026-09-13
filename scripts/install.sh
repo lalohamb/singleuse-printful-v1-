@@ -150,7 +150,7 @@ if [[ "$USE_PSQL" == "true" ]]; then
 fi
 
 echo "  Running 01_schema.sql..."
-if run_sql_file "$SQL_DIR/01_schema.sql" "$SUPABASE_PROJECT_REF" "$SERVICE_ROLE_KEY" "$DB_URL"; then
+if run_sql_file "$SQL_DIR/01_schema.sql" "$SUPABASE_PROJECT_REF" "$SERVICE_ROLE_KEY" "$DB_URL" "$SUPABASE_ACCESS_TOKEN"; then
   ok "Schema created"
 else
   fail "Schema SQL failed — check your DB credentials"
@@ -215,7 +215,7 @@ WHERE id = '00000000-0000-0000-0000-000000000001';
 EOSQL
 )
 
-if run_sql "$SEED_SQL" "$SUPABASE_PROJECT_REF" "$SERVICE_ROLE_KEY" "$DB_URL"; then
+if run_sql "$SEED_SQL" "$SUPABASE_PROJECT_REF" "$SERVICE_ROLE_KEY" "$DB_URL" "$SUPABASE_ACCESS_TOKEN"; then
   ok "Store settings seeded"
 else
   warn "Settings seed failed — configure manually via admin UI"

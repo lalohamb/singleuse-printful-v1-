@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { ChevronLeft, Lock, Check, Loader2, Truck } from "lucide-react";
 import { useCart } from "@/lib/cart";
-import { formatPrice, createStripeCheckout, getShippingQuote } from "@/lib/supabase";
+import { formatPrice, createStripeCheckout, getShippingQuote, getAffiliateCode } from "@/lib/supabase";
 import type { CartItem } from "@/types";
 
 export default function CheckoutPage() {
@@ -14,7 +14,16 @@ export default function CheckoutPage() {
 
   const [shippingCost, setShippingCost] = useState<number | null>(null);
   const [shippingLoading, setShippingLoading] = useState(false);
+  const [shippingFallback, setShippingFallback] = useState(6.99);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    import("@/lib/supabase").then(({ supabase }) => {
+      supabase.from("settings").select("default_shipping_cost").limit(1).maybeSingle().then(({ data }) => {
+        if (data?.default_shipping_cost) setShippingFallback(Number(data.default_shipping_cost));
+      });
+    });
+  }, []);
 
   // Fetch real shipping quote whenever country changes
   useEffect(() => {
@@ -34,7 +43,7 @@ export default function CheckoutPage() {
     }, 400);
   }, [form.country, items]);
 
-  const resolvedShipping = shippingCost ?? 6.99;
+  const resolvedShipping = shippingCost ?? shippingFallback;
   const total = subtotal + resolvedShipping;
   const updateForm = (key: string, value: string) => setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -54,6 +63,7 @@ export default function CheckoutPage() {
         shipping_name: `${form.firstName} ${form.lastName}`,
         email: form.email,
         shipping_cost: resolvedShipping,
+        affiliate_code: getAffiliateCode() || undefined,
       });
       clearCart();
       window.location.href = result.url;

@@ -206,7 +206,7 @@ CREATE TABLE IF NOT EXISTS settings (
   hero_gradient_dir       text        DEFAULT 'to right',
   hero_image_fit          text        DEFAULT 'cover',
   story_image_url         text,
-  story_object_position   text        DEFAULT '0px 0px',
+  story_object_position   text        DEFAULT '0px -437px',
   story_image_scale       numeric     DEFAULT 100,
   story_image_flip        boolean     DEFAULT false,
   story_image_fit         text        DEFAULT 'cover',
@@ -319,7 +319,9 @@ ON CONFLICT (slug) DO NOTHING;
 
 INSERT INTO settings (
   store_name, tagline, hero_title, hero_subtitle, hero_image_url,
-  announcement, announcement_active
+  announcement, announcement_active,
+  story_object_position, story_image_scale, story_image_flip, story_image_fit,
+  story_gradient_opacity, story_gradient_dir
 ) VALUES (
   'Gender Apparel',
   'Made for Every Body.',
@@ -327,7 +329,9 @@ INSERT INTO settings (
   'Apparel celebrating Black culture, faith, and family. Every design made with intention, printed on demand, shipped to your door.',
   'https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
   'Made to order. Made with love. — Free shipping on orders over $75',
-  true
+  true,
+  '0px -437px', 100, false, 'cover',
+  40, 'full'
 ) ON CONFLICT DO NOTHING;
 
 INSERT INTO seo_settings (id)

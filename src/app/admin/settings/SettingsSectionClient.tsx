@@ -19,7 +19,11 @@ import ProductImagePicker from "./ProductImagePicker";
 import { supabase } from "@/lib/supabase";
 import {
   DEFAULT_ABOUT_SETTINGS,
+  DEFAULT_MISSION_CARDS,
+  DEFAULT_CULTURE_CARDS,
   type AboutSettings,
+  type AboutValueCard,
+  type AboutCultureCard,
 } from "@/lib/about-settings";
 import {
   DEFAULT_AFFIRMATIONS_SETTINGS,
@@ -50,6 +54,7 @@ const TITLES: Record<string, string> = {
   "wear-your-story": "Wear Your Story",
   "customer-love": "Customer Love",
   announcements: "Announcements",
+  "newsletter-popup": "Newsletter Popup",
   "store-information": "Store Information",
   about: "About, Mission & Culture",
   footer: "Footer",
@@ -222,9 +227,13 @@ export default function SettingsSectionClient({
   const [heroPreviewH, setHeroPreviewH] = useState(70);
   const [ourWhyPreviewH, setOurWhyPreviewH] = useState(400);
   const [showOurWhyPicker, setShowOurWhyPicker] = useState(false);
+  const [showStoryPicker, setShowStoryPicker] = useState(false);
+  const [showPopupPicker, setShowPopupPicker] = useState(false);
   const [stripeOk, setStripeOk] = useState<ServiceStatus>("checking");
   const [mailerOk, setMailerOk] = useState<ServiceStatus>("checking");
   const [resendOk, setResendOk] = useState<ServiceStatus>("checking");
+  const [mailerGroups, setMailerGroups] = useState<{ id: string; name: string }[]>([]);
+  const [mailerGroupsLoading, setMailerGroupsLoading] = useState(false);
   const [stripeSecret, setStripeSecret] = useState("");
   const [showStripeSecret, setShowStripeSecret] = useState(false);
   const [stripeSaving, setStripeSaving] = useState(false);
@@ -304,8 +313,7 @@ export default function SettingsSectionClient({
               : "warning",
         ),
       )
-      .catch(() => setMailerOk("warning"));
-    fetch("/api/resend?path=/domains")
+      .catch(() => setMailerOk("warning"));    fetch("/api/resend?path=/domains")
       .then((response) =>
         setResendOk(
           response.status === 200
@@ -317,6 +325,19 @@ export default function SettingsSectionClient({
       )
       .catch(() => setResendOk("warning"));
   }, []);
+
+  useEffect(() => {
+    if (section !== "announcements" && section !== "newsletter-popup" && section !== "integrations") return;
+    setMailerGroupsLoading(true);
+    fetch("/api/mailerlite?action=groups")
+      .then(async (r) => {
+        if (!r.ok) return;
+        const data = await r.json();
+        if (Array.isArray(data) && data.length > 0) setMailerGroups(data);
+      })
+      .catch(() => {})
+      .finally(() => setMailerGroupsLoading(false));
+  }, [section]);
 
   const registerStripeWebhook = async () => {
     if (!stripeSecret) return;
@@ -395,10 +416,67 @@ export default function SettingsSectionClient({
   };
   const about = {
     ...DEFAULT_ABOUT_SETTINGS,
-    ...(form.about_settings || {}),
+    ...Object.fromEntries(
+      Object.entries(form.about_settings || {}).filter(([, v]) => v !== "" && v !== null && v !== undefined)
+    ),
   } as AboutSettings;
   const setAbout = (key: keyof AboutSettings, value: string) =>
     set("about_settings", { ...about, [key]: value });
+
+  const [aboutSaved, setAboutSaved] = useState<string | null>(null);
+  const [announcementSaved, setAnnouncementSaved] = useState<string | null>(null);
+  const saveAboutSection = async (sectionKey: "hero" | "story" | "mission" | "culture") => {
+    setError("");
+    const keys: Record<string, (keyof AboutSettings)[]> = {
+      hero: ["heroEyebrow", "heroTitle", "heroSubtitle", "heroQuote", "heroCredit", "heroImageUrl", "heroObjectPosition", "heroImageScale", "heroImageFlip", "heroImageFit", "heroGradientOpacity", "heroGradientDir", "heroBackground", "heroTextColor"],
+      story: ["storyParagraph1", "storyParagraph2", "storyParagraph3", "storyQuote", "storyQuoteCredit", "storyImageUrl", "storyImageAlt", "storyImageCaption", "storyImageSubcaption", "storyObjectPosition", "storyImageScale", "storyImageFlip", "storyImageFit"],
+      mission: ["missionEyebrow", "missionTitle", "missionBody", "missionBackground", "missionTextColor", "missionCards"],
+      culture: ["cultureEyebrow", "cultureTitle", "cultureBody", "cultureCreed", "cultureBackground", "cultureTextColor", "cultureCards"],
+    };
+    const partial = keys[sectionKey].reduce((acc, k) => ({ ...acc, [k]: about[k] }), {} as Partial<AboutSettings>);
+    const merged = { ...about, ...partial };
+    const { error: saveError } = await supabase
+      .from("settings")
+      .update({ about_settings: merged, updated_at: new Date().toISOString() })
+      .eq("id", form.id);
+    if (saveError) setError(saveError.message);
+    else {
+      setAboutSaved(sectionKey);
+      fetch("/api/revalidate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paths: ["/about"] }),
+      });
+      setTimeout(() => setAboutSaved(null), 2000);
+    }
+  };
+
+  const saveAnnouncementSection = async (sectionKey: "banners" | "popup") => {
+    setError("");
+    const updates = sectionKey === "banners"
+      ? {
+          announcement: form.announcement,
+          announcement_active: form.announcement_active,
+          promo_banner_active: form.promo_banner_active,
+          promo_banner_title: form.promo_banner_title,
+          promo_banner_body: form.promo_banner_body,
+          promo_banner_cta_label: form.promo_banner_cta_label,
+          promo_banner_cta_url: form.promo_banner_cta_url,
+          promo_banner_bg_color: form.promo_banner_bg_color,
+          promo_banner_max_shows: form.promo_banner_max_shows,
+          newsletter_group_id: form.newsletter_group_id,
+        }
+      : { popup_settings: form.popup_settings };
+    const { error: saveError } = await supabase
+      .from("settings")
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq("id", form.id);
+    if (saveError) setError(saveError.message);
+    else {
+      setAnnouncementSaved(sectionKey);
+      setTimeout(() => setAnnouncementSaved(null), 2000);
+    }
+  };
 
   const save = async () => {
     setError("");
@@ -484,6 +562,8 @@ export default function SettingsSectionClient({
                                 form.promo_banner_cta_label,
                               promo_banner_cta_url: form.promo_banner_cta_url,
                               promo_banner_bg_color: form.promo_banner_bg_color,
+                              promo_banner_max_shows: form.promo_banner_max_shows,
+                              popup_settings: form.popup_settings,
                             }
                           : section === "homepage"
                             ? {
@@ -554,7 +634,7 @@ export default function SettingsSectionClient({
             Manage this settings group independently.
           </p>
         </div>
-        <section className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6 space-y-4">
+        <section className={section === "about" || section === "announcements" || section === "newsletter-popup" ? "space-y-0" : "bg-white rounded-xl border border-secondary-100 shadow-sm p-6 space-y-4"}>
           {section === "branding" && (
             <>
               {text("Store Name", "store_name")} {text("Tagline", "tagline")}
@@ -639,168 +719,408 @@ export default function SettingsSectionClient({
             </>
           )}
           {section === "announcements" && (
-            <>
-              <div>
-                <label className="label-text">Announcement Text</label>
-                <input
-                  value={form.announcement || ""}
-                  onChange={(e) => set("announcement", e.target.value)}
-                  className="input-field"
-                  placeholder="Free shipping on orders over $75!"
-                />
-              </div>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.announcement_active || false}
-                  onChange={(e) => set("announcement_active", e.target.checked)}
-                  className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500"
-                />
-                <span className="text-sm font-medium text-secondary-700">
-                  Show announcement bar
-                </span>
-              </label>
-              <div className="border-t border-secondary-100 pt-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-secondary-800">
-                      Promotional Drop Banner
-                    </p>
-                    <p className="text-xs text-secondary-400 mt-0.5">
-                      Drops from the top on homepage load. Shown max 2× per
-                      session. User can dismiss.
-                    </p>
-                  </div>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={form.promo_banner_active || false}
-                      onChange={(e) =>
-                        set("promo_banner_active", e.target.checked)
-                      }
-                      className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500"
-                    />
-                    <span className="text-sm font-medium text-secondary-700">
-                      Active
-                    </span>
-                  </label>
+            <div className="space-y-6">
+              {/* Banners Card */}
+              <div className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6 space-y-4">
+                <h2 className="font-semibold text-secondary-800">Announcement Bar &amp; Promo Banner</h2>
+                <div>
+                  <label className="label-text">Announcement Text</label>
+                  <input
+                    value={form.announcement || ""}
+                    onChange={(e) => set("announcement", e.target.value)}
+                    className="input-field"
+                    placeholder="Free shipping on orders over $75!"
+                  />
                 </div>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.announcement_active || false}
+                    onChange={(e) => set("announcement_active", e.target.checked)}
+                    className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500"
+                  />
+                  <span className="text-sm font-medium text-secondary-700">Show announcement bar</span>
+                </label>
+                <div>
+                  <label className="label-text">Newsletter Signup Group</label>
+                  <p className="text-xs text-secondary-400 mb-1">Used by the homepage &amp; footer signup forms.</p>
+                  {mailerGroups.length > 0 ? (
+                    <select
+                      value={form.newsletter_group_id || ""}
+                      onChange={(e) => set("newsletter_group_id", e.target.value)}
+                      className="input-field"
+                    >
+                      <option value="">All subscribers (no group)</option>
+                      {mailerGroups.map((g) => (
+                        <option key={g.id} value={g.id}>{g.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      value={form.newsletter_group_id || ""}
+                      onChange={(e) => set("newsletter_group_id", e.target.value)}
+                      className="input-field"
+                      placeholder="182701481182365511"
+                    />
+                  )}
+                </div>
+                <div className="border-t border-secondary-100 pt-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-secondary-800">Promotional Drop Banner</p>
+                      <p className="text-xs text-secondary-400 mt-0.5">Drops from the top on homepage load. User can dismiss.</p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div>
+                        <label className="label-text">Max shows per session</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={10}
+                          value={form.promo_banner_max_shows ?? 2}
+                          onChange={(e) => set("promo_banner_max_shows", Number(e.target.value))}
+                          className="input-field w-20"
+                        />
+                      </div>
+                      <label className="flex items-center gap-2 cursor-pointer mt-5">
+                        <input
+                          type="checkbox"
+                          checked={form.promo_banner_active || false}
+                          onChange={(e) => set("promo_banner_active", e.target.checked)}
+                          className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500"
+                        />
+                        <span className="text-sm font-medium text-secondary-700">Active</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label-text">Headline</label>
+                    <input
+                      ref={promoTitleRef}
+                      value={form.promo_banner_title || ""}
+                      onChange={(e) => set("promo_banner_title", e.target.value)}
+                      className="input-field"
+                      placeholder="🔥 Limited Drop — 20% Off This Weekend Only"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setPromoEmojiOpen((open) => !open)}
+                      className="mt-1.5 flex items-center gap-1.5 text-xs text-secondary-500 hover:text-secondary-800 transition-colors"
+                    >
+                      <span>😊</span>
+                      <span>Add emoji</span>
+                      <span className="text-secondary-400">{promoEmojiOpen ? "▲" : "▼"}</span>
+                    </button>
+                    {promoEmojiOpen && (
+                      <div className="mt-2 border border-secondary-200 rounded-xl p-3 bg-secondary-50 space-y-2">
+                        {PROMO_EMOJIS.map((group) => (
+                          <div key={group.label}>
+                            <p className="text-[10px] font-semibold text-secondary-400 uppercase tracking-wide mb-1">{group.label}</p>
+                            <div className="flex flex-wrap gap-1">
+                              {group.icons.map((emoji) => (
+                                <button key={emoji} type="button" onClick={() => insertPromoEmoji(emoji)}
+                                  className="text-lg hover:scale-125 transition-transform leading-none p-0.5 rounded hover:bg-secondary-200">
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="label-text">Body Text</label>
+                    <input
+                      value={form.promo_banner_body || ""}
+                      onChange={(e) => set("promo_banner_body", e.target.value)}
+                      className="input-field"
+                      placeholder="Use code CULTURE20 at checkout. Ends Sunday."
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="label-text">CTA Button Label</label>
+                      <input
+                        value={form.promo_banner_cta_label || ""}
+                        onChange={(e) => set("promo_banner_cta_label", e.target.value)}
+                        className="input-field"
+                        placeholder="Shop the Drop"
+                      />
+                    </div>
+                    <div>
+                      <label className="label-text">CTA URL</label>
+                      <input
+                        value={form.promo_banner_cta_url || ""}
+                        onChange={(e) => set("promo_banner_cta_url", e.target.value)}
+                        className="input-field"
+                        placeholder="/shop"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <label className="label-text">Banner Background Color</label>
+                      <input
+                        type="color"
+                        value={form.promo_banner_bg_color || "#1a1a1a"}
+                        onChange={(e) => set("promo_banner_bg_color", e.target.value)}
+                        className="mt-1 h-10 w-full rounded border border-secondary-200 cursor-pointer"
+                      />
+                    </div>
+                    <div
+                      className="flex-shrink-0 rounded-lg overflow-hidden border border-secondary-100"
+                      style={{ backgroundColor: form.promo_banner_bg_color || "#1a1a1a", minWidth: 160, padding: "10px 16px" }}
+                    >
+                      <p className="text-white font-bold text-xs truncate">{form.promo_banner_title || "Headline preview"}</p>
+                      {form.promo_banner_body && <p className="text-white/70 text-[10px] mt-0.5 truncate">{form.promo_banner_body}</p>}
+                      {form.promo_banner_cta_label && (
+                        <span className="inline-block mt-1.5 px-3 py-0.5 rounded-full bg-white text-secondary-900 text-[10px] font-semibold">
+                          {form.promo_banner_cta_label}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-end items-center gap-3 pt-2 border-t border-secondary-100">
+                  {error && <span className="text-sm text-red-600">{error}</span>}
+                  <button onClick={() => saveAnnouncementSection("banners")} className={`btn-primary ${announcementSaved === "banners" ? "!bg-green-600 hover:!bg-green-600" : ""}`}>
+                    {announcementSaved === "banners" ? <><Check size={18} className="mr-2" />Saved</> : <><Save size={18} className="mr-2" />Save Banners</>}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {section === "newsletter-popup" && (
+            <div className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-secondary-400">Appears on page load after a delay. User can dismiss.</p>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.popup_settings?.active || false}
+                    onChange={(e) => set("popup_settings", { ...(form.popup_settings || {}), active: e.target.checked })}
+                    className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500"
+                  />
+                  <span className="text-sm font-medium text-secondary-700">Active</span>
+                </label>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="label-text">Headline</label>
                   <input
-                    ref={promoTitleRef}
-                    value={form.promo_banner_title || ""}
-                    onChange={(e) => set("promo_banner_title", e.target.value)}
+                    value={form.popup_settings?.title || ""}
+                    onChange={(e) => set("popup_settings", { ...(form.popup_settings || {}), title: e.target.value })}
                     className="input-field"
-                    placeholder="🔥 Limited Drop — 20% Off This Weekend Only"
+                    placeholder="Join the Culture"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setPromoEmojiOpen((open) => !open)}
-                    className="mt-1.5 flex items-center gap-1.5 text-xs text-secondary-500 hover:text-secondary-800 transition-colors"
-                  >
-                    <span>😊</span>
-                    <span>Add emoji</span>
-                    <span className="text-secondary-400">
-                      {promoEmojiOpen ? "▲" : "▼"}
-                    </span>
-                  </button>
-                  {promoEmojiOpen && (
-                    <div className="mt-2 border border-secondary-200 rounded-xl p-3 bg-secondary-50 space-y-2">
-                      {PROMO_EMOJIS.map((group) => (
-                        <div key={group.label}>
-                          <p className="text-[10px] font-semibold text-secondary-400 uppercase tracking-wide mb-1">
-                            {group.label}
-                          </p>
-                          <div className="flex flex-wrap gap-1">
-                            {group.icons.map((emoji) => (
-                              <button
-                                key={emoji}
-                                type="button"
-                                onClick={() => insertPromoEmoji(emoji)}
-                                className="text-lg hover:scale-125 transition-transform leading-none p-0.5 rounded hover:bg-secondary-200"
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
                 <div>
-                  <label className="label-text">Body Text</label>
+                  <label className="label-text">Delay (seconds)</label>
                   <input
-                    value={form.promo_banner_body || ""}
-                    onChange={(e) => set("promo_banner_body", e.target.value)}
+                    type="number" min={0} max={60}
+                    value={form.popup_settings?.delay ?? 3}
+                    onChange={(e) => set("popup_settings", { ...(form.popup_settings || {}), delay: Number(e.target.value) })}
                     className="input-field"
-                    placeholder="Use code CULTURE20 at checkout. Ends Sunday."
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="label-text">CTA Button Label</label>
-                    <input
-                      value={form.promo_banner_cta_label || ""}
-                      onChange={(e) =>
-                        set("promo_banner_cta_label", e.target.value)
-                      }
-                      className="input-field"
-                      placeholder="Shop the Drop"
-                    />
-                  </div>
-                  <div>
-                    <label className="label-text">CTA URL</label>
-                    <input
-                      value={form.promo_banner_cta_url || ""}
-                      onChange={(e) =>
-                        set("promo_banner_cta_url", e.target.value)
-                      }
-                      className="input-field"
-                      placeholder="/shop"
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex-1">
-                    <label className="label-text">
-                      Banner Background Color
-                    </label>
-                    <input
-                      type="color"
-                      value={form.promo_banner_bg_color || "#1a1a1a"}
-                      onChange={(e) =>
-                        set("promo_banner_bg_color", e.target.value)
-                      }
-                      className="mt-1 h-10 w-full rounded border border-secondary-200 cursor-pointer"
-                    />
-                  </div>
-                  <div
-                    className="flex-shrink-0 rounded-lg overflow-hidden border border-secondary-100"
-                    style={{
-                      backgroundColor: form.promo_banner_bg_color || "#1a1a1a",
-                      minWidth: 160,
-                      padding: "10px 16px",
-                    }}
-                  >
-                    <p className="text-white font-bold text-xs truncate">
-                      {form.promo_banner_title || "Headline preview"}
-                    </p>
-                    {form.promo_banner_body && (
-                      <p className="text-white/70 text-[10px] mt-0.5 truncate">
-                        {form.promo_banner_body}
-                      </p>
-                    )}
-                    {form.promo_banner_cta_label && (
-                      <span className="inline-block mt-1.5 px-3 py-0.5 rounded-full bg-white text-secondary-900 text-[10px] font-semibold">
-                        {form.promo_banner_cta_label}
-                      </span>
-                    )}
-                  </div>
+                <div>
+                  <label className="label-text">Dismiss for (days)</label>
+                  <input
+                    type="number" min={1} max={365}
+                    value={form.popup_settings?.dismissDays ?? 7}
+                    onChange={(e) => set("popup_settings", { ...(form.popup_settings || {}), dismissDays: Number(e.target.value) })}
+                    className="input-field"
+                  />
                 </div>
               </div>
-            </>
+              <div>
+                <label className="label-text">Body Text</label>
+                <input
+                  value={form.popup_settings?.body || ""}
+                  onChange={(e) => set("popup_settings", { ...(form.popup_settings || {}), body: e.target.value })}
+                  className="input-field"
+                  placeholder="New drops, exclusive offers, and culture — straight to your inbox."
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="label-text">Button Label</label>
+                  <input
+                    value={form.popup_settings?.ctaLabel || ""}
+                    onChange={(e) => set("popup_settings", { ...(form.popup_settings || {}), ctaLabel: e.target.value })}
+                    className="input-field"
+                    placeholder="Subscribe"
+                  />
+                </div>
+                <div>
+                  <label className="label-text">MailerLite Group</label>
+                  <select
+                    value={form.popup_settings?.groupId || ""}
+                    onChange={(e) => set("popup_settings", { ...(form.popup_settings || {}), groupId: e.target.value })}
+                    className="input-field"
+                    disabled={mailerGroupsLoading}
+                  >
+                    <option value="">{mailerGroupsLoading ? "Loading groups..." : mailerGroups.length === 0 ? "No groups found" : "All subscribers"}</option>
+                    {mailerGroups.map((g) => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label-text">Position</label>
+                  <select
+                    value={form.popup_settings?.position || "right"}
+                    onChange={(e) => set("popup_settings", { ...(form.popup_settings || {}), position: e.target.value })}
+                    className="input-field"
+                  >
+                    <option value="center">Center</option>
+                    <option value="bottom-left">Bottom Left</option>
+                    <option value="bottom-center">Bottom Center</option>
+                    <option value="bottom-right">Bottom Right</option>
+                    <option value="top-left">Top Left</option>
+                    <option value="top-center">Top Center</option>
+                    <option value="top-right">Top Right</option>
+                    <option value="left">Left Side</option>
+                    <option value="right">Right Side</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 items-end">
+                <label className="label-text">
+                  Background Color
+                  <input
+                    type="color"
+                    value={form.popup_settings?.bgColor || "#111111"}
+                    onChange={(e) => set("popup_settings", { ...(form.popup_settings || {}), bgColor: e.target.value })}
+                    className="mt-1 h-10 w-full cursor-pointer"
+                  />
+                </label>
+                <div className="rounded-lg p-3 text-center" style={{ backgroundColor: form.popup_settings?.bgColor || "#111111" }}>
+                  <p className="text-white font-bold text-xs truncate">{form.popup_settings?.title || "Headline"}</p>
+                  <p className="text-white/60 text-[10px] mt-0.5 truncate">{form.popup_settings?.body || "Body text"}</p>
+                </div>
+              </div>
+              <ImageUpload
+                label="Popup Image"
+                value={form.popup_settings?.imageUrl ?? "/ga.png"}
+                onChange={(url) => set("popup_settings", { ...(form.popup_settings || {}), imageUrl: url })}
+                folder="settings/popup"
+                preview={false}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPopupPicker(true)}
+                className="btn-outline py-2 text-sm"
+              >
+                📷 Pick from Product Library
+              </button>
+              {showPopupPicker && (
+                <ProductImagePicker
+                  onSelect={(url) => {
+                    set("popup_settings", { ...(form.popup_settings || {}), imageUrl: url });
+                    setShowPopupPicker(false);
+                  }}
+                  onClose={() => setShowPopupPicker(false)}
+                />
+              )}
+              {(() => {
+                const ps = form.popup_settings || {};
+                const x = ps.imgX ?? 0;
+                const y = ps.imgY ?? 0;
+                const objPos = (x === 0 && y === 0) ? "center" : `${x}px ${y}px`;
+                const setPos = (nx: number, ny: number) =>
+                  set("popup_settings", { ...ps, imgX: nx, imgY: ny });
+                return (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-secondary-500 w-16">X: {x}px</span>
+                      <input type="range" min={-1000} max={1000} value={x}
+                        onChange={(e) => setPos(Number(e.target.value), y)}
+                        className="flex-1 accent-gold-500"
+                      />
+                    </div>
+                    {(ps.imageUrl ?? "/ga.png") && (
+                      <div className="flex gap-2 items-stretch">
+                        <div className="flex flex-col items-center gap-1 w-10 flex-shrink-0">
+                          <span className="text-[10px] text-secondary-400">▲</span>
+                          <input type="range" min={30} max={100} value={ps.popupPreviewH ?? 60}
+                            onChange={(e) => set("popup_settings", { ...ps, popupPreviewH: Number(e.target.value) })}
+                            className="flex-1 accent-gold-500"
+                            style={{ writingMode: "vertical-lr", direction: "rtl", width: 28, cursor: "ns-resize" }}
+                          />
+                          <span className="text-[10px] text-secondary-400">▼</span>
+                          <span className="text-[10px] text-secondary-500 mt-1">{ps.popupPreviewH ?? 60}vh</span>
+                        </div>
+                        <div className="flex-1 relative rounded-lg bg-secondary-900 overflow-hidden"
+                          style={{ height: Math.max(200, (ps.popupPreviewH ?? 60) * 3) }}
+                        >
+                          <img
+                            src={ps.imageUrl || "/ga.png"}
+                            alt="Popup preview"
+                            className={`absolute inset-0 w-full h-full ${
+                              ps.popupImageFit === "contain" ? "object-contain" :
+                              (ps.popupImageScale ?? 100) === 100 ? "object-cover" : "object-contain"
+                            }`}
+                            style={{
+                              objectPosition: `${x}px ${y}px`,
+                              transform: ps.popupImageFlip ? "scaleX(-1)" : undefined,
+                              scale: `${ps.popupImageScale ?? 100}%`,
+                            }}
+                          />
+                          <span className="absolute bottom-2 right-2 text-xs bg-black/50 text-white px-2 py-1 rounded">Live preview</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-1 w-10 flex-shrink-0">
+                          <span className="text-[10px] text-secondary-400">▲</span>
+                          <input type="range" min={-1000} max={1000} value={y}
+                            onChange={(e) => setPos(x, Number(e.target.value))}
+                            className="flex-1 accent-gold-500"
+                            style={{ writingMode: "vertical-lr", direction: "rtl", width: 28, cursor: "ns-resize" }}
+                          />
+                          <span className="text-[10px] text-secondary-400">▼</span>
+                          <span className="text-[10px] text-secondary-500 mt-1">{y}px</span>
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-secondary-500 w-24">Zoom: {ps.popupImageScale ?? 100}%</span>
+                      <input type="range" min={10} max={100} value={ps.popupImageScale ?? 100}
+                        onChange={(e) => set("popup_settings", { ...ps, popupImageScale: Number(e.target.value) })}
+                        className="flex-1 accent-gold-500"
+                      />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-secondary-500 w-24">Fit</span>
+                      {["cover", "contain"].map((v) => (
+                        <button key={v} type="button"
+                          onClick={() => set("popup_settings", { ...ps, popupImageFit: v })}
+                          className={`text-xs px-3 py-1 rounded border capitalize ${
+                            (ps.popupImageFit || "cover") === v ? "bg-gold-500 text-white border-gold-500" : "border-secondary-300"
+                          }`}
+                        >{v}</button>
+                      ))}
+                      <button type="button"
+                        onClick={() => set("popup_settings", { ...ps, popupImageFlip: !ps.popupImageFlip })}
+                        className={`text-xs px-3 py-1 rounded border ${
+                          ps.popupImageFlip ? "bg-gold-500 text-white border-gold-500" : "border-secondary-300"
+                        }`}
+                      >Flip</button>
+                      <button type="button"
+                        onClick={() => set("popup_settings", { ...ps, imgX: 0, imgY: 0, popupImageScale: 100, popupImageFlip: false, popupImageFit: "cover", popupPreviewH: 60 })}
+                        className="btn-outline py-1 text-xs"
+                      >Reset</button>
+                    </div>
+                  </div>
+                );
+              })()}
+              <div className="flex justify-end items-center gap-3 pt-2 border-t border-secondary-100">
+                {error && <span className="text-sm text-red-600">{error}</span>}
+                <button onClick={() => saveAnnouncementSection("popup")} className={`btn-primary ${announcementSaved === "popup" ? "!bg-green-600 hover:!bg-green-600" : ""}`}>
+                  {announcementSaved === "popup" ? <><Check size={18} className="mr-2" />Saved</> : <><Save size={18} className="mr-2" />Save Popup</>
+}
+                </button>
+              </div>
+            </div>
           )}
           {section === "store-information" && (
             <>
@@ -2100,18 +2420,18 @@ export default function SettingsSectionClient({
               />
               <button
                 type="button"
-                onClick={() => setShowOurWhyPicker(true)}
+                onClick={() => setShowStoryPicker(true)}
                 className="btn-outline py-2 text-sm"
               >
                 📷 Pick from Product Library
               </button>
-              {showOurWhyPicker && (
+              {showStoryPicker && (
                 <ProductImagePicker
                   onSelect={(url) => {
                     set("story_image_url", url);
-                    setShowOurWhyPicker(false);
+                    setShowStoryPicker(false);
                   }}
-                  onClose={() => setShowOurWhyPicker(false)}
+                  onClose={() => setShowStoryPicker(false)}
                 />
               )}
               {(() => {
@@ -2440,119 +2760,341 @@ export default function SettingsSectionClient({
             </>
           )}
           {section === "about" && (
-            <>
-              <h2 className="font-semibold text-secondary-800">Hero</h2>
-              {text("Eyebrow", "about_heroEyebrow")}
-              <div>
-                <label className="label-text">Title</label>
-                <input
-                  value={about.heroTitle}
-                  onChange={(e) => setAbout("heroTitle", e.target.value)}
-                  className="input-field"
+            <div className="space-y-6">
+              {/* Hero Section */}
+              <div className="border border-secondary-100 rounded-xl p-5 space-y-4">
+                <h2 className="font-semibold text-secondary-800">About Hero Section</h2>
+                <div>
+                  <label className="label-text">Eyebrow</label>
+                  <input value={about.heroEyebrow} onChange={(e) => setAbout("heroEyebrow", e.target.value)} className="input-field" />
+                </div>
+                <div>
+                  <label className="label-text">Title</label>
+                  <input value={about.heroTitle} onChange={(e) => setAbout("heroTitle", e.target.value)} className="input-field" />
+                </div>
+                <div>
+                  <label className="label-text">Subtitle</label>
+                  <input value={about.heroSubtitle} onChange={(e) => setAbout("heroSubtitle", e.target.value)} className="input-field" />
+                </div>
+                <div>
+                  <label className="label-text">Quote</label>
+                  <input value={about.heroQuote} onChange={(e) => setAbout("heroQuote", e.target.value)} className="input-field" />
+                </div>
+                <div>
+                  <label className="label-text">Credit</label>
+                  <input value={about.heroCredit} onChange={(e) => setAbout("heroCredit", e.target.value)} className="input-field" />
+                </div>
+                <ImageUpload
+                  label="Hero Image"
+                  value={about.heroImageUrl}
+                  onChange={(url) => setAbout("heroImageUrl", url)}
+                  folder="settings/about"
+                  preview={false}
                 />
+                {about.heroImageUrl && (() => {
+                  const pos = (about.heroObjectPosition || "50% 20%").replace(/%/g, "").split(" ");
+                  const x = parseInt(pos[0]) || 50;
+                  const y = parseInt(pos[1]) || 20;
+                  const setPos = (nx: number, ny: number) => setAbout("heroObjectPosition", `${nx}% ${ny}%`);
+                  const opacity = (about.heroGradientOpacity ?? 40) / 100;
+                  const dir = about.heroGradientDir || "right";
+                  const gradients: Record<string, string> = {
+                    left:   `linear-gradient(to right, rgba(17,17,17,${opacity}) 0%, rgba(17,17,17,${opacity*0.6}) 50%, transparent 100%)`,
+                    right:  `linear-gradient(to left, rgba(17,17,17,${opacity}) 0%, rgba(17,17,17,${opacity*0.6}) 50%, transparent 100%)`,
+                    center: `linear-gradient(to bottom, rgba(17,17,17,${opacity*0.6}) 0%, rgba(17,17,17,${opacity}) 50%, rgba(17,17,17,${opacity*0.6}) 100%)`,
+                    top:    `linear-gradient(to bottom, rgba(17,17,17,${opacity}) 0%, transparent 100%)`,
+                    bottom: `linear-gradient(to top, rgba(17,17,17,${opacity}) 0%, transparent 100%)`,
+                    full:   `rgba(17,17,17,${opacity})`,
+                    none:   "transparent",
+                  };
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-secondary-500 w-16">X: {x}%</span>
+                        <input type="range" min={0} max={100} value={x} onChange={(e) => setPos(Number(e.target.value), y)} className="flex-1 accent-gold-500" />
+                      </div>
+                      <div className="flex gap-2 items-stretch">
+                        <div className="flex flex-col items-center gap-1 w-10 flex-shrink-0">
+                          <span className="text-[10px] text-secondary-400">▲</span>
+                          <input type="range" min={0} max={100} value={y} onChange={(e) => setPos(x, Number(e.target.value))}
+                            className="flex-1 accent-gold-500" style={{ writingMode: "vertical-lr", direction: "rtl", width: 28, cursor: "ns-resize" }} />
+                          <span className="text-[10px] text-secondary-400">▼</span>
+                          <span className="text-[10px] text-secondary-500 mt-1">{y}%</span>
+                        </div>
+                        <div className="flex-1 relative rounded-lg bg-secondary-900 overflow-hidden" style={{ height: 200 }}>
+                          <img src={about.heroImageUrl} alt="preview"
+                            className={`absolute inset-0 w-full h-full ${about.heroImageFit === "contain" ? "object-contain" : "object-cover"}`}
+                            style={{ objectPosition: about.heroObjectPosition || "50% 20%", transform: about.heroImageFlip ? "scaleX(-1)" : undefined, scale: `${about.heroImageScale ?? 100}%` }}
+                          />
+                          <div className="absolute inset-0" style={{ background: gradients[dir] }} />
+                          <span className="absolute bottom-2 right-2 text-xs bg-black/50 text-white px-2 py-1 rounded">Live preview</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-secondary-500 w-24">Zoom: {about.heroImageScale ?? 100}%</span>
+                        <input type="range" min={10} max={200} value={about.heroImageScale ?? 100} onChange={(e) => setAbout("heroImageScale", e.target.value as any)} className="flex-1 accent-gold-500" />
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-secondary-500 w-24">Overlay: {about.heroGradientOpacity ?? 40}%</span>
+                        <input type="range" min={0} max={100} value={about.heroGradientOpacity ?? 40} onChange={(e) => setAbout("heroGradientOpacity", e.target.value as any)} className="flex-1 accent-gold-500" />
+                      </div>
+                      <div>
+                        <label className="label-text">Gradient</label>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {["left","right","center","top","bottom","full","none"].map((v) => (
+                            <button key={v} type="button" onClick={() => setAbout("heroGradientDir", v)}
+                              className={`text-xs px-3 py-1 rounded border capitalize ${dir === v ? "bg-gold-500 text-white border-gold-500" : "border-secondary-300"}`}>{v}</button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {["cover","contain"].map((v) => (
+                          <button key={v} type="button" onClick={() => setAbout("heroImageFit", v)}
+                            className={`text-xs px-3 py-1 rounded border capitalize ${(about.heroImageFit || "cover") === v ? "bg-gold-500 text-white border-gold-500" : "border-secondary-300"}`}>{v}</button>
+                        ))}
+                        <button type="button" onClick={() => setAbout("heroImageFlip", (!about.heroImageFlip) as any)}
+                          className={`text-xs px-3 py-1 rounded border ${about.heroImageFlip ? "bg-gold-500 text-white border-gold-500" : "border-secondary-300"}`}>Flip</button>
+                        <button type="button" onClick={() => {
+                          setAbout("heroObjectPosition", "50% 20%");
+                          setAbout("heroImageScale", 100 as any);
+                          setAbout("heroImageFlip", false as any);
+                          setAbout("heroGradientOpacity", 40 as any);
+                          setAbout("heroGradientDir", "right");
+                          setAbout("heroImageFit", "cover");
+                        }} className="btn-outline py-1 text-xs">Reset</button>
+                      </div>
+                    </div>
+                  );
+                })()}
+                <div className="grid grid-cols-2 gap-4">
+                  {color("Hero Background", "heroBackground")}
+                  {color("Hero Text", "heroTextColor")}
+                </div>
+                <div className="flex justify-end items-center gap-3 pt-2 border-t border-secondary-100">
+                  {error && <span className="text-sm text-red-600">{error}</span>}
+                  <button onClick={() => saveAboutSection("hero")} className={`btn-primary ${aboutSaved === "hero" ? "!bg-green-600 hover:!bg-green-600" : ""}`}>
+                    {aboutSaved === "hero" ? <><Check size={18} className="mr-2" />Saved</> : <><Save size={18} className="mr-2" />Save Hero</>}
+                  </button>
+                </div>
               </div>
-              <div>
-                <label className="label-text">Subtitle</label>
-                <input
-                  value={about.heroSubtitle}
-                  onChange={(e) => setAbout("heroSubtitle", e.target.value)}
-                  className="input-field"
+
+              {/* Story Section */}
+              <div className="border border-secondary-100 rounded-xl p-5 space-y-4">
+                <h2 className="font-semibold text-secondary-800">Story</h2>
+                <p className="text-xs text-secondary-500">The text + image section below the hero.</p>
+                <div>
+                  <label className="label-text">Paragraph 1</label>
+                  <textarea value={about.storyParagraph1} onChange={(e) => setAbout("storyParagraph1", e.target.value)} className="input-field min-h-[80px]" />
+                </div>
+                <div>
+                  <label className="label-text">Paragraph 2</label>
+                  <textarea value={about.storyParagraph2} onChange={(e) => setAbout("storyParagraph2", e.target.value)} className="input-field min-h-[80px]" />
+                </div>
+                <div>
+                  <label className="label-text">Paragraph 3</label>
+                  <textarea value={about.storyParagraph3} onChange={(e) => setAbout("storyParagraph3", e.target.value)} className="input-field min-h-[80px]" />
+                </div>
+                <div>
+                  <label className="label-text">Closing Quote</label>
+                  <input value={about.storyQuote} onChange={(e) => setAbout("storyQuote", e.target.value)} className="input-field" />
+                </div>
+                <div>
+                  <label className="label-text">Quote Credit</label>
+                  <input value={about.storyQuoteCredit} onChange={(e) => setAbout("storyQuoteCredit", e.target.value)} className="input-field" />
+                </div>
+                <ImageUpload
+                  label="Story Image"
+                  value={about.storyImageUrl}
+                  onChange={(url) => setAbout("storyImageUrl", url)}
+                  folder="settings/about"
+                  preview={false}
                 />
+                {about.storyImageUrl && (() => {
+                  const pos = (about.storyObjectPosition || "50% 20%").replace(/%/g, "").split(" ");
+                  const x = parseInt(pos[0]) || 50;
+                  const y = parseInt(pos[1]) || 20;
+                  const setPos = (nx: number, ny: number) => setAbout("storyObjectPosition", `${nx}% ${ny}%`);
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-secondary-500 w-16">X: {x}%</span>
+                        <input type="range" min={0} max={100} value={x} onChange={(e) => setPos(Number(e.target.value), y)} className="flex-1 accent-gold-500" />
+                      </div>
+                      <div className="flex gap-2 items-stretch">
+                        <div className="flex flex-col items-center gap-1 w-10 flex-shrink-0">
+                          <span className="text-[10px] text-secondary-400">▲</span>
+                          <input type="range" min={0} max={100} value={y} onChange={(e) => setPos(x, Number(e.target.value))}
+                            className="flex-1 accent-gold-500" style={{ writingMode: "vertical-lr", direction: "rtl", width: 28, cursor: "ns-resize" }} />
+                          <span className="text-[10px] text-secondary-400">▼</span>
+                          <span className="text-[10px] text-secondary-500 mt-1">{y}%</span>
+                        </div>
+                        <div className="flex-1 relative rounded-lg bg-secondary-900 overflow-hidden" style={{ height: 200 }}>
+                          <img src={about.storyImageUrl} alt="preview"
+                            className={`absolute inset-0 w-full h-full ${about.storyImageFit === "contain" ? "object-contain" : "object-cover"}`}
+                            style={{ objectPosition: about.storyObjectPosition || "50% 20%", transform: about.storyImageFlip ? "scaleX(-1)" : undefined, scale: `${about.storyImageScale ?? 100}%` }}
+                          />
+                          <span className="absolute bottom-2 right-2 text-xs bg-black/50 text-white px-2 py-1 rounded">Live preview</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-secondary-500 w-24">Zoom: {about.storyImageScale ?? 100}%</span>
+                        <input type="range" min={10} max={200} value={about.storyImageScale ?? 100} onChange={(e) => setAbout("storyImageScale", e.target.value as any)} className="flex-1 accent-gold-500" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {["cover","contain"].map((v) => (
+                          <button key={v} type="button" onClick={() => setAbout("storyImageFit", v)}
+                            className={`text-xs px-3 py-1 rounded border capitalize ${(about.storyImageFit || "cover") === v ? "bg-gold-500 text-white border-gold-500" : "border-secondary-300"}`}>{v}</button>
+                        ))}
+                        <button type="button" onClick={() => setAbout("storyImageFlip", (!about.storyImageFlip) as any)}
+                          className={`text-xs px-3 py-1 rounded border ${about.storyImageFlip ? "bg-gold-500 text-white border-gold-500" : "border-secondary-300"}`}>Flip</button>
+                        <button type="button" onClick={() => {
+                          setAbout("storyObjectPosition", "50% 20%");
+                          setAbout("storyImageScale", 100 as any);
+                          setAbout("storyImageFlip", false as any);
+                          setAbout("storyImageFit", "cover");
+                        }} className="btn-outline py-1 text-xs">Reset</button>
+                      </div>
+                    </div>
+                  );
+                })()}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="label-text">Image Caption</label>
+                    <input value={about.storyImageCaption} onChange={(e) => setAbout("storyImageCaption", e.target.value)} className="input-field" />
+                  </div>
+                  <div>
+                    <label className="label-text">Image Subcaption</label>
+                    <input value={about.storyImageSubcaption} onChange={(e) => setAbout("storyImageSubcaption", e.target.value)} className="input-field" />
+                  </div>
+                </div>
+                <div>
+                  <label className="label-text">Image Alt Text</label>
+                  <input value={about.storyImageAlt} onChange={(e) => setAbout("storyImageAlt", e.target.value)} className="input-field" />
+                </div>
+                <div className="flex justify-end items-center gap-3 pt-2 border-t border-secondary-100">
+                  {error && <span className="text-sm text-red-600">{error}</span>}
+                  <button onClick={() => saveAboutSection("story")} className={`btn-primary ${aboutSaved === "story" ? "!bg-green-600 hover:!bg-green-600" : ""}`}>
+                    {aboutSaved === "story" ? <><Check size={18} className="mr-2" />Saved</> : <><Save size={18} className="mr-2" />Save Story</>}
+                  </button>
+                </div>
               </div>
-              <div>
-                <label className="label-text">Quote</label>
-                <input
-                  value={about.heroQuote}
-                  onChange={(e) => setAbout("heroQuote", e.target.value)}
-                  className="input-field"
-                />
+
+              {/* Mission Section */}
+              <div className="border border-secondary-100 rounded-xl p-5 space-y-4">
+                <h2 className="font-semibold text-secondary-800">Mission</h2>
+                <div>
+                  <label className="label-text">Eyebrow</label>
+                  <input value={about.missionEyebrow} onChange={(e) => setAbout("missionEyebrow", e.target.value)} className="input-field" />
+                </div>
+                <div>
+                  <label className="label-text">Title</label>
+                  <input value={about.missionTitle} onChange={(e) => setAbout("missionTitle", e.target.value)} className="input-field" />
+                </div>
+                <div>
+                  <label className="label-text">Body</label>
+                  <textarea value={about.missionBody} onChange={(e) => setAbout("missionBody", e.target.value)} className="input-field min-h-[100px]" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  {color("Mission Background", "missionBackground")}
+                  {color("Mission Text", "missionTextColor")}
+                </div>
+                <div className="border-t border-secondary-100 pt-4 space-y-3">
+                  <p className="text-sm font-semibold text-secondary-800">Value Cards</p>
+                  {(about.missionCards?.length ? about.missionCards : DEFAULT_MISSION_CARDS).map((card: AboutValueCard, i: number) => (
+                    <div key={i} className="border border-secondary-100 rounded-lg p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-secondary-500">Card {i + 1}</span>
+                        <button type="button" onClick={() => setAbout("missionCards", (about.missionCards ?? DEFAULT_MISSION_CARDS).filter((_: AboutValueCard, j: number) => j !== i) as any)}
+                          className="text-xs text-red-500 hover:text-red-700">Remove</button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="label-text">Icon</label>
+                          <select value={card.icon} onChange={(e) => setAbout("missionCards", (about.missionCards ?? DEFAULT_MISSION_CARDS).map((c: AboutValueCard, j: number) => j === i ? { ...c, icon: e.target.value } : c) as any)} className="input-field">
+                            {["Heart","Sparkles","Users","Globe"].map((v) => <option key={v} value={v}>{v}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="label-text">Title</label>
+                          <input value={card.title} onChange={(e) => setAbout("missionCards", (about.missionCards ?? DEFAULT_MISSION_CARDS).map((c: AboutValueCard, j: number) => j === i ? { ...c, title: e.target.value } : c) as any)} className="input-field" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="label-text">Description</label>
+                        <input value={card.desc} onChange={(e) => setAbout("missionCards", (about.missionCards ?? DEFAULT_MISSION_CARDS).map((c: AboutValueCard, j: number) => j === i ? { ...c, desc: e.target.value } : c) as any)} className="input-field" />
+                      </div>
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => setAbout("missionCards", [...(about.missionCards ?? DEFAULT_MISSION_CARDS), { icon: "Sparkles", title: "New Value", desc: "" }] as any)}
+                    className="btn-outline py-1.5 text-sm w-full">+ Add Card</button>
+                </div>
+                <div className="flex justify-end items-center gap-3 pt-2 border-t border-secondary-100">
+                  {error && <span className="text-sm text-red-600">{error}</span>}
+                  <button onClick={() => saveAboutSection("mission")} className={`btn-primary ${aboutSaved === "mission" ? "!bg-green-600 hover:!bg-green-600" : ""}`}>
+                    {aboutSaved === "mission" ? <><Check size={18} className="mr-2" />Saved</> : <><Save size={18} className="mr-2" />Save Mission</>}
+                  </button>
+                </div>
               </div>
-              <div>
-                <label className="label-text">Credit</label>
-                <input
-                  value={about.heroCredit}
-                  onChange={(e) => setAbout("heroCredit", e.target.value)}
-                  className="input-field"
-                />
+
+              {/* Culture Section */}
+              <div className="border border-secondary-100 rounded-xl p-5 space-y-4">
+                <h2 className="font-semibold text-secondary-800">Culture</h2>
+                <div>
+                  <label className="label-text">Eyebrow</label>
+                  <input value={about.cultureEyebrow} onChange={(e) => setAbout("cultureEyebrow", e.target.value)} className="input-field" />
+                </div>
+                <div>
+                  <label className="label-text">Title</label>
+                  <input value={about.cultureTitle} onChange={(e) => setAbout("cultureTitle", e.target.value)} className="input-field" />
+                </div>
+                <div>
+                  <label className="label-text">Body</label>
+                  <textarea value={about.cultureBody} onChange={(e) => setAbout("cultureBody", e.target.value)} className="input-field min-h-[100px]" />
+                </div>
+                <div>
+                  <label className="label-text">Closing statement</label>
+                  <input value={about.cultureCreed} onChange={(e) => setAbout("cultureCreed", e.target.value)} className="input-field" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  {color("Culture Background", "cultureBackground")}
+                  {color("Culture Text", "cultureTextColor")}
+                </div>
+                <div className="border-t border-secondary-100 pt-4 space-y-3">
+                  <p className="text-sm font-semibold text-secondary-800">Culture Cards</p>
+                  {(about.cultureCards?.length ? about.cultureCards : DEFAULT_CULTURE_CARDS).map((card: AboutCultureCard, i: number) => (
+                    <div key={i} className="border border-secondary-100 rounded-lg p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-secondary-500">Card {i + 1}</span>
+                        <button type="button" onClick={() => setAbout("cultureCards", (about.cultureCards ?? DEFAULT_CULTURE_CARDS).filter((_: AboutCultureCard, j: number) => j !== i) as any)}
+                          className="text-xs text-red-500 hover:text-red-700">Remove</button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="label-text">Emoji</label>
+                          <input value={card.emoji} onChange={(e) => setAbout("cultureCards", (about.cultureCards ?? DEFAULT_CULTURE_CARDS).map((c: AboutCultureCard, j: number) => j === i ? { ...c, emoji: e.target.value } : c) as any)} className="input-field" />
+                        </div>
+                        <div>
+                          <label className="label-text">Title</label>
+                          <input value={card.title} onChange={(e) => setAbout("cultureCards", (about.cultureCards ?? DEFAULT_CULTURE_CARDS).map((c: AboutCultureCard, j: number) => j === i ? { ...c, title: e.target.value } : c) as any)} className="input-field" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="label-text">Description</label>
+                        <input value={card.desc} onChange={(e) => setAbout("cultureCards", (about.cultureCards ?? DEFAULT_CULTURE_CARDS).map((c: AboutCultureCard, j: number) => j === i ? { ...c, desc: e.target.value } : c) as any)} className="input-field" />
+                      </div>
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => setAbout("cultureCards", [...(about.cultureCards ?? DEFAULT_CULTURE_CARDS), { emoji: "✨", title: "New Card", desc: "" }] as any)}
+                    className="btn-outline py-1.5 text-sm w-full">+ Add Card</button>
+                </div>
+                <div className="flex justify-end items-center gap-3 pt-2 border-t border-secondary-100">
+                  {error && <span className="text-sm text-red-600">{error}</span>}
+                  <button onClick={() => saveAboutSection("culture")} className={`btn-primary ${aboutSaved === "culture" ? "!bg-green-600 hover:!bg-green-600" : ""}`}>
+                    {aboutSaved === "culture" ? <><Check size={18} className="mr-2" />Saved</> : <><Save size={18} className="mr-2" />Save Culture</>}
+                  </button>
+                </div>
               </div>
-              <ImageUpload
-                label="Hero Image"
-                value={about.heroImageUrl}
-                onChange={(url) => setAbout("heroImageUrl", url)}
-                folder="settings/about"
-                preview={false}
-              />
-              <div className="grid grid-cols-2 gap-4">
-                {color("Hero Background", "heroBackground")}
-                {color("Hero Text", "heroTextColor")}
-              </div>
-              <h2 className="font-semibold text-secondary-800 pt-4">Mission</h2>
-              <div>
-                <label className="label-text">Eyebrow</label>
-                <input
-                  value={about.missionEyebrow}
-                  onChange={(e) => setAbout("missionEyebrow", e.target.value)}
-                  className="input-field"
-                />
-              </div>
-              <div>
-                <label className="label-text">Title</label>
-                <input
-                  value={about.missionTitle}
-                  onChange={(e) => setAbout("missionTitle", e.target.value)}
-                  className="input-field"
-                />
-              </div>
-              <div>
-                <label className="label-text">Body</label>
-                <textarea
-                  value={about.missionBody}
-                  onChange={(e) => setAbout("missionBody", e.target.value)}
-                  className="input-field min-h-[100px]"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                {color("Mission Background", "missionBackground")}
-                {color("Mission Text", "missionTextColor")}
-              </div>
-              <h2 className="font-semibold text-secondary-800 pt-4">Culture</h2>
-              <div>
-                <label className="label-text">Eyebrow</label>
-                <input
-                  value={about.cultureEyebrow}
-                  onChange={(e) => setAbout("cultureEyebrow", e.target.value)}
-                  className="input-field"
-                />
-              </div>
-              <div>
-                <label className="label-text">Title</label>
-                <input
-                  value={about.cultureTitle}
-                  onChange={(e) => setAbout("cultureTitle", e.target.value)}
-                  className="input-field"
-                />
-              </div>
-              <div>
-                <label className="label-text">Body</label>
-                <textarea
-                  value={about.cultureBody}
-                  onChange={(e) => setAbout("cultureBody", e.target.value)}
-                  className="input-field min-h-[100px]"
-                />
-              </div>
-              <div>
-                <label className="label-text">Closing statement</label>
-                <input
-                  value={about.cultureCreed}
-                  onChange={(e) => setAbout("cultureCreed", e.target.value)}
-                  className="input-field"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                {color("Culture Background", "cultureBackground")}
-                {color("Culture Text", "cultureTextColor")}
-              </div>
-            </>
+            </div>
           )}
           {section === "footer" && (
             <>
@@ -2996,22 +3538,24 @@ export default function SettingsSectionClient({
               </div>
             </>
           )}
-          <div className="flex justify-end items-center gap-3 pt-4 border-t border-secondary-100">
-            {error && <span className="text-sm text-red-600">{error}</span>}
-            <button onClick={save} className="btn-primary">
-              {saved ? (
-                <>
-                  <Check size={18} className="mr-2" />
-                  Saved
-                </>
-              ) : (
-                <>
-                  <Save size={18} className="mr-2" />
-                  Save Settings
-                </>
-              )}
-            </button>
-          </div>
+          {section !== "about" && section !== "announcements" && section !== "newsletter-popup" && (
+            <div className="flex justify-end items-center gap-3 pt-4 border-t border-secondary-100">
+              {error && <span className="text-sm text-red-600">{error}</span>}
+              <button onClick={save} className={`btn-primary ${saved ? "!bg-green-600 hover:!bg-green-600" : ""}`}>
+                {saved ? (
+                  <>
+                    <Check size={18} className="mr-2" />
+                    Saved
+                  </>
+                ) : (
+                  <>
+                    <Save size={18} className="mr-2" />
+                    Save Settings
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </section>
       </div>
     </ProtectedAdmin>

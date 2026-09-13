@@ -4,8 +4,8 @@
 # Read a single value from a file
 env_get() {
   local key="$1" file="$2"
-  [[ ! -f "$file" ]] && echo "" && return
-  grep -E "^${key}=" "$file" | tail -1 | cut -d'=' -f2- | sed "s/^['\"]//;s/['\"]$//"
+  [[ ! -f "$file" ]] && echo "" && return 0
+  grep -E "^${key}=" "$file" | tail -1 | cut -d'=' -f2- | sed "s/^['\"]//;s/['\"]$//" || true
 }
 
 # Upsert a key in a file (replace if exists, append if not)

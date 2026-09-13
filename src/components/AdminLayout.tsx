@@ -2,8 +2,9 @@
 import { type ReactNode, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingBag, LogOut, Menu, FolderTree, ExternalLink, Mail, CreditCard, Send, Search, Truck, Image, FileText, AlertTriangle, Palette, Home, Users, PanelBottom, Plug, Share2, Megaphone, Store, Sparkles, BarChart3, Heart, BookOpen, MessageCircle } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag, LogOut, Menu, FolderTree, ExternalLink, Mail, CreditCard, Send, Search, Truck, Image, FileText, AlertTriangle, Palette, Home, Users, PanelBottom, Plug, Share2, Megaphone, Store, Sparkles, BarChart3, Heart, BookOpen, MessageCircle, Link2, DollarSign } from "lucide-react";
 import { useAdminAuth } from "@/lib/admin-auth";
+import { supabase } from "@/lib/supabase";
 
 const navItems = [
   { path: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -13,6 +14,8 @@ const navItems = [
   { path: "/admin/email", label: "Email - Resend", icon: Mail },
   { path: "/admin/stripe", label: "Stripe - Payments", icon: CreditCard },
   { path: "/admin/mailerlite", label: "MailerLite", icon: Send },
+  { path: "/admin/affiliates", label: "Affiliates", icon: Link2 },
+  { path: "/admin/affiliates/payouts", label: "Affiliate Payouts", icon: DollarSign },
   { path: "/admin/seo", label: "SEO", icon: Search },
   { path: "/admin/shipping", label: "Shipping", icon: Truck },
   { path: "/admin/media", label: "Media", icon: Image },
@@ -20,8 +23,9 @@ const navItems = [
 ];
 
 const settingsItems = [
-  { path: "/admin/settings/announcements", label: "Announcements", icon: Megaphone },
   { path: "/admin/settings/store-information", label: "Store Information", icon: Store },
+  { path: "/admin/settings/announcements", label: "Announcements", icon: Megaphone },
+  { path: "/admin/settings/newsletter-popup", label: "Newsletter Popup", icon: Mail },
   { path: "/admin/settings/branding", label: "Branding", icon: Palette },
   { path: "/admin/settings/admin-menu", label: "Menu Bar", icon: Menu },
   { path: "/admin/settings/homepage-hero", label: "Homepage Hero", icon: Home },
@@ -44,6 +48,15 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [stripeMode, setStripeMode] = useState<"live" | "test" | null>(null);
   const [ordersPaused, setOrdersPaused] = useState<boolean | null>(null);
+  const [storeName, setStoreName] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.from("settings").select("store_name, logo_url").limit(1).maybeSingle().then(({ data }) => {
+      if (data?.store_name) setStoreName(data.store_name);
+      if (data?.logo_url) setLogoUrl(data.logo_url);
+    });
+  }, []);
 
   useEffect(() => {
     fetch("/api/stripe-mode").then((r) => r.ok ? r.json() : null).then((d) => {
@@ -69,7 +82,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       <aside className={`fixed lg:sticky top-0 left-0 h-screen w-64 bg-secondary-900 text-white z-50 transition-transform flex flex-col ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
         <div className="p-6 border-b border-secondary-700 flex-shrink-0">
           <Link href="/admin/dashboard" className="flex items-center gap-2">
-            <span className="font-display text-xl font-bold">Body<span className="text-gold-500">&</span>Sleeves</span>
+            {logoUrl
+              ? <img src={logoUrl} alt={storeName || "Admin"} style={{ height: "28px", width: "auto" }} />
+              : <span className="font-display text-xl font-bold">{storeName || "Admin"}</span>}
           </Link>
           <p className="text-secondary-400 text-xs mt-1">Admin Panel</p>
         </div>
@@ -99,6 +114,14 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           <div className="ml-4 mb-2 border-l border-secondary-700 pl-2 space-y-0.5">
             {settingsItems.map((item) => {
               const active = pathname === item.path;
+              const isDanger = item.path === "/admin/danger";
+              if (isDanger) return (
+                <div key={item.path} className="pt-3 mt-1 border-t border-secondary-700">
+                  <Link href={item.path} onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs ${active ? "bg-red-900/60 text-red-300" : "text-red-500 hover:text-red-300 hover:bg-red-900/40"}`}>
+                    <item.icon size={14} /><span>{item.label}</span>
+                  </Link>
+                </div>
+              );
               return <Link key={item.path} href={item.path} onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs ${active ? "bg-secondary-800 text-white" : "text-secondary-500 hover:text-white hover:bg-secondary-800"}`}><item.icon size={14} /><span>{item.label}</span></Link>;
             })}
           </div>
@@ -120,7 +143,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         <header className="bg-white border-b border-secondary-100 sticky top-0 z-30 flex-shrink-0">
           <div className="flex items-center gap-3">
             <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 text-secondary-700"><Menu size={24} /></button>
-            <h1 className="text-lg font-semibold text-secondary-900">{navItems.find((n) => pathname === n.path)?.label || settingsItems.find((n) => pathname === n.path)?.label || "Admin"}</h1>
+            <h1 className={`text-lg font-semibold ${pathname === "/admin/danger" ? "text-red-600" : "text-secondary-900"}`}>{navItems.find((n) => pathname === n.path)?.label || settingsItems.find((n) => pathname === n.path)?.label || "Admin"}</h1>
             {pathname === "/admin/dashboard" && ordersPaused !== null && (
               <span className={`text-sm font-semibold ${ordersPaused ? "text-red-500" : "text-green-500"}`}>
                 {ordersPaused ? "orders paused" : "orders open"}

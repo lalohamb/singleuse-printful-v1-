@@ -4,7 +4,8 @@ import { Upload, Loader2, X, Image as ImageIcon, Check } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 const BUCKET = "store-images";
-const FOLDERS = ["uploads", "settings/hero", "settings/our-why", "settings/story", "settings/logo"];
+const FOLDERS = ["uploads", "settings/hero", "settings/our-why", "settings/story", "settings/logo", "settings/about", "settings/popup"];
+
 
 interface MediaFile {
   name: string;
@@ -52,14 +53,16 @@ export default function ImageUpload({ value, onChange, folder = "uploads", label
     if (!file.type.startsWith("image/")) { setError("Please select an image file."); return; }
     if (file.size > 5 * 1024 * 1024) { setError("Image must be under 5MB."); return; }
     setUploading(true); setError(null);
-    const ext = file.name.split(".").pop();
-    const path = `${folder}/${Date.now()}.${ext}`;
-    const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: true });
-    if (upErr) { setError(upErr.message); setUploading(false); return; }
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-    onChange(data.publicUrl);
+    // Reset input so the same file can be re-selected
+    if (inputRef.current) inputRef.current.value = "";
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("folder", folder);
+    const res = await fetch("/api/upload", { method: "POST", body: fd });
+    const json = await res.json();
+    if (!res.ok) { setError(json.error || "Upload failed"); setUploading(false); return; }
+    onChange(json.url);
     setUploading(false);
-    // refresh media list if picker was opened before
     if (media.length > 0) fetchMedia();
   };
 

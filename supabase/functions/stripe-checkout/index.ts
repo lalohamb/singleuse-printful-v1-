@@ -52,7 +52,7 @@ Deno.serve(async (req: Request) => {
     });
 
     const body = await req.json();
-    const { items, shipping_address, shipping_name, email, shipping_cost } = body;
+    const { items, shipping_address, shipping_name, email, shipping_cost, affiliate_code } = body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return errorResponse(req, "Items are required", 400);
@@ -67,7 +67,7 @@ Deno.serve(async (req: Request) => {
     const productIds: string[] = [...new Set(items.map((i: any) => String(i.product_id)))];
     const { data: dbProducts, error: dbError } = await supabase
       .from("products")
-      .select("id, title, image_url, images, printify_id, variants")
+      .select("id, title, image_url, images, printify_id, variants, price")
       .in("id", productIds)
       .eq("status", "active");
 
@@ -104,7 +104,8 @@ Deno.serve(async (req: Request) => {
       }
 
       const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
-      const price: number = Number(variant.price);   // dollars, from DB
+      // Fall back to product-level price if variant has no price
+      const price: number = Number(variant.price) || Number(product.price);
       if (!price || price <= 0) {
         return errorResponse(req, `Invalid price for variant ${item.variant_id}`, 400);
       }
@@ -186,6 +187,7 @@ Deno.serve(async (req: Request) => {
           variant_label: item.variant_label,
           personalization_text: item.personalization_text,
         }))),
+        ...(affiliate_code ? { affiliate_code: String(affiliate_code).slice(0, 50) } : {}),
       },
       shipping_address_collection: {
         allowed_countries: ["US", "CA", "GB", "AU"],
@@ -206,6 +208,7 @@ Deno.serve(async (req: Request) => {
       total: verifiedTotal,
       status: "pending",
       items: verifiedItems,
+      ...(affiliate_code ? { affiliate_code } : {}),
     });
 
     if (orderError) {

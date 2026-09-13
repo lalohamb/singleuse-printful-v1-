@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import { ExternalLink, Truck, Package, Globe, Info, RefreshCw, CheckCircle, AlertTriangle, XCircle } from "lucide-react";
+import { ExternalLink, Truck, Package, Globe, Info, RefreshCw, CheckCircle, AlertTriangle, XCircle, Save, Loader2, Check } from "lucide-react";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
+import { supabase } from "@/lib/supabase";
 
 interface Diagnostic {
   mode: "live" | "partial" | "fallback";
@@ -38,6 +39,23 @@ function ModeBadge({ mode }: { mode: Diagnostic["mode"] }) {
 function ShippingPanel() {
   const [diag, setDiag] = useState<Diagnostic | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fallback, setFallback] = useState("6.99");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [settingsId, setSettingsId] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.from("settings").select("id, default_shipping_cost").limit(1).maybeSingle().then(({ data }) => {
+      if (data) { setSettingsId(data.id); setFallback(String(data.default_shipping_cost ?? 6.99)); }
+    });
+  }, []);
+
+  const saveFallback = async () => {
+    if (!settingsId) return;
+    setSaving(true);
+    await supabase.from("settings").update({ default_shipping_cost: parseFloat(fallback) || 6.99 }).eq("id", settingsId);
+    setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
+  };
 
   const runDiagnostic = async () => {
     setLoading(true);
@@ -144,6 +162,26 @@ function ShippingPanel() {
             )}
           </div>
         ) : null}
+      </section>
+
+      {/* Fallback rate control */}
+      <section className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-secondary-900 flex items-center gap-2 mb-2">
+          <Truck size={20} className="text-primary-500" />Fallback Shipping Rate
+        </h2>
+        <p className="text-sm text-secondary-500 mb-4">Used when a product has no Printify shipping profile stored. Keeps checkout from being blocked.</p>
+        <div className="flex items-center gap-3">
+          <span className="text-secondary-500 text-sm">$</span>
+          <input
+            type="number" min="0" step="0.01"
+            value={fallback}
+            onChange={(e) => setFallback(e.target.value)}
+            className="input-field w-32"
+          />
+          <button onClick={saveFallback} disabled={saving} className="btn-primary py-2 text-sm flex items-center gap-2">
+            {saving ? <><Loader2 size={15} className="animate-spin" />Saving...</> : saved ? <><Check size={15} />Saved!</> : <><Save size={15} />Save</>}
+          </button>
+        </div>
       </section>
 
       {/* Printify notice */}

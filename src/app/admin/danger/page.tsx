@@ -74,6 +74,13 @@ function DangerPanel() {
 
   return (
     <div className="max-w-2xl space-y-6">
+      <div className="pb-4 border-b-2 border-red-200">
+        <h1 className="text-2xl font-bold text-red-600 flex items-center gap-2">
+          <AlertTriangle size={24} className="text-red-500" />
+          Danger Zone
+        </h1>
+        <p className="text-sm text-red-400 mt-1">Irreversible actions. Proceed with caution.</p>
+      </div>
       {/* Second confirmation modal */}
       {pendingOption && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">

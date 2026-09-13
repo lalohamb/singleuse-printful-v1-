@@ -17,7 +17,7 @@ const TEMPLATE_SETTINGS: StoreSettings = {
   tagline: "Made for Every Body.",
   hero_title: "Wear What Feels Like You.",
   hero_subtitle: "Thoughtful apparel designed for every body, every style, and every day. Made to order and shipped to your door.",
-  hero_image_url: "https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+  hero_image_url: "https://images.pexels.com/photos/5693889/pexels-photo-5693889.jpeg?auto=compress&cs=tinysrgb&w=1920",
   hero_object_position: "center",
   hero_height_vh: 80,
   hero_image_flip: false,
@@ -83,6 +83,7 @@ const TEMPLATE_SETTINGS: StoreSettings = {
     threads: { url: "https://threads.net/@genderapparel", enabled: true },
     email: { url: "mailto:hello@genderapparel.example", enabled: true },
   },
+  site_menu_settings: null,
 };
 
 const TEMPLATE_CATEGORIES: Category[] = [

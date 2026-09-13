@@ -14,8 +14,8 @@ module.exports = { apps: [{ name: '<PM2_APP_NAME>', script: '.next/standalone/se
   "PRINTIFY_API_TOKEN": "",
   "RESEND_API_KEY": "",
   "MAILER_LITE_API_KEY": "",
-  "STRIPE_SECRET_KEY": "",
-  "STRIPE_WEBHOOK_SECRET": "",
+  "STRIPE_SECRET_KEY": "sk_test_51UEiW6KB3dxCEzFyHDS1XUdupz0sbyvBTb7RYm43SsWtH1o78HZq5VHD5UI1f9SFBWuE5LynY2liwNAnkWf2UZvb00ANyz6ByT",
+  "STRIPE_WEBHOOK_SECRET": "whsec_af49BZjWXG544KmFFMOr2Y8ec6TW3Xtn",
   "NEXT_PUBLIC_SITE_URL": "",
   "PLATFORM_DOMAIN": "",
   "LICENSE_HMAC_SECRET": ""

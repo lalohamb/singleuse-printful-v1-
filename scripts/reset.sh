@@ -32,6 +32,7 @@ read -rp "  Type RESET to confirm: " confirm
 # Load credentials
 SUPABASE_PROJECT_REF=$(env_get "SUPABASE_PROJECT_REF" "$ENV_LOCAL")
 SERVICE_ROLE_KEY=$(env_get "SUPABASE_SERVICE_ROLE_KEY" "$ENV_LOCAL")
+ACCESS_TOKEN=$(env_get "SUPABASE_ACCESS_TOKEN" "$ENV_LOCAL")
 DB_PASSWORD=$(env_get "DB_PASSWORD" "$ENV_LOCAL")
 
 DB_URL=""
@@ -41,7 +42,7 @@ fi
 
 echo ""
 echo "  Running reset SQL..."
-if run_sql_file "$SQL_DIR/02_reset.sql" "$SUPABASE_PROJECT_REF" "$SERVICE_ROLE_KEY" "$DB_URL"; then
+if run_sql_file "$SQL_DIR/02_reset.sql" "$SUPABASE_PROJECT_REF" "$SERVICE_ROLE_KEY" "$DB_URL" "$ACCESS_TOKEN"; then
   ok "Data wiped"
 else
   fail "Reset SQL failed"
@@ -80,7 +81,7 @@ WHERE id = (SELECT id FROM settings LIMIT 1);
 EOSQL
 )
 
-if run_sql "$SEED_SQL" "$SUPABASE_PROJECT_REF" "$SERVICE_ROLE_KEY" "$DB_URL"; then
+if run_sql "$SEED_SQL" "$SUPABASE_PROJECT_REF" "$SERVICE_ROLE_KEY" "$DB_URL" "$ACCESS_TOKEN"; then
   ok "Settings restored to defaults"
 else
   warn "Settings seed failed — configure manually via admin UI"

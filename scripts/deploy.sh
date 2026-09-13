@@ -1,16 +1,20 @@
 #!/bin/bash
 set -e
 
-APP_DIR="/var/www/bodyandsleeves"
-APP_NAME="bodyandsleeves"
+APP_DIR="/var/www/genderapparel"
+APP_NAME="genderapparel"
 
 echo "🚀 Deploying $APP_NAME..."
 
 cd $APP_DIR
 
 echo "📦 Pulling latest code..."
-git fetch origin
-git reset --hard origin/main
+if git remote | grep -q origin; then
+  git fetch origin
+  git reset --hard origin/main
+else
+  echo "No git remote found — skipping pull (local mode)"
+fi
 
 echo "🔧 Installing dependencies..."
 npm install --prefer-offline

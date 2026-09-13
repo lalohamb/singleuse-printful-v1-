@@ -11,8 +11,17 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storage: {
       getItem: (key) => {
         if (typeof document === "undefined") return null;
-        const match = document.cookie.match(new RegExp(`(^| )${key}=([^;]+)`));
-        return match ? decodeURIComponent(match[2]) : null;
+        // Reassemble chunked cookies (sb-xxx-auth-token.0, .1, ...)
+        const all = document.cookie.split("; ");
+        const base = all.find((c) => c.startsWith(`${key}=`));
+        if (base) return decodeURIComponent(base.split("=").slice(1).join("="));
+        let chunks = "";
+        for (let i = 0; ; i++) {
+          const chunk = all.find((c) => c.startsWith(`${key}.${i}=`));
+          if (!chunk) break;
+          chunks += decodeURIComponent(chunk.split("=").slice(1).join("="));
+        }
+        return chunks || null;
       },
       setItem: (key, value) => {
         if (typeof document === "undefined") return;
@@ -82,6 +91,16 @@ export async function getShippingQuote({
 
   return Math.round(total * 100) / 100;
 }
+export function getAffiliateCode(): string | null {
+  try {
+    const raw = localStorage.getItem("affiliate_ref");
+    if (!raw) return null;
+    const { code, expires } = JSON.parse(raw);
+    if (Date.now() > expires) { localStorage.removeItem("affiliate_ref"); return null; }
+    return code;
+  } catch { return null; }
+}
+
 export async function createStripeCheckout(payload: {
   items: Array<{
     product_id: string;
@@ -93,6 +112,7 @@ export async function createStripeCheckout(payload: {
   shipping_name: string;
   email: string;
   shipping_cost: number;
+  affiliate_code?: string;
 }): Promise<{ url: string; session_id: string }> {
   const apiUrl = `${supabaseUrl}/functions/v1/stripe-checkout`;
   const res = await fetch(apiUrl, {

@@ -17,7 +17,18 @@ export async function requireAdmin(): Promise<NextResponse | null> {
   // the client version / SSR setup.
   const projectRef = process.env.NEXT_PUBLIC_SUPABASE_URL?.split("//")[1]?.split(".")[0];
   const cookieKey = `sb-${projectRef}-auth-token`;
-  const raw = cookieStore.get(cookieKey)?.value;
+
+  // Reassemble chunked cookies (.0, .1, ...) or fall back to base key
+  let raw = cookieStore.get(cookieKey)?.value ?? "";
+  if (!raw) {
+    let i = 0;
+    while (true) {
+      const chunk = cookieStore.get(`${cookieKey}.${i}`)?.value;
+      if (!chunk) break;
+      raw += chunk;
+      i++;
+    }
+  }
 
   if (!raw) return unauthorized();
 

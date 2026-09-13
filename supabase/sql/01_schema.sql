@@ -1,26 +1,102 @@
--- =============================================================================
--- Gender Apparel — Full Install Script
--- Run this in Supabase SQL Editor on a fresh project.
--- =============================================================================
+/*
+# Gender Apparel E-Commerce Schema
 
+## Overview
+Creates the full database schema for an apparel e-commerce site celebrating Black culture.
+Products are synced from Printify but stored locally for fast storefront browsing.
+Orders are stored locally and optionally forwarded to Printify for fulfillment.
+Admin access is controlled via an `admins` table checked against auth.users.
 
--- ============================================================================
--- ADMINS
--- Must be created first — all other table policies reference it.
--- ============================================================================
+## New Tables
+
+### admins (created first — other policies depend on it)
+- `id` (uuid, PK, DEFAULT auth.uid())
+- `email` (text, not null)
+- `role` (text, default 'admin') — 'admin' | 'super_admin'
+- `created_at` (timestamptz)
+
+### categories
+- `id` (uuid, PK)
+- `name` (text, unique)
+- `slug` (text, unique)
+- `description` (text)
+- `created_at` (timestamptz)
+
+### products
+- `id` (uuid, PK)
+- `printify_id` (text, unique, nullable)
+- `title` (text, not null)
+- `description` (text)
+- `category_id` (uuid, FK → categories)
+- `price` (numeric(10,2))
+- `cost` (numeric(10,2))
+- `image_url` (text)
+- `images` (jsonb)
+- `status` (text) — 'active' | 'draft' | 'archived'
+- `featured` (boolean, default false)
+- `print_provider_id` (text, nullable)
+- `blueprint_id` (text, nullable)
+- `variants` (jsonb) — Printify variant data
+- `shipping_info` (jsonb)
+- `created_at` (timestamptz)
+- `updated_at` (timestamptz)
+
+### orders
+- `id` (uuid, PK)
+- `printify_order_id` (text, nullable)
+- `stripe_session_id` (text, nullable)
+- `stripe_payment_intent_id` (text, nullable)
+- `email` (text, not null)
+- `shipping_name` (text, not null)
+- `shipping_address` (jsonb, not null)
+- `shipping_method` (text, nullable)
+- `shipping_cost` (numeric(10,2), default 0)
+- `subtotal` (numeric(10,2), not null)
+- `total` (numeric(10,2), not null)
+- `currency` (text, default 'USD')
+- `status` (text)
+- `fulfillment_status` (text, nullable)
+- `tracking_number` (text, nullable)
+- `tracking_url` (text, nullable)
+- `items` (jsonb, not null)
+- `created_at` (timestamptz)
+- `updated_at` (timestamptz)
+
+### settings
+- `id` (uuid, PK, single row)
+- `store_name`, `tagline`, `hero_image_url`, `hero_title`, `hero_subtitle`
+- `announcement`, `announcement_active`
+- `shipping_free_threshold`, `default_shipping_cost`
+- `printify_connected`, `stripe_connected`
+- `updated_at` (timestamptz)
+
+## Security
+- All tables have RLS enabled.
+- Public tables (categories, products, settings): anon+authenticated can SELECT; only authenticated admins can INSERT/UPDATE/DELETE.
+- Orders: anyone can INSERT (checkout); only admins can SELECT/UPDATE/DELETE.
+- Admins: authenticated users can SELECT their own row; super_admins can INSERT/DELETE.
+
+## Important Notes
+1. Settings table is seeded with a single default row.
+2. Sample categories and products are seeded for initial storefront display.
+3. The admins table is created first because other table policies reference it.
+*/
+
+-- ============ ADMINS (must be first — policies on other tables reference it) ============
 CREATE TABLE IF NOT EXISTS admins (
-  id         uuid PRIMARY KEY DEFAULT auth.uid(),
-  email      text NOT NULL,
-  role       text NOT NULL DEFAULT 'admin', -- 'admin' | 'super_admin'
+  id uuid PRIMARY KEY DEFAULT auth.uid(),
+  email text NOT NULL,
+  role text NOT NULL DEFAULT 'admin',
   created_at timestamptz DEFAULT now()
 );
 
 ALTER TABLE admins ENABLE ROW LEVEL SECURITY;
 
--- Non-recursive: each user can only read their own row
 DROP POLICY IF EXISTS "auth_read_admins" ON admins;
 CREATE POLICY "auth_read_admins" ON admins FOR SELECT
-  TO authenticated USING (auth.uid() = id);
+  TO authenticated USING (auth.uid() = id OR EXISTS (
+    SELECT 1 FROM admins a WHERE a.id = auth.uid() AND a.role = 'super_admin'
+  ));
 
 DROP POLICY IF EXISTS "super_admin_insert_admins" ON admins;
 CREATE POLICY "super_admin_insert_admins" ON admins FOR INSERT
@@ -34,16 +110,13 @@ CREATE POLICY "super_admin_delete_admins" ON admins FOR DELETE
     EXISTS (SELECT 1 FROM admins a WHERE a.id = auth.uid() AND a.role = 'super_admin')
   );
 
-
--- ============================================================================
--- CATEGORIES
--- ============================================================================
+-- ============ CATEGORIES ============
 CREATE TABLE IF NOT EXISTS categories (
-  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name        text UNIQUE NOT NULL,
-  slug        text UNIQUE NOT NULL,
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text UNIQUE NOT NULL,
+  slug text UNIQUE NOT NULL,
   description text,
-  created_at  timestamptz DEFAULT now()
+  created_at timestamptz DEFAULT now()
 );
 
 ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
@@ -60,9 +133,11 @@ CREATE POLICY "admin_insert_categories" ON categories FOR INSERT
 
 DROP POLICY IF EXISTS "admin_update_categories" ON categories;
 CREATE POLICY "admin_update_categories" ON categories FOR UPDATE
-  TO authenticated
-  USING     (EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()))
-  WITH CHECK(EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()));
+  TO authenticated USING (
+    EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid())
+  ) WITH CHECK (
+    EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid())
+  );
 
 DROP POLICY IF EXISTS "admin_delete_categories" ON categories;
 CREATE POLICY "admin_delete_categories" ON categories FOR DELETE
@@ -70,33 +145,32 @@ CREATE POLICY "admin_delete_categories" ON categories FOR DELETE
     EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid())
   );
 
-
--- ============================================================================
--- PRODUCTS
--- ============================================================================
+-- ============ PRODUCTS ============
 CREATE TABLE IF NOT EXISTS products (
-  id                uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  printify_id       text        UNIQUE,
-  title             text        NOT NULL,
-  description       text,
-  category_id       uuid        REFERENCES categories(id) ON DELETE SET NULL,
-  price             numeric(10,2) NOT NULL,
-  cost              numeric(10,2) DEFAULT 0,
-  image_url         text,
-  images            jsonb       DEFAULT '[]'::jsonb,
-  status            text        NOT NULL DEFAULT 'active', -- 'active' | 'draft' | 'archived'
-  featured          boolean     NOT NULL DEFAULT false,
-  is_new_arrival    boolean     NOT NULL DEFAULT false,
-  is_trending       boolean     NOT NULL DEFAULT false,
-  is_bestseller     boolean     NOT NULL DEFAULT false,
-  is_on_sale        boolean     NOT NULL DEFAULT false,
-  content_locked    boolean     NOT NULL DEFAULT false,
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  printify_id text UNIQUE,
+  title text NOT NULL,
+  description text,
+  category_id uuid REFERENCES categories(id) ON DELETE SET NULL,
+  price numeric(10,2) NOT NULL,
+  cost numeric(10,2) DEFAULT 0,
+  image_url text,
+  images jsonb DEFAULT '[]'::jsonb,
+  status text NOT NULL DEFAULT 'active',
+  featured boolean NOT NULL DEFAULT false,
+  is_personalizable boolean NOT NULL DEFAULT false,
+  is_new_arrival boolean NOT NULL DEFAULT false,
+  is_trending boolean NOT NULL DEFAULT false,
+  is_bestseller boolean NOT NULL DEFAULT false,
+  is_on_sale boolean NOT NULL DEFAULT false,
+  content_locked boolean NOT NULL DEFAULT false,
+  personalization_label text,
   print_provider_id text,
-  blueprint_id      text,
-  variants          jsonb       DEFAULT '[]'::jsonb,
-  shipping_info     jsonb       DEFAULT '{}'::jsonb,
-  created_at        timestamptz DEFAULT now(),
-  updated_at        timestamptz DEFAULT now()
+  blueprint_id text,
+  variants jsonb DEFAULT '[]'::jsonb,
+  shipping_info jsonb DEFAULT '{}'::jsonb,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
 );
 
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
@@ -113,9 +187,11 @@ CREATE POLICY "admin_insert_products" ON products FOR INSERT
 
 DROP POLICY IF EXISTS "admin_update_products" ON products;
 CREATE POLICY "admin_update_products" ON products FOR UPDATE
-  TO authenticated
-  USING     (EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()))
-  WITH CHECK(EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()));
+  TO authenticated USING (
+    EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid())
+  ) WITH CHECK (
+    EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid())
+  );
 
 DROP POLICY IF EXISTS "admin_delete_products" ON products;
 CREATE POLICY "admin_delete_products" ON products FOR DELETE
@@ -123,39 +199,27 @@ CREATE POLICY "admin_delete_products" ON products FOR DELETE
     EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid())
   );
 
-CREATE INDEX IF NOT EXISTS idx_products_category    ON products(category_id);
-CREATE INDEX IF NOT EXISTS idx_products_status      ON products(status);
-CREATE INDEX IF NOT EXISTS idx_products_featured    ON products(featured);
-CREATE INDEX IF NOT EXISTS idx_products_new_arrival ON products(is_new_arrival) WHERE is_new_arrival;
-CREATE INDEX IF NOT EXISTS idx_products_trending    ON products(is_trending)    WHERE is_trending;
-CREATE INDEX IF NOT EXISTS idx_products_bestseller  ON products(is_bestseller)  WHERE is_bestseller;
-CREATE INDEX IF NOT EXISTS idx_products_on_sale     ON products(is_on_sale)     WHERE is_on_sale;
-
-
--- ============================================================================
--- ORDERS
--- ============================================================================
+-- ============ ORDERS ============
 CREATE TABLE IF NOT EXISTS orders (
-  id                        uuid          PRIMARY KEY DEFAULT gen_random_uuid(),
-  printify_order_id         text,
-  stripe_session_id         text,
-  stripe_payment_intent_id  text,
-  email                     text          NOT NULL,
-  shipping_name             text          NOT NULL,
-  shipping_address          jsonb         NOT NULL,
-  shipping_method           text,
-  shipping_cost             numeric(10,2) DEFAULT 0,
-  subtotal                  numeric(10,2) NOT NULL,
-  total                     numeric(10,2) NOT NULL,
-  currency                  text          DEFAULT 'USD',
-  status                    text          NOT NULL DEFAULT 'pending',
-  fulfillment_status        text,
-  tracking_number           text,
-  tracking_url              text,
-  items                     jsonb         NOT NULL,
-  livemode                  boolean       NOT NULL DEFAULT true,
-  created_at                timestamptz   DEFAULT now(),
-  updated_at                timestamptz   DEFAULT now()
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  printify_order_id text,
+  stripe_session_id text,
+  stripe_payment_intent_id text,
+  email text NOT NULL,
+  shipping_name text NOT NULL,
+  shipping_address jsonb NOT NULL,
+  shipping_method text,
+  shipping_cost numeric(10,2) DEFAULT 0,
+  subtotal numeric(10,2) NOT NULL,
+  total numeric(10,2) NOT NULL,
+  currency text DEFAULT 'USD',
+  status text NOT NULL DEFAULT 'pending',
+  fulfillment_status text,
+  tracking_number text,
+  tracking_url text,
+  items jsonb NOT NULL,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
 );
 
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
@@ -172,9 +236,11 @@ CREATE POLICY "admin_read_orders" ON orders FOR SELECT
 
 DROP POLICY IF EXISTS "admin_update_orders" ON orders;
 CREATE POLICY "admin_update_orders" ON orders FOR UPDATE
-  TO authenticated
-  USING     (EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()))
-  WITH CHECK(EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()));
+  TO authenticated USING (
+    EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid())
+  ) WITH CHECK (
+    EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid())
+  );
 
 DROP POLICY IF EXISTS "admin_delete_orders" ON orders;
 CREATE POLICY "admin_delete_orders" ON orders FOR DELETE
@@ -182,84 +248,29 @@ CREATE POLICY "admin_delete_orders" ON orders FOR DELETE
     EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid())
   );
 
-CREATE INDEX IF NOT EXISTS idx_orders_status     ON orders(status);
-CREATE INDEX IF NOT EXISTS idx_orders_email      ON orders(email);
-CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_orders_livemode   ON orders(livemode);
-
-
--- ============================================================================
--- SETTINGS  (single row)
--- ============================================================================
+-- ============ SETTINGS ============
 CREATE TABLE IF NOT EXISTS settings (
-  id                      uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  store_name              text        NOT NULL DEFAULT 'Gender Apparel',
-  tagline                 text        DEFAULT 'Made for Every Body.',
-  hero_image_url          text,
-  hero_object_position    text        DEFAULT '0px 0px',
-  hero_title              text,
-  hero_subtitle           text,
-  hero_height_vh          numeric     DEFAULT 80,
-  hero_image_flip         boolean     DEFAULT false,
-  hero_image_scale        numeric     DEFAULT 1,
-  hero_gradient_opacity   numeric     DEFAULT 0.4,
-  hero_gradient_dir       text        DEFAULT 'to right',
-  hero_image_fit          text        DEFAULT 'cover',
-  story_image_url         text,
-  story_object_position   text        DEFAULT '0px 0px',
-  story_image_scale       numeric     DEFAULT 100,
-  story_image_flip        boolean     DEFAULT false,
-  story_image_fit         text        DEFAULT 'cover',
-  story_gradient_opacity  numeric     DEFAULT 40,
-  story_gradient_dir      text        DEFAULT 'full',
-  logo_url                text,
-  logo_size               numeric     DEFAULT 40,
-  footer_text             text        DEFAULT 'Made-to-order apparel designed for every body, every style, and every day. Wear what feels like you.',
-  footer_bottom_message   text        DEFAULT 'Made to order. Made with love.',
-  footer_logo_url         text,
-  footer_logo_size        numeric     DEFAULT 40,
-  about_settings          jsonb,
-  affirmations_settings   jsonb,
-  new_arrivals_settings   jsonb,
-  brand_values_settings   jsonb,
-  testimonials            jsonb       DEFAULT '[{"quote":"I wore my shirt to a family reunion and got so many compliments. This brand truly gets us.","name":"Jasmine T.","location":"Atlanta, GA","product":"Culture First Tee"},{"quote":"The quality is unmatched. Soft, true to size, and the design is everything. Will be ordering again.","name":"Marcus W.","location":"Houston, TX","product":"Faith Over Fear Hoodie"},{"quote":"Finally a brand that celebrates who we are. Every piece feels intentional and powerful.","name":"Aaliyah R.","location":"Chicago, IL","product":"Heritage Collection"}]'::jsonb,
-  promo_banner_active     boolean     DEFAULT false,
-  promo_banner_title      text,
-  promo_banner_body       text,
-  promo_banner_cta_label  text,
-  promo_banner_cta_url    text,
-  promo_banner_bg_color   text        DEFAULT '#1a1a1a',
-  our_why_image_url       text,
-  our_why_object_position text        DEFAULT '0px 0px',
-  our_why_height_vh       numeric     DEFAULT 60,
-  our_why_label           text,
-  our_why_quote           text,
-  our_why_body            text,
-  our_why_image_scale     numeric     DEFAULT 1,
-  our_why_image_flip      boolean     DEFAULT false,
-  our_why_image_fit       text        DEFAULT 'cover',
-  our_why_gradient_opacity numeric    DEFAULT 0.4,
-  our_why_gradient_dir    text        DEFAULT 'to right',
-  announcement            text,
-  announcement_active     boolean     DEFAULT true,
-  orders_paused           boolean     NOT NULL DEFAULT false,
-  shipping_free_threshold numeric     DEFAULT 75,
-  default_shipping_cost   numeric     DEFAULT 6.99,
-  printify_connected      boolean     DEFAULT false,
-  printify_shop_id        text,
-  stripe_connected        boolean     DEFAULT false,
-  social_links            jsonb       NOT NULL DEFAULT '{
-    "instagram": {"url": "https://instagram.com/body_and_sleeves", "enabled": true},
-    "tiktok":    {"url": "https://tiktok.com/@genderapparel", "enabled": true},
-    "facebook":  {"url": "https://facebook.com/genderapparel", "enabled": true},
-    "youtube":   {"url": "https://youtube.com/@genderapparel", "enabled": true},
-    "pinterest": {"url": "https://pinterest.com/genderapparel", "enabled": true},
-    "snapchat":  {"url": "https://snapchat.com/add/genderapparel", "enabled": true},
-    "threads":   {"url": "https://threads.net/@genderapparel", "enabled": true},
-    "email":     {"url": "mailto:hello@genderapparel.example", "enabled": true}
-  }'::jsonb,
-  favicon_url             text,
-  updated_at              timestamptz DEFAULT now()
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  store_name text NOT NULL DEFAULT 'Gender Apparel',
+  tagline text DEFAULT 'Wear Your Heritage',
+  footer_text text DEFAULT 'Made-to-order apparel designed for every body, every style, and every day. Wear what feels like you.',
+  footer_bottom_message text DEFAULT 'Made to order. Made with love.',
+  footer_logo_url text,
+  footer_logo_size numeric DEFAULT 40,
+  about_settings jsonb,
+  affirmations_settings jsonb,
+  new_arrivals_settings jsonb,
+  brand_values_settings jsonb,
+  hero_image_url text,
+  hero_title text,
+  hero_subtitle text,
+  announcement text,
+  announcement_active boolean DEFAULT true,
+  shipping_free_threshold numeric DEFAULT 75,
+  default_shipping_cost numeric DEFAULT 6.99,
+  printify_connected boolean DEFAULT false,
+  stripe_connected boolean DEFAULT false,
+  updated_at timestamptz DEFAULT now()
 );
 
 ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
@@ -270,127 +281,140 @@ CREATE POLICY "public_read_settings" ON settings FOR SELECT
 
 DROP POLICY IF EXISTS "admin_update_settings" ON settings;
 CREATE POLICY "admin_update_settings" ON settings FOR UPDATE
-  TO authenticated
-  USING     (EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()))
-  WITH CHECK(EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()));
+  TO authenticated USING (
+    EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid())
+  ) WITH CHECK (
+    EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid())
+  );
 
-
--- ============================================================================
--- SEO SETTINGS  (single row)
--- ============================================================================
-CREATE TABLE IF NOT EXISTS seo_settings (
-  id                      uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  site_url                text        NOT NULL DEFAULT 'https://genderapparel.example',
-  default_og_image        text,
-  sitemap_enabled         boolean     NOT NULL DEFAULT true,
-  robots_noindex_admin    boolean     NOT NULL DEFAULT true,
-  jsonld_enabled          boolean     NOT NULL DEFAULT true,
-  canonical_enabled       boolean     NOT NULL DEFAULT true,
-  meta_title_suffix       text        NOT NULL DEFAULT '| Gender Apparel',
-  twitter_handle          text        DEFAULT '@body_and_sleeves',
-  google_site_verification text,
-  updated_at              timestamptz NOT NULL DEFAULT now()
-);
-
-ALTER TABLE seo_settings ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "admins_all" ON seo_settings;
-DROP POLICY IF EXISTS "public_read_seo_settings" ON seo_settings;
-DROP POLICY IF EXISTS "admin_update_seo_settings" ON seo_settings;
-CREATE POLICY "public_read_seo_settings" ON seo_settings FOR SELECT
-  TO anon, authenticated USING (true);
-CREATE POLICY "admin_update_seo_settings" ON seo_settings FOR UPDATE
-  TO authenticated
-  USING     (EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()))
-  WITH CHECK(EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()));
-
-
--- ============================================================================
--- SEED DATA
--- ============================================================================
+-- ============ SEED DATA ============
 
 INSERT INTO categories (name, slug, description) VALUES
-  ('T-Shirts',    't-shirts',    'Premium tees with culturally inspired designs'),
-  ('Hoodies',     'hoodies',     'Comfortable hoodies for every season'),
-  ('Hats',        'hats',        'Caps and headwear to complete your look'),
-  ('Sweatpants',  'sweatpants',  'Matching bottoms for your streetwear sets'),
+  ('T-Shirts', 't-shirts', 'Premium tees with culturally inspired designs'),
+  ('Hoodies', 'hoodies', 'Comfortable hoodies for every season'),
+  ('Hats', 'hats', 'Caps and headwear to complete your look'),
+  ('Sweatpants', 'sweatpants', 'Matching bottoms for your streetwear sets'),
   ('Accessories', 'accessories', 'Tote bags, stickers, and more')
 ON CONFLICT (slug) DO NOTHING;
 
-INSERT INTO settings (
-  store_name, tagline, hero_title, hero_subtitle, hero_image_url,
-  announcement, announcement_active
-) VALUES (
+INSERT INTO settings (store_name, tagline, hero_title, hero_subtitle, hero_image_url, announcement, announcement_active)
+VALUES (
   'Gender Apparel',
-  'Made for Every Body.',
-  'Empower Yourself. Empower the Culture.',
-  'Apparel celebrating Black culture, faith, and family. Every design made with intention, printed on demand, shipped to your door.',
+  'Wear Your Heritage',
+  'Culture. Style. Heritage.',
+  'Premium apparel celebrating Black culture, designed by us, printed on demand, shipped to your door.',
   'https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
-  'Made to order. Made with love. — Free shipping on orders over $75',
+  'Free shipping on orders over $75 — Celebrate Black excellence every day',
   true
-) ON CONFLICT DO NOTHING;
+)
+ON CONFLICT DO NOTHING;
 
-INSERT INTO seo_settings (id)
-  VALUES ('00000000-0000-0000-0000-000000000001')
-  ON CONFLICT (id) DO NOTHING;
+INSERT INTO products (title, description, category_id, price, cost, image_url, images, status, featured, variants) VALUES
+  (
+    'Heritage Crown Tee',
+    'A statement piece celebrating the richness of Black heritage. Crafted from premium cotton for all-day comfort.',
+    (SELECT id FROM categories WHERE slug = 't-shirts'),
+    29.99, 12.50,
+    'https://images.pexels.com/photos/33258841/pexels-photo-33258841.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
+    '["https://images.pexels.com/photos/33258841/pexels-photo-33258841.jpeg?auto=compress&cs=tinysrgb&h=650&w=940","https://images.pexels.com/photos/35625406/pexels-photo-35625406.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"]'::jsonb,
+    'active', true,
+    '[{"id":"S","label":"Small","color":"Black","price":29.99},{"id":"M","label":"Medium","color":"Black","price":29.99},{"id":"L","label":"Large","color":"Black","price":29.99},{"id":"XL","label":"X-Large","color":"Black","price":29.99},{"id":"2XL","label":"2X-Large","color":"Black","price":29.99}]'::jsonb
+  ),
+  (
+    'Urban Pride Hoodie',
+    'Stay warm and stylish with this premium hoodie featuring bold cultural designs. Perfect for year-round wear.',
+    (SELECT id FROM categories WHERE slug = 'hoodies'),
+    29.99, 22.00,
+    'https://images.pexels.com/photos/18016399/pexels-photo-18016399.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
+    '["https://images.pexels.com/photos/18016399/pexels-photo-18016399.jpeg?auto=compress&cs=tinysrgb&h=650&w=940","https://images.pexels.com/photos/6311644/pexels-photo-6311644.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"]'::jsonb,
+    'active', true,
+    '[{"id":"S","label":"Small","color":"Black","price":29.99},{"id":"M","label":"Medium","color":"Black","price":29.99},{"id":"L","label":"Large","color":"Black","price":29.99},{"id":"XL","label":"X-Large","color":"Black","price":29.99},{"id":"2XL","label":"2X-Large","color":"Black","price":29.99}]'::jsonb
+  ),
+  (
+    'Street Culture Cap',
+    'A classic cap with a modern twist. Adjustable fit, premium embroidery, designed for the culture.',
+    (SELECT id FROM categories WHERE slug = 'hats'),
+    28.00, 8.50,
+    'https://images.pexels.com/photos/13447017/pexels-photo-13447017.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
+    '["https://images.pexels.com/photos/13447017/pexels-photo-13447017.jpeg?auto=compress&cs=tinysrgb&h=650&w=940","https://images.pexels.com/photos/16234507/pexels-photo-16234507.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"]'::jsonb,
+    'active', true,
+    '[{"id":"OS","label":"One Size","color":"Black","price":28.00},{"id":"OS","label":"One Size","color":"White","price":28.00}]'::jsonb
+  ),
+  (
+    'Movement Sweatpants',
+    'Premium joggers designed for comfort and style. Features a tapered fit with cultural accent detailing.',
+    (SELECT id FROM categories WHERE slug = 'sweatpants'),
+    29.99, 18.00,
+    'https://images.pexels.com/photos/6311619/pexels-photo-6311619.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
+    '["https://images.pexels.com/photos/6311619/pexels-photo-6311619.jpeg?auto=compress&cs=tinysrgb&h=650&w=940","https://images.pexels.com/photos/25457430/pexels-photo-25457430.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"]'::jsonb,
+    'active', true,
+    '[{"id":"S","label":"Small","color":"Black","price":29.99},{"id":"M","label":"Medium","color":"Black","price":29.99},{"id":"L","label":"Large","color":"Black","price":29.99},{"id":"XL","label":"X-Large","color":"Black","price":29.99}]'::jsonb
+  ),
+  (
+    'Roots & Culture Tee',
+    'A tribute to the roots that ground us. Lightweight, breathable, and perfect for making a statement.',
+    (SELECT id FROM categories WHERE slug = 't-shirts'),
+    29.99, 12.50,
+    'https://images.pexels.com/photos/8794470/pexels-photo-8794470.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
+    '["https://images.pexels.com/photos/8794470/pexels-photo-8794470.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"]'::jsonb,
+    'active', true,
+    '[{"id":"S","label":"Small","color":"White","price":29.99},{"id":"M","label":"Medium","color":"White","price":29.99},{"id":"L","label":"Large","color":"White","price":29.99},{"id":"XL","label":"X-Large","color":"White","price":29.99}]'::jsonb
+  ),
+  (
+    'Night City Hoodie',
+    'Effortless style meets cultural pride. This hoodie features a relaxed fit and premium fleece interior.',
+    (SELECT id FROM categories WHERE slug = 'hoodies'),
+    29.99, 22.00,
+    'https://images.pexels.com/photos/7061864/pexels-photo-7061864.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
+    '["https://images.pexels.com/photos/7061864/pexels-photo-7061864.jpeg?auto=compress&cs=tinysrgb&h=650&w=940","https://images.pexels.com/photos/7061927/pexels-photo-7061927.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"]'::jsonb,
+    'active', false,
+    '[{"id":"S","label":"Small","color":"Gray","price":29.99},{"id":"M","label":"Medium","color":"Gray","price":29.99},{"id":"L","label":"Large","color":"Gray","price":29.99},{"id":"XL","label":"X-Large","color":"Gray","price":29.99}]'::jsonb
+  ),
+  (
+    'Pineapple Vibes Hoodie',
+    'Fun, fresh, and full of personality. A standout hoodie for those who lead with joy.',
+    (SELECT id FROM categories WHERE slug = 'hoodies'),
+    29.99, 22.00,
+    'https://images.pexels.com/photos/859058/pexels-photo-859058.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
+    '["https://images.pexels.com/photos/859058/pexels-photo-859058.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"]'::jsonb,
+    'active', false,
+    '[{"id":"S","label":"Small","color":"Green","price":29.99},{"id":"M","label":"Medium","color":"Green","price":29.99},{"id":"L","label":"Large","color":"Green","price":29.99}]'::jsonb
+  ),
+  (
+    'Classic Black Tee',
+    'The essential black tee. Clean, versatile, and always in style.',
+    (SELECT id FROM categories WHERE slug = 't-shirts'),
+    25.00, 12.50,
+    'https://images.pexels.com/photos/35625406/pexels-photo-35625406.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
+    '["https://images.pexels.com/photos/35625406/pexels-photo-35625406.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"]'::jsonb,
+    'active', false,
+    '[{"id":"S","label":"Small","color":"Black","price":25.00},{"id":"M","label":"Medium","color":"Black","price":25.00},{"id":"L","label":"Large","color":"Black","price":25.00},{"id":"XL","label":"X-Large","color":"Black","price":25.00}]'::jsonb
+  ),
+  (
+    'Statement Royal Tee',
+    'Bold design meets premium quality. This tee makes a statement without saying a word.',
+    (SELECT id FROM categories WHERE slug = 't-shirts'),
+    29.99, 12.50,
+    'https://images.pexels.com/photos/34433423/pexels-photo-34433423.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
+    '["https://images.pexels.com/photos/34433423/pexels-photo-34433423.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"]'::jsonb,
+    'active', false,
+    '[{"id":"S","label":"Small","color":"White","price":29.99},{"id":"M","label":"Medium","color":"White","price":29.99},{"id":"L","label":"Large","color":"White","price":29.99}]'::jsonb
+  ),
+  (
+    'Streetwear Set Hat',
+    'Complete your look with this premium adjustable cap. Minimal design, maximum impact.',
+    (SELECT id FROM categories WHERE slug = 'hats'),
+    26.00, 8.50,
+    'https://images.pexels.com/photos/33882157/pexels-photo-33882157.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
+    '["https://images.pexels.com/photos/33882157/pexels-photo-33882157.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"]'::jsonb,
+    'active', false,
+    '[{"id":"OS","label":"One Size","color":"Black","price":26.00}]'::jsonb
+  )
+ON CONFLICT (printify_id) DO NOTHING;
 
-
--- ============================================================================
--- POLICIES
--- ============================================================================
-CREATE TABLE IF NOT EXISTS policies (
-  id         text        PRIMARY KEY, -- 'terms' | 'privacy' | 'refund'
-  title      text        NOT NULL,
-  content    text        NOT NULL DEFAULT '',
-  locked     boolean     NOT NULL DEFAULT false,
-  updated_at timestamptz DEFAULT now()
-);
-
-ALTER TABLE policies ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "public_read_policies" ON policies;
-CREATE POLICY "public_read_policies" ON policies FOR SELECT
-  TO anon, authenticated USING (true);
-
-DROP POLICY IF EXISTS "admin_update_policies" ON policies;
-CREATE POLICY "admin_update_policies" ON policies FOR UPDATE
-  TO authenticated
-  USING     (EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()))
-  WITH CHECK(EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()));
-
-DROP POLICY IF EXISTS "admin_insert_policies" ON policies;
-CREATE POLICY "admin_insert_policies" ON policies FOR INSERT
-  TO authenticated WITH CHECK (
-    EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid())
-  );
-
-INSERT INTO policies (id, title, content) VALUES
-  ('terms',   'Terms of Service',          ''),
-  ('privacy', 'Privacy Policy',            ''),
-  ('refund',  'Refund and Returns Policy', '')
-ON CONFLICT (id) DO NOTHING;
-
-
--- ============================================================================
--- EMAIL EVENTS
--- ============================================================================
-CREATE TABLE IF NOT EXISTS email_events (
-  id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  resend_id  text        NOT NULL,
-  to_email   text        NOT NULL,
-  subject    text,
-  event_type text        NOT NULL, -- sent, delivered, opened, clicked, bounced, complained
-  created_at timestamptz DEFAULT now()
-);
-
-ALTER TABLE email_events ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "admin_all_email_events" ON email_events;
-CREATE POLICY "admin_all_email_events" ON email_events FOR ALL
-  TO authenticated USING (
-    EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid())
-  );
-
-CREATE INDEX IF NOT EXISTS idx_email_events_resend_id ON email_events(resend_id);
-CREATE INDEX IF NOT EXISTS idx_email_events_to_email  ON email_events(to_email);
-CREATE INDEX IF NOT EXISTS idx_email_events_type      ON email_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
+CREATE INDEX IF NOT EXISTS idx_products_status ON products(status);
+CREATE INDEX IF NOT EXISTS idx_products_featured ON products(featured);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_email ON orders(email);
+CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
