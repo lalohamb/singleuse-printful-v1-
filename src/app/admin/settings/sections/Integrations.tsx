@@ -39,6 +39,14 @@ export default function Integrations() {
       if (!r.ok) throw new Error(data.error);
 
       // Step 2 — persist both keys to .env.live / .env.test automatically
+      // Skip if webhook already existed — signing secret was already saved on first setup
+      if (data.reused) {
+        setStripeResult({ type: "success", msg: `Webhook already registered for this URL. Keys are already saved. Go to Admin → Stripe to activate this mode.` });
+        setStripeSecret("");
+        setStripeSaving(false);
+        return;
+      }
+
       const mode = stripeSecret.startsWith("sk_live") ? "live" : "test";
       const saveR = await fetch("/api/stripe-mode", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "save-keys", mode, secret_key: stripeSecret, webhook_secret: data.signing_secret }) });
       if (!saveR.ok) throw new Error("Webhook registered but keys could not be saved to disk.");

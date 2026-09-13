@@ -58,17 +58,22 @@ export async function POST(req: NextRequest) {
     if (action === "register_webhook") {
       if (!secret_key || !webhook_url) return NextResponse.json({ error: "secret_key and webhook_url required" }, { status: 400 });
       const client = new Stripe(secret_key, { apiVersion: "2026-08-26.dahlia" });
-      // Delete any existing webhook pointing to the same URL to avoid duplicates
+
+      // Reuse existing webhook at this URL if one exists — avoids invalidating a saved signing secret
       const existing = await client.webhookEndpoints.list({ limit: 20 });
-      for (const ep of existing.data) {
-        if (ep.url === webhook_url) await client.webhookEndpoints.del(ep.id);
+      const match = existing.data.find((ep) => ep.url === webhook_url);
+      if (match) {
+        const isLive = !secret_key.startsWith("sk_test");
+        // Stripe never re-exposes the signing secret after creation — caller must re-register to rotate
+        return NextResponse.json({ webhook_id: match.id, signing_secret: null, livemode: isLive, reused: true });
       }
+
       const endpoint = await client.webhookEndpoints.create({
         url: webhook_url,
         enabled_events: ["checkout.session.completed", "payment_intent.payment_failed"],
       });
       const isLive = !secret_key.startsWith("sk_test");
-      return NextResponse.json({ webhook_id: endpoint.id, signing_secret: endpoint.secret, livemode: isLive });
+      return NextResponse.json({ webhook_id: endpoint.id, signing_secret: endpoint.secret, livemode: isLive, reused: false });
     }
 
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
