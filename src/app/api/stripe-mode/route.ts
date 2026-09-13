@@ -14,6 +14,14 @@ export async function POST(req: NextRequest) {
   if (action !== "save-keys") return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   if (mode !== "live" && mode !== "test") return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
   if (!secret_key || !webhook_secret) return NextResponse.json({ error: "Both keys are required" }, { status: 400 });
+  if (!secret_key.startsWith("sk_live_") && !secret_key.startsWith("sk_test_"))
+    return NextResponse.json({ error: "Invalid secret key format — must start with sk_live_ or sk_test_" }, { status: 400 });
+  if (!webhook_secret.startsWith("whsec_"))
+    return NextResponse.json({ error: "Invalid webhook secret format — must start with whsec_" }, { status: 400 });
+  if (mode === "live" && !secret_key.startsWith("sk_live_"))
+    return NextResponse.json({ error: "Live mode requires a sk_live_ key" }, { status: 400 });
+  if (mode === "test" && !secret_key.startsWith("sk_test_"))
+    return NextResponse.json({ error: "Test mode requires a sk_test_ key" }, { status: 400 });
 
   const root = appRoot();
   const filePath = path.resolve(root, mode === "live" ? ".env.live" : ".env.test");
