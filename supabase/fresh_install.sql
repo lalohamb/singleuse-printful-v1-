@@ -154,6 +154,7 @@ CREATE TABLE IF NOT EXISTS orders (
   tracking_url              text,
   items                     jsonb         NOT NULL,
   livemode                  boolean       NOT NULL DEFAULT true,
+  affiliate_code            text,
   created_at                timestamptz   DEFAULT now(),
   updated_at                timestamptz   DEFAULT now()
 );
@@ -259,6 +260,11 @@ CREATE TABLE IF NOT EXISTS settings (
     "email":     {"url": "mailto:hello@genderapparel.example", "enabled": true}
   }'::jsonb,
   favicon_url             text,
+  site_menu_settings      jsonb,
+  promo_banner_max_shows  integer     DEFAULT 2,
+  newsletter_group_id     text,
+  popup_settings          jsonb       DEFAULT '{"active": false, "title": "Join the Culture", "body": "New drops, exclusive offers, and culture — straight to your inbox.", "ctaLabel": "Subscribe", "delay": 3, "dismissDays": 7, "position": "right", "imageUrl": "/ga.png", "imgX": 0, "imgY": 0, "popupImageScale": 100, "popupImageFlip": false, "popupImageFit": "cover", "popupPreviewH": 60, "bgColor": "#111111"}'::jsonb,
+  affiliate_program_enabled boolean    DEFAULT true,
   updated_at              timestamptz DEFAULT now()
 );
 
@@ -398,3 +404,86 @@ CREATE POLICY "admin_all_email_events" ON email_events FOR ALL
 CREATE INDEX IF NOT EXISTS idx_email_events_resend_id ON email_events(resend_id);
 CREATE INDEX IF NOT EXISTS idx_email_events_to_email  ON email_events(to_email);
 CREATE INDEX IF NOT EXISTS idx_email_events_type      ON email_events(event_type);
+
+
+-- ============================================================================
+-- AFFILIATES
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS affiliates (
+  id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name            text        NOT NULL,
+  email           text        UNIQUE NOT NULL,
+  code            text        UNIQUE NOT NULL,
+  status          text        NOT NULL DEFAULT 'pending', -- pending | active | suspended | rejected
+  commission_rate numeric     NOT NULL DEFAULT 0.10,
+  payout_method   text,
+  payout_handle   text,
+  platform_url    text,
+  follower_count  integer     DEFAULT 0,
+  total_views     integer     DEFAULT 0,
+  stripe_account_id text,
+  notes           text,
+  created_at      timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS affiliate_clicks (
+  id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  code       text        NOT NULL,
+  referrer   text,
+  user_agent text,
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS affiliate_conversions (
+  id               uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  affiliate_id     uuid        REFERENCES affiliates(id) ON DELETE CASCADE,
+  order_id         uuid        REFERENCES orders(id) ON DELETE SET NULL,
+  order_subtotal   numeric     NOT NULL,
+  commission_amount numeric    NOT NULL,
+  status           text        NOT NULL DEFAULT 'pending', -- pending | approved | paid | voided
+  created_at       timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS affiliate_payouts (
+  id                 uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  affiliate_id       uuid        REFERENCES affiliates(id) ON DELETE CASCADE,
+  amount             numeric     NOT NULL,
+  method             text,
+  memo               text,
+  stripe_transfer_id text,
+  created_at         timestamptz DEFAULT now()
+);
+
+ALTER TABLE affiliates           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE affiliate_clicks     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE affiliate_conversions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE affiliate_payouts    ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "admin_all_affiliates" ON affiliates;
+CREATE POLICY "admin_all_affiliates" ON affiliates FOR ALL
+  TO authenticated USING (EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()));
+
+DROP POLICY IF EXISTS "public_insert_affiliate_clicks" ON affiliate_clicks;
+CREATE POLICY "public_insert_affiliate_clicks" ON affiliate_clicks FOR INSERT
+  TO anon, authenticated WITH CHECK (true);
+
+DROP POLICY IF EXISTS "admin_read_affiliate_clicks" ON affiliate_clicks;
+CREATE POLICY "admin_read_affiliate_clicks" ON affiliate_clicks FOR SELECT
+  TO authenticated USING (EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()));
+
+DROP POLICY IF EXISTS "admin_all_affiliate_conversions" ON affiliate_conversions;
+CREATE POLICY "admin_all_affiliate_conversions" ON affiliate_conversions FOR ALL
+  TO authenticated USING (EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()));
+
+DROP POLICY IF EXISTS "affiliate_read_own_conversions" ON affiliate_conversions;
+CREATE POLICY "affiliate_read_own_conversions" ON affiliate_conversions FOR SELECT
+  TO anon, authenticated USING (true);
+
+DROP POLICY IF EXISTS "admin_all_affiliate_payouts" ON affiliate_payouts;
+CREATE POLICY "admin_all_affiliate_payouts" ON affiliate_payouts FOR ALL
+  TO authenticated USING (EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()));
+
+CREATE INDEX IF NOT EXISTS idx_affiliate_clicks_code       ON affiliate_clicks(code);
+CREATE INDEX IF NOT EXISTS idx_affiliate_conversions_aff   ON affiliate_conversions(affiliate_id);
+CREATE INDEX IF NOT EXISTS idx_affiliate_conversions_order ON affiliate_conversions(order_id);
+CREATE INDEX IF NOT EXISTS idx_affiliate_payouts_aff       ON affiliate_payouts(affiliate_id);
