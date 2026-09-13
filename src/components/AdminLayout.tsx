@@ -54,7 +54,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     supabase.from("settings").select("store_name, logo_url").limit(1).maybeSingle().then(({ data }) => {
       if (data?.store_name) setStoreName(data.store_name);
-      if (data?.logo_url) setLogoUrl(data.logo_url);
+      // Only use logo_url if it's a real uploaded URL, not a default placeholder
+      const url = data?.logo_url;
+      if (url && !url.includes("genderapparel.png") && !url.includes("logo.png")) setLogoUrl(url);
     });
   }, []);
 
