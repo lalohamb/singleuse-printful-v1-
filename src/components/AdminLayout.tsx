@@ -59,10 +59,17 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    fetch("/api/stripe-mode").then((r) => r.ok ? r.json() : null).then((d) => {
-      if (d?.active_mode) setStripeMode(d.active_mode);
-    }).catch(() => {});
+    const fetchStripeMode = () =>
+      fetch("/api/stripe-mode", { cache: "no-store" }).then((r) => r.ok ? r.json() : null).then((d) => {
+        if (d?.active_mode) setStripeMode(d.active_mode);
+      }).catch(() => {});
 
+    fetchStripeMode();
+
+    const onVisible = () => { if (document.visibilityState === "visible") fetchStripeMode(); };
+    const onModeChanged = (e: Event) => setStripeMode((e as CustomEvent).detail);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("stripe-mode-changed", onModeChanged);
     const fetchPaused = () =>
       import("@/lib/supabase").then(({ supabase }) =>
         supabase.from("settings").select("orders_paused").limit(1).maybeSingle().then(({ data }) => {
@@ -72,7 +79,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
     fetchPaused();
     const interval = setInterval(fetchPaused, 3000);
-    return () => clearInterval(interval);
+    return () => { clearInterval(interval); document.removeEventListener("visibilitychange", onVisible); window.removeEventListener("stripe-mode-changed", onModeChanged); };
   }, []);
 
   const handleSignOut = async () => { await signOut(); router.push("/admin"); };
