@@ -108,7 +108,7 @@ UPDATE seo_settings SET
   jsonld_enabled           = true,
   canonical_enabled        = true,
   meta_title_suffix        = '| Gender Apparel',
-  twitter_handle           = '@body_and_sleeves',
+  twitter_handle           = '@gender_apparel',
   google_site_verification = null,
   updated_at               = now()
 WHERE id = '00000000-0000-0000-0000-000000000001';

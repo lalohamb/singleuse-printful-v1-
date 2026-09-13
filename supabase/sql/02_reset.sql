@@ -88,7 +88,7 @@ UPDATE settings SET
     {"quote":"Finally a brand that celebrates who we are. Every piece feels intentional and powerful.","name":"Aaliyah R.","location":"Chicago, IL","product":"Heritage Collection"}
   ]'::jsonb,
   social_links            = '{
-    "instagram": {"url": "https://instagram.com/body_and_sleeves", "enabled": true},
+    "instagram": {"url": "https://instagram.com/gender_apparel", "enabled": true},
     "tiktok":    {"url": "https://tiktok.com/@genderapparel", "enabled": true},
     "facebook":  {"url": "https://facebook.com/genderapparel", "enabled": true},
     "youtube":   {"url": "https://youtube.com/@genderapparel", "enabled": true},
@@ -162,7 +162,7 @@ UPDATE seo_settings SET
   jsonld_enabled           = true,
   canonical_enabled        = true,
   meta_title_suffix        = '| Gender Apparel',
-  twitter_handle           = '@body_and_sleeves',
+  twitter_handle           = '@gender_apparel',
   google_site_verification = null,
   updated_at               = now()
 WHERE id = '00000000-0000-0000-0000-000000000001';

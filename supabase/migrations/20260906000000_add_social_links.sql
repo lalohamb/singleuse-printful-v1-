@@ -1,6 +1,6 @@
 alter table settings
   add column if not exists social_links jsonb not null default '{
-    "instagram": {"url": "https://instagram.com/body_and_sleeves", "enabled": true},
+    "instagram": {"url": "https://instagram.com/gender_apparel", "enabled": true},
     "tiktok":    {"url": "https://tiktok.com/@genderapparel", "enabled": true},
     "facebook":  {"url": "https://facebook.com/genderapparel", "enabled": true},
     "youtube":   {"url": "https://youtube.com/@genderapparel", "enabled": true},

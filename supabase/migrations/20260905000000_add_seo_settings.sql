@@ -7,7 +7,7 @@ create table if not exists seo_settings (
   jsonld_enabled boolean not null default true,
   canonical_enabled boolean not null default true,
   meta_title_suffix text not null default '| Gender Apparel',
-  twitter_handle text default '@body_and_sleeves',
+  twitter_handle text default '@gender_apparel',
   google_site_verification text,
   updated_at timestamptz not null default now()
 );

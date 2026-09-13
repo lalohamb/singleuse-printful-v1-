@@ -250,7 +250,7 @@ CREATE TABLE IF NOT EXISTS settings (
   printify_shop_id        text,
   stripe_connected        boolean     DEFAULT false,
   social_links            jsonb       NOT NULL DEFAULT '{
-    "instagram": {"url": "https://instagram.com/body_and_sleeves", "enabled": true},
+    "instagram": {"url": "https://instagram.com/gender_apparel", "enabled": true},
     "tiktok":    {"url": "https://tiktok.com/@genderapparel", "enabled": true},
     "facebook":  {"url": "https://facebook.com/genderapparel", "enabled": true},
     "youtube":   {"url": "https://youtube.com/@genderapparel", "enabled": true},
@@ -293,7 +293,7 @@ CREATE TABLE IF NOT EXISTS seo_settings (
   jsonld_enabled          boolean     NOT NULL DEFAULT true,
   canonical_enabled       boolean     NOT NULL DEFAULT true,
   meta_title_suffix       text        NOT NULL DEFAULT '| Gender Apparel',
-  twitter_handle          text        DEFAULT '@body_and_sleeves',
+  twitter_handle          text        DEFAULT '@gender_apparel',
   google_site_verification text,
   updated_at              timestamptz NOT NULL DEFAULT now()
 );
