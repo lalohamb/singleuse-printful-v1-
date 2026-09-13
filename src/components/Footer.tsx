@@ -83,12 +83,13 @@ const DEFAULT_SOCIAL: StoreSettings["social_links"] = {
 };
 
 export default async function Footer() {
-  const { data } = await supabase.from("settings").select("social_links, logo_url, logo_size, footer_logo_url, footer_logo_size, footer_text, footer_bottom_message").limit(1).maybeSingle();
+  const { data } = await supabase.from("settings").select("social_links, logo_url, logo_size, footer_logo_url, footer_logo_size, footer_text, footer_bottom_message, affiliate_program_enabled").limit(1).maybeSingle();
   const social: StoreSettings["social_links"] = data?.social_links ?? DEFAULT_SOCIAL;
   const logoUrl = data?.footer_logo_url || data?.logo_url || "/genderapparel.png";
   const logoSize = data?.footer_logo_size ?? data?.logo_size ?? 40;
   const footerText = data?.footer_text || "Made-to-order apparel designed for every body, every style, and every day. Wear what feels like you.";
   const footerBottomMessage = data?.footer_bottom_message || "Made to order. Made with love.";
+  const affiliateEnabled = !!data?.affiliate_program_enabled;
 
   return (
     <footer className="bg-secondary-900 text-secondary-300 mt-20">
@@ -139,6 +140,9 @@ export default async function Footer() {
               <li><Link href="/about" className="hover:text-white transition-colors">About Us</Link></li>
               <li><Link href="/about#mission" className="hover:text-white transition-colors">Our Mission</Link></li>
               <li><Link href="/about#culture" className="hover:text-white transition-colors">The Culture</Link></li>
+              {affiliateEnabled && (
+                <li><Link href="/affiliates" className="hover:text-white transition-colors">Affiliate Program</Link></li>
+              )}
             </ul>
           </div>
         </div>
