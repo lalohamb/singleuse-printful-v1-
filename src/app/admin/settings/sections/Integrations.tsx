@@ -33,10 +33,18 @@ export default function Integrations() {
     if (!stripeSecret) return;
     setStripeSaving(true); setStripeResult(null);
     try {
+      // Step 1 — create webhook endpoint in Stripe, get signing secret
       const r = await fetch("/api/stripe-admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "register_webhook", secret_key: stripeSecret, webhook_url: WEBHOOK_URL }) });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error);
-      setStripeResult({ type: "success", msg: `Webhook registered. Set this signing secret in Supabase: ${data.signing_secret}` });
+
+      // Step 2 — persist both keys to .env.live / .env.test automatically
+      const mode = stripeSecret.startsWith("sk_live") ? "live" : "test";
+      const saveR = await fetch("/api/stripe-mode", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "save-keys", mode, secret_key: stripeSecret, webhook_secret: data.signing_secret }) });
+      if (!saveR.ok) throw new Error("Webhook registered but keys could not be saved to disk.");
+
+      setStripeResult({ type: "success", msg: `Stripe ${mode} keys saved. Webhook is live. Go to Admin → Stripe to activate this mode.` });
+      setStripeSecret("");
     } catch (e: any) {
       setStripeResult({ type: "error", msg: e.message });
     }
