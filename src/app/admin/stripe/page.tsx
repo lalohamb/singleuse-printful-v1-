@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { RefreshCw, ExternalLink, DollarSign, TrendingUp, CreditCard, ArrowDownCircle, X, Loader2, Check, AlertCircle } from "lucide-react";
+import { RefreshCw, ExternalLink, DollarSign, TrendingUp, CreditCard, ArrowDownCircle, X, Loader2, Check, AlertCircle, Eye, EyeOff } from "lucide-react";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
 
 interface Balance {
@@ -101,149 +101,156 @@ function RefundModal({ charge, onClose, onRefunded }: { charge: Charge; onClose:
   );
 }
 
-interface KeyStatus { hasKeys: boolean; secret_key_hint: string; webhook_hint: string; }
+interface KeyStatus { configured: boolean; key_hint: string; }
 
-function KeyForm({ mode, status, onSaved }: { mode: "live" | "test"; status: KeyStatus; onSaved: () => void }) {
-  const [open, setOpen] = useState(false);
-  const [secretKey, setSecretKey] = useState("");
-  const [webhookSecret, setWebhookSecret] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-
-  const save = async () => {
-    setSaving(true); setMsg(null); setErr(null);
-    const r = await fetch("/api/stripe-mode", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "save-keys", mode, secret_key: secretKey.trim(), webhook_secret: webhookSecret.trim() }) });
-    const data = await r.json();
-    if (!r.ok) setErr(data.error);
-    else { setMsg(data.message); setSecretKey(""); setWebhookSecret(""); onSaved(); }
-    setSaving(false);
-  };
-
-  const stripeLink = mode === "live" ? "https://dashboard.stripe.com/apikeys" : "https://dashboard.stripe.com/test/apikeys";
-
-  return (
-    <div className="border-t border-secondary-200 pt-3">
-      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between text-left">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-secondary-700">API Keys</span>
-          {status.hasKeys
-            ? <span className="flex items-center gap-1 text-xs text-success-600"><Check size={12} />Saved</span>
-            : <span className="text-xs text-warning-600">Not set</span>}
-        </div>
-        <span className="text-xs text-secondary-400">{open ? "Hide" : "Edit"}</span>
-      </button>
-      {open && (
-        <div className="mt-3 space-y-3">
-          {status.hasKeys && (
-            <div className="text-xs text-secondary-500 space-y-1">
-              <p>Secret key: <code className="bg-white px-1 rounded">{status.secret_key_hint}</code></p>
-              <p>Webhook secret: <code className="bg-white px-1 rounded">{status.webhook_hint}</code></p>
-            </div>
-          )}
-          <a href={stripeLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-primary-600 hover:underline">
-            Get keys from Stripe <ExternalLink size={11} />
-          </a>
-          <div>
-            <label className="label-text">Secret Key (sk_{mode}_...)</label>
-            <input value={secretKey} onChange={e => setSecretKey(e.target.value)} className="input-field font-mono text-sm" placeholder={`sk_${mode}_...`} />
-          </div>
-          <div>
-            <label className="label-text">Webhook Secret (whsec_...)</label>
-            <input value={webhookSecret} onChange={e => setWebhookSecret(e.target.value)} className="input-field font-mono text-sm" placeholder="whsec_..." />
-          </div>
-          {msg && <p className="text-xs text-success-600">{msg}</p>}
-          {err && <p className="text-xs text-error-600">{err}</p>}
-          <button onClick={save} disabled={saving || !secretKey || !webhookSecret} className="btn-primary py-2 w-full">
-            {saving ? <Loader2 size={16} className="animate-spin mx-auto" /> : `Save ${mode} keys`}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function SwitchButton({ mode, isActive, onSwitched }: { mode: "live" | "test"; isActive: boolean; onSwitched: () => void }) {
+function StripeSetup({ onActivated }: { onActivated: () => void }) {
+  const [status, setStatus] = useState<{ live: KeyStatus; test: KeyStatus; active_mode: string } | null>(null);
+  const [key, setKey] = useState("");
+  const [showKey, setShowKey] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [steps, setSteps] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [activating, setActivating] = useState(false);
+  const [result, setResult] = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const [restarting, setRestarting] = useState(false);
 
-  const pollUntilBack = () => {
-    setRestarting(true);
-    const interval = setInterval(async () => {
-      try {
-        const r = await fetch("/api/stripe-mode", { cache: "no-store" });
-        if (r.ok) { clearInterval(interval); window.location.reload(); }
-      } catch { /* still down, keep polling */ }
-    }, 1500);
-  };
-
-  const doSwitch = async () => {
-    setLoading(true); setSteps([]); setError(null);
-    const r = await fetch("/api/stripe-switch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode }) });
-    const data = await r.json();
-    if (!r.ok) { setError(data.error); setLoading(false); }
-    else { setSteps(data.steps || []); setLoading(false); pollUntilBack(); }
-  };
-
-  if (restarting) return (
-    <div className="flex items-center gap-2 text-xs text-warning-600">
-      <Loader2 size={12} className="animate-spin" />Server restarting…
-    </div>
-  );
-
-  if (isActive) return <span className="text-xs text-success-600 font-medium flex items-center gap-1"><Check size={12} />Active</span>;
-
-  return (
-    <div className="space-y-2">
-      <button onClick={doSwitch} disabled={loading} className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-primary-600 text-white hover:bg-primary-700 transition-colors disabled:opacity-50">
-        {loading ? <Loader2 size={12} className="animate-spin" /> : null}
-        {loading ? "Switching…" : `Switch to ${mode.toUpperCase()}`}
-      </button>
-      {error && <p className="text-xs text-error-600">{error}</p>}
-      {steps.length > 0 && (
-        <ul className="text-xs text-success-700 space-y-1 bg-white/60 rounded-lg p-2">
-          {steps.map((s, i) => <li key={i} className="flex items-center gap-1"><Check size={10} className="shrink-0" />{s}</li>)}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function StripeKeyManager({ isLive, onModeChange }: { isLive: boolean; onModeChange?: (mode: string) => void }) {
-  const [keyStatus, setKeyStatus] = useState<{ live: KeyStatus; test: KeyStatus; active_mode: string } | null>(null);
-
   const fetchStatus = async () => {
-    const r = await fetch("/api/stripe-mode");
-    if (r.ok) {
-      const data = await r.json();
-      setKeyStatus(data);
-      onModeChange?.(data.active_mode);
-    }
+    const r = await fetch("/api/stripe-setup");
+    if (r.ok) setStatus(await r.json());
   };
 
   useEffect(() => { fetchStatus(); }, []);
 
-  const activeMode = keyStatus?.active_mode ?? (isLive ? "live" : "test");
+  const connect = async (activate: boolean) => {
+    if (!key) return;
+    activate ? setActivating(true) : setLoading(true);
+    setResult(null);
+    const r = await fetch("/api/stripe-setup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ secret_key: key, activate }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      setResult({ type: "error", msg: data.error });
+    } else {
+      setResult({ type: "success", msg: data.steps.join(" → ") });
+      setKey("");
+      if (activate) {
+        setRestarting(true);
+        const poll = setInterval(async () => {
+          try {
+            const pr = await fetch("/api/stripe-setup", { cache: "no-store" });
+            if (pr.ok) { clearInterval(poll); setRestarting(false); fetchStatus(); onActivated(); }
+          } catch { /* still restarting */ }
+        }, 1500);
+      } else {
+        fetchStatus();
+      }
+    }
+    activate ? setActivating(false) : setLoading(false);
+  };
 
-  if (!keyStatus) return null;
+  const switchMode = async (mode: "live" | "test") => {
+    setActivating(true); setResult(null);
+    const r = await fetch("/api/stripe-switch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode }),
+    });
+    const data = await r.json();
+    if (!r.ok) { setResult({ type: "error", msg: data.error }); setActivating(false); return; }
+    setRestarting(true); setActivating(false);
+    const poll = setInterval(async () => {
+      try {
+        const pr = await fetch("/api/stripe-setup", { cache: "no-store" });
+        if (pr.ok) { clearInterval(poll); setRestarting(false); fetchStatus(); onActivated(); }
+      } catch { /* still restarting */ }
+    }, 1500);
+  };
+
+  const keyMode = key.startsWith("sk_live_") ? "live" : key.startsWith("sk_test_") ? "test" : null;
+  const isValid = keyMode !== null;
+  const activeMode = status?.active_mode ?? "test";
 
   return (
-    <div className="flex flex-col gap-3 w-full max-w-xs">
-      <div className="rounded-xl border border-success-200 bg-success-50 p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-success-100 text-success-700">LIVE</span>
-          <SwitchButton mode="live" isActive={activeMode === "live"} onSwitched={fetchStatus} />
+    <div className="flex flex-col gap-4 w-full max-w-sm">
+      {/* Status cards */}
+      {status && (
+        <div className="grid grid-cols-2 gap-3">
+          {(["live", "test"] as const).map((m) => (
+            <div key={m} className={`rounded-xl border p-3 space-y-2 ${
+              m === "live" ? "border-success-200 bg-success-50" : "border-amber-200 bg-amber-50"
+            }`}>
+              <div className="flex items-center justify-between">
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                  m === "live" ? "bg-success-100 text-success-700" : "bg-amber-100 text-amber-700"
+                }`}>{m.toUpperCase()}</span>
+                {activeMode === m
+                  ? <span className="text-xs text-success-600 font-medium flex items-center gap-1"><Check size={11} />Active</span>
+                  : status[m].configured
+                    ? <button onClick={() => switchMode(m)} disabled={activating || restarting} className="text-xs font-medium px-2 py-1 rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50">
+                        {activating || restarting ? <Loader2 size={11} className="animate-spin" /> : `Use ${m}`}
+                      </button>
+                    : <span className="text-xs text-secondary-400">Not set up</span>}
+              </div>
+              {status[m].configured
+                ? <p className="text-xs font-mono text-secondary-500 truncate">{status[m].key_hint}</p>
+                : <p className="text-xs text-secondary-400">Paste a sk_{m}_ key below</p>}
+            </div>
+          ))}
         </div>
-        <KeyForm mode="live" status={keyStatus.live} onSaved={fetchStatus} />
-      </div>
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">TEST</span>
-          <SwitchButton mode="test" isActive={activeMode === "test"} onSwitched={fetchStatus} />
+      )}
+
+      {/* Connect form */}
+      <div className="bg-white rounded-xl border border-secondary-100 p-4 space-y-3">
+        <p className="text-sm font-semibold text-secondary-900">Connect Stripe</p>
+        <div className="relative">
+          <input
+            type={showKey ? "text" : "password"}
+            value={key}
+            onChange={(e) => { setKey(e.target.value); setResult(null); }}
+            placeholder="sk_live_... or sk_test_..."
+            className="input-field pr-10 font-mono text-sm"
+          />
+          <button type="button" onClick={() => setShowKey((v) => !v)} className="absolute right-3 top-2.5 text-secondary-400">
+            {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
         </div>
-        <KeyForm mode="test" status={keyStatus.test} onSaved={fetchStatus} />
+        {key && (
+          <p className={`text-xs ${
+            keyMode === "live" ? "text-success-600" : keyMode === "test" ? "text-amber-600" : "text-error-600"
+          }`}>
+            {keyMode === "live" ? "✓ Live key — real payments" : keyMode === "test" ? "⚠ Test key — no real money" : "✗ Invalid key format"}
+          </p>
+        )}
+        {result && (
+          <div className={`rounded-lg p-3 text-xs ${
+            result.type === "success" ? "bg-success-50 border border-success-200 text-success-800" : "bg-error-50 border border-error-100 text-error-700"
+          }`}>
+            <p className="break-all">{result.msg}</p>
+          </div>
+        )}
+        {restarting && (
+          <div className="flex items-center gap-2 text-xs text-warning-600">
+            <Loader2 size={12} className="animate-spin" />Server restarting…
+          </div>
+        )}
+        <div className="flex gap-2">
+          <button
+            onClick={() => connect(false)}
+            disabled={!isValid || loading || activating}
+            className="btn-outline py-2 text-sm flex-1 disabled:opacity-50"
+          >
+            {loading ? <><Loader2 size={14} className="mr-1 animate-spin" />Saving...</> : "Save Only"}
+          </button>
+          <button
+            onClick={() => connect(true)}
+            disabled={!isValid || loading || activating}
+            className="btn-primary py-2 text-sm flex-1 disabled:opacity-50"
+          >
+            {activating ? <><Loader2 size={14} className="mr-1 animate-spin" />Activating...</> : "Save & Activate"}
+          </button>
+        </div>
+        <p className="text-xs text-secondary-400">"Save Only" stores the key without switching active mode. "Save &amp; Activate" saves and immediately switches to this mode.</p>
       </div>
     </div>
   );
@@ -328,13 +335,13 @@ function StripeDashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Active mode banner + key manager side by side */}
+      {/* Active mode banner + setup panel side by side */}
       <div className="flex items-start justify-between gap-6">
         <div className={`rounded-xl border p-4 self-start ${isLive ? "bg-success-50 border-success-200" : "bg-amber-50 border-amber-200"}`}>
           <p className="text-sm font-semibold text-secondary-900">Active mode: <span className={isLive ? "text-success-700" : "text-amber-700"}>{isLive ? "LIVE" : "TEST"}</span></p>
           <p className="text-xs text-secondary-500 mt-0.5">{isLive ? "Real payments are being processed." : "Test mode — no real charges."}</p>
         </div>
-        <StripeKeyManager isLive={isLive} />
+        <StripeSetup onActivated={fetchAll} />
       </div>
 
       {/* Header */}
