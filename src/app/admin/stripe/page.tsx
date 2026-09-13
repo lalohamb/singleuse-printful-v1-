@@ -103,7 +103,7 @@ function RefundModal({ charge, onClose, onRefunded }: { charge: Charge; onClose:
 
 interface KeyStatus { configured: boolean; key_hint: string; }
 
-function StripeSetup({ onActivated }: { onActivated: () => void }) {
+function StripeSetup({ activeMode: activeModeOverride, onActivated }: { activeMode?: string; onActivated: (mode: "live" | "test") => void }) {
   const [status, setStatus] = useState<{ live: KeyStatus; test: KeyStatus; active_mode: string } | null>(null);
   const [key, setKey] = useState("");
   const [showKey, setShowKey] = useState(false);
@@ -135,11 +135,17 @@ function StripeSetup({ onActivated }: { onActivated: () => void }) {
       setResult({ type: "success", msg: data.steps.join(" → ") });
       setKey("");
       if (activate) {
+        const activatedMode = key.startsWith("sk_live_") ? "live" : "test";
         setRestarting(true);
         const poll = setInterval(async () => {
           try {
             const pr = await fetch("/api/stripe-setup", { cache: "no-store" });
-            if (pr.ok) { clearInterval(poll); setRestarting(false); fetchStatus(); onActivated(); }
+            if (pr.ok) {
+              const pd = await pr.json();
+              if (pd.active_mode === activatedMode) {
+                clearInterval(poll); setRestarting(false); fetchStatus(); onActivated(activatedMode);
+              }
+            }
           } catch { /* still restarting */ }
         }, 1500);
       } else {
@@ -162,14 +168,19 @@ function StripeSetup({ onActivated }: { onActivated: () => void }) {
     const poll = setInterval(async () => {
       try {
         const pr = await fetch("/api/stripe-setup", { cache: "no-store" });
-        if (pr.ok) { clearInterval(poll); setRestarting(false); fetchStatus(); onActivated(); }
+        if (pr.ok) {
+          const pd = await pr.json();
+          if (pd.active_mode === mode) {
+            clearInterval(poll); setRestarting(false); fetchStatus(); onActivated(mode);
+          }
+        }
       } catch { /* still restarting */ }
     }, 1500);
   };
 
   const keyMode = key.startsWith("sk_live_") ? "live" : key.startsWith("sk_test_") ? "test" : null;
   const isValid = keyMode !== null;
-  const activeMode = status?.active_mode ?? "test";
+  const activeMode = activeModeOverride ?? status?.active_mode ?? "test";
 
   return (
     <div className="flex flex-col gap-4 w-full max-w-sm">
@@ -257,6 +268,7 @@ function StripeSetup({ onActivated }: { onActivated: () => void }) {
 }
 
 function StripeDashboard() {
+  const [activeMode, setActiveMode] = useState<"live" | "test">("test");
   const [balance, setBalance] = useState<Balance | null>(null);
   const [charges, setCharges] = useState<Charge[]>([]);
   const [payouts, setPayouts] = useState<Payout[]>([]);
@@ -264,47 +276,42 @@ function StripeDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refundTarget, setRefundTarget] = useState<Charge | null>(null);
-  const [isLive, setIsLive] = useState(false);
 
-  const fetchAll = async () => {
-    setLoading(true); setError(null);
+  const loadStripeData = async (knownMode?: "live" | "test", showSpinner = true) => {
+    if (showSpinner) { setLoading(true); setError(null); }
     try {
-      const [balRes, chargesRes, payoutsRes] = await Promise.all([
+      const [setupRes, balRes, chargesRes, payoutsRes] = await Promise.all([
+        fetch("/api/stripe-setup", { cache: "no-store" }),
         fetch("/api/stripe-admin?action=balance"),
         fetch("/api/stripe-admin?action=charges&limit=20"),
         fetch("/api/stripe-admin?action=payouts"),
       ]);
-      const [balData, chargesData, payoutsData] = await Promise.all([balRes.json(), chargesRes.json(), payoutsRes.json()]);
+      const [setupData, balData, chargesData, payoutsData] = await Promise.all([setupRes.json(), balRes.json(), chargesRes.json(), payoutsRes.json()]);
       if (!balRes.ok) throw new Error(balData.error);
+      setActiveMode(knownMode ?? setupData?.active_mode ?? (balData.livemode ? "live" : "test"));
       setBalance(balData);
-      setIsLive(!!balData.livemode);
       const chargeList: Charge[] = chargesData.data || [];
       setCharges(chargeList);
       setPayouts(payoutsData.data || []);
-
-      // Match charges to order IDs via payment_intent
       const piIds = chargeList.map((c) => c.payment_intent).filter(Boolean) as string[];
       if (piIds.length) {
         const { createClient } = await import("@supabase/supabase-js");
-        const sb = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        );
-        const { data: orders } = await sb
-          .from("orders")
-          .select("id, stripe_payment_intent_id")
-          .in("stripe_payment_intent_id", piIds);
+        const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+        const { data: orders } = await sb.from("orders").select("id, stripe_payment_intent_id").in("stripe_payment_intent_id", piIds);
         const map: Record<string, string> = {};
         for (const o of orders || []) map[o.stripe_payment_intent_id] = o.id;
         setOrderMap(map);
       }
     } catch (e: any) {
-      setError(e.message);
+      if (showSpinner) setError(e.message);
     }
-    setLoading(false);
+    if (showSpinner) setLoading(false);
   };
 
-  useEffect(() => { fetchAll(); }, []);
+  const fetchAll = () => loadStripeData(undefined, true);
+  const onModeSwitch = (mode: "live" | "test") => { setActiveMode(mode); loadStripeData(mode, false); window.dispatchEvent(new CustomEvent("stripe-mode-changed", { detail: mode })); };
+
+  useEffect(() => { fetchAll(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [chargeSearch, setChargeSearch] = useState("");
   const [chargeStatus, setChargeStatus] = useState("all");
@@ -337,11 +344,11 @@ function StripeDashboard() {
     <div className="space-y-8">
       {/* Active mode banner + setup panel side by side */}
       <div className="flex items-start justify-between gap-6">
-        <div className={`rounded-xl border p-4 self-start ${isLive ? "bg-success-50 border-success-200" : "bg-amber-50 border-amber-200"}`}>
-          <p className="text-sm font-semibold text-secondary-900">Active mode: <span className={isLive ? "text-success-700" : "text-amber-700"}>{isLive ? "LIVE" : "TEST"}</span></p>
-          <p className="text-xs text-secondary-500 mt-0.5">{isLive ? "Real payments are being processed." : "Test mode — no real charges."}</p>
+        <div className={`rounded-xl border p-4 self-start ${activeMode === "live" ? "bg-success-50 border-success-200" : "bg-amber-50 border-amber-200"}`}>
+          <p className="text-sm font-semibold text-secondary-900">Active mode: <span className={activeMode === "live" ? "text-success-700" : "text-amber-700"}>{activeMode === "live" ? "LIVE" : "TEST"}</span></p>
+          <p className="text-xs text-secondary-500 mt-0.5">{activeMode === "live" ? "Real payments are being processed." : "Test mode — no real charges."}</p>
         </div>
-        <StripeSetup onActivated={fetchAll} />
+        <StripeSetup activeMode={activeMode} onActivated={onModeSwitch} />
       </div>
 
       {/* Header */}
@@ -349,7 +356,7 @@ function StripeDashboard() {
         <a href="https://dashboard.stripe.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 font-medium">
           Open Stripe Dashboard <ExternalLink size={16} />
         </a>
-        <button onClick={fetchAll} className="flex items-center gap-2 text-sm text-secondary-500 hover:text-secondary-900 transition-colors">
+        <button onClick={() => fetchAll()} className="flex items-center gap-2 text-sm text-secondary-500 hover:text-secondary-900 transition-colors">
           <RefreshCw size={16} />Refresh
         </button>
       </div>
@@ -364,7 +371,7 @@ function StripeDashboard() {
         ];
         return (
           <>
-            {!isLive && (
+            {activeMode !== "live" && (
               <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
                 <AlertCircle size={14} className="flex-shrink-0" />
                 These values reflect your Stripe test account — no real money involved.
@@ -485,7 +492,7 @@ function StripeDashboard() {
         )}
       </div>
 
-      {refundTarget && <RefundModal charge={refundTarget} onClose={() => setRefundTarget(null)} onRefunded={fetchAll} />}
+      {refundTarget && <RefundModal charge={refundTarget} onClose={() => setRefundTarget(null)} onRefunded={() => loadStripeData(activeMode, false)} />}
     </div>
   );
 }

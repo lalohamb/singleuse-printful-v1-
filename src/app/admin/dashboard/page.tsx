@@ -16,6 +16,9 @@ function Dashboard() {
   const [settingsId, setSettingsId] = useState<string | null>(null);
   const [stripeLive, setStripeLive] = useState<boolean | null>(null);
 
+  const fetchStripeMode = () =>
+    fetch("/api/stripe-mode", { cache: "no-store" }).then(r => r.ok ? r.json() : null).then(d => { if (d) setStripeLive(d.active_mode === "live"); });
+
   useEffect(() => {
     Promise.all([
       supabase.from("orders").select("*").order("created_at", { ascending: false }).limit(5),
@@ -30,8 +33,17 @@ function Dashboard() {
       setRecentProducts(products.slice(0, 5));
       if (s) { setSettingsId(s.id); setPaused(!!s.orders_paused); }
       setLoading(false);
-      fetch("/api/stripe-mode").then(r => r.ok ? r.json() : null).then(d => { if (d) setStripeLive(d.active_mode === "live"); });
+      fetchStripeMode();
     });
+
+    const onVisible = () => { if (document.visibilityState === "visible") fetchStripeMode(); };
+    const onModeChanged = (e: Event) => { setStripeLive((e as CustomEvent).detail === "live"); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("stripe-mode-changed", onModeChanged);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("stripe-mode-changed", onModeChanged);
+    };
   }, []);
 
   const togglePause = async () => {
