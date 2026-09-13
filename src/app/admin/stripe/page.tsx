@@ -131,28 +131,36 @@ function StripeSetup({ activeMode: activeModeOverride, onActivated }: { activeMo
     const data = await r.json();
     if (!r.ok) {
       setResult({ type: "error", msg: data.error });
+      activate ? setActivating(false) : setLoading(false);
     } else {
       setResult({ type: "success", msg: data.steps.join(" → ") });
       setKey("");
       if (activate) {
         const activatedMode = key.startsWith("sk_live_") ? "live" : "test";
         setRestarting(true);
+        let elapsed = 0;
         const poll = setInterval(async () => {
+          elapsed += 1500;
+          if (elapsed > 30000) {
+            clearInterval(poll); setRestarting(false); setActivating(false);
+            setResult({ type: "error", msg: "Server restart timed out. Refresh the page." });
+            return;
+          }
           try {
             const pr = await fetch("/api/stripe-setup", { cache: "no-store" });
             if (pr.ok) {
               const pd = await pr.json();
               if (pd.active_mode === activatedMode) {
-                clearInterval(poll); setRestarting(false); fetchStatus(); onActivated(activatedMode);
+                clearInterval(poll); setRestarting(false); setActivating(false); fetchStatus(); onActivated(activatedMode);
               }
             }
           } catch { /* still restarting */ }
         }, 1500);
       } else {
+        setLoading(false);
         fetchStatus();
       }
     }
-    activate ? setActivating(false) : setLoading(false);
   };
 
   const switchMode = async (mode: "live" | "test") => {
@@ -164,14 +172,21 @@ function StripeSetup({ activeMode: activeModeOverride, onActivated }: { activeMo
     });
     const data = await r.json();
     if (!r.ok) { setResult({ type: "error", msg: data.error }); setActivating(false); return; }
-    setRestarting(true); setActivating(false);
+    setRestarting(true);
+    let elapsed = 0;
     const poll = setInterval(async () => {
+      elapsed += 1500;
+      if (elapsed > 30000) {
+        clearInterval(poll); setRestarting(false); setActivating(false);
+        setResult({ type: "error", msg: "Server restart timed out. Refresh the page." });
+        return;
+      }
       try {
         const pr = await fetch("/api/stripe-setup", { cache: "no-store" });
         if (pr.ok) {
           const pd = await pr.json();
           if (pd.active_mode === mode) {
-            clearInterval(poll); setRestarting(false); fetchStatus(); onActivated(mode);
+            clearInterval(poll); setRestarting(false); setActivating(false); fetchStatus(); onActivated(mode);
           }
         }
       } catch { /* still restarting */ }
@@ -277,8 +292,12 @@ function StripeDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [refundTarget, setRefundTarget] = useState<Charge | null>(null);
 
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [balanceCurrency, setBalanceCurrency] = useState("usd");
+
   const loadStripeData = async (knownMode?: "live" | "test", showSpinner = true) => {
     if (showSpinner) { setLoading(true); setError(null); }
+    setRefreshError(null);
     try {
       const [setupRes, balRes, chargesRes, payoutsRes] = await Promise.all([
         fetch("/api/stripe-setup", { cache: "no-store" }),
@@ -290,9 +309,12 @@ function StripeDashboard() {
       if (!balRes.ok) throw new Error(balData.error);
       setActiveMode(knownMode ?? setupData?.active_mode ?? (balData.livemode ? "live" : "test"));
       setBalance(balData);
+      const currency = balData.available?.[0]?.currency ?? "usd";
+      setBalanceCurrency(currency);
       const chargeList: Charge[] = chargesData.data || [];
       setCharges(chargeList);
       setPayouts(payoutsData.data || []);
+      // Always reset orderMap so stale IDs from previous mode don't persist
       const piIds = chargeList.map((c) => c.payment_intent).filter(Boolean) as string[];
       if (piIds.length) {
         const { createClient } = await import("@supabase/supabase-js");
@@ -301,15 +323,23 @@ function StripeDashboard() {
         const map: Record<string, string> = {};
         for (const o of orders || []) map[o.stripe_payment_intent_id] = o.id;
         setOrderMap(map);
+      } else {
+        setOrderMap({});
       }
     } catch (e: any) {
       if (showSpinner) setError(e.message);
+      else setRefreshError("Data refresh failed after mode switch — click Refresh to retry.");
     }
     if (showSpinner) setLoading(false);
   };
 
   const fetchAll = () => loadStripeData(undefined, true);
-  const onModeSwitch = (mode: "live" | "test") => { setActiveMode(mode); loadStripeData(mode, false); window.dispatchEvent(new CustomEvent("stripe-mode-changed", { detail: mode })); };
+  // Delay background reload by 2s to allow PM2 process to fully boot with new key
+  const onModeSwitch = (mode: "live" | "test") => {
+    setActiveMode(mode);
+    window.dispatchEvent(new CustomEvent("stripe-mode-changed", { detail: mode }));
+    setTimeout(() => loadStripeData(mode, false), 2000);
+  };
 
   useEffect(() => { fetchAll(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -328,6 +358,7 @@ function StripeDashboard() {
   const pending = balance?.pending.reduce((s, b) => s + b.amount, 0) ?? 0;
   const totalVolume = charges.filter((c) => c.status === "succeeded").reduce((s, c) => s + c.amount, 0);
   const totalRefunded = charges.reduce((s, c) => s + c.amount_refunded, 0);
+  const chargeCurrency = charges[0]?.currency ?? balanceCurrency;
 
   if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-2 border-secondary-300 border-t-secondary-900" /></div>;
 
@@ -364,13 +395,18 @@ function StripeDashboard() {
       {/* Balance Cards */}
       {(() => {
         const balanceCards = [
-          { label: "Available Balance", value: fmt(available), icon: DollarSign, color: "bg-success-50 text-success-600" },
-          { label: "Pending Balance", value: fmt(pending), icon: TrendingUp, color: "bg-warning-50 text-warning-600" },
-          { label: "Volume (last 20)", value: fmt(totalVolume), icon: CreditCard, color: "bg-primary-50 text-primary-600" },
-          { label: "Refunded (last 20)", value: fmt(totalRefunded), icon: ArrowDownCircle, color: "bg-error-50 text-error-600" },
+          { label: "Available Balance", value: fmt(available, balanceCurrency), icon: DollarSign, color: "bg-success-50 text-success-600" },
+          { label: "Pending Balance", value: fmt(pending, balanceCurrency), icon: TrendingUp, color: "bg-warning-50 text-warning-600" },
+          { label: "Volume (last 20)", value: fmt(totalVolume, chargeCurrency), icon: CreditCard, color: "bg-primary-50 text-primary-600" },
+          { label: "Refunded (last 20)", value: fmt(totalRefunded, chargeCurrency), icon: ArrowDownCircle, color: "bg-error-50 text-error-600" },
         ];
         return (
           <>
+            {refreshError && (
+              <div className="flex items-center gap-2 text-xs text-error-700 bg-error-50 border border-error-100 rounded-lg px-4 py-2">
+                <AlertCircle size={14} className="flex-shrink-0" />{refreshError}
+              </div>
+            )}
             {activeMode !== "live" && (
               <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
                 <AlertCircle size={14} className="flex-shrink-0" />
