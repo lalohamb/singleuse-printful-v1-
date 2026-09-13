@@ -4,31 +4,11 @@ import path from "path";
 import { exec } from "child_process";
 import { promisify } from "util";
 import { requireAdmin } from "@/lib/require-admin";
+import { appRoot, parseEnvFile } from "@/lib/env-utils";
 
 export const runtime = "nodejs";
 
 const execAsync = promisify(exec);
-
-function appRoot(): string {
-  if (process.env.APP_ROOT && fs.existsSync(path.join(process.env.APP_ROOT, ".env.local"))) return process.env.APP_ROOT;
-  const cwd = process.cwd();
-  if (fs.existsSync(path.join(cwd, ".env.local"))) return cwd;
-  let dir = __dirname;
-  for (let i = 0; i < 8; i++) {
-    if (fs.existsSync(path.join(dir, ".env.local"))) return dir;
-    dir = path.dirname(dir);
-  }
-  return cwd;
-}
-
-function parseEnvFile(filePath: string): Record<string, string> {
-  if (!fs.existsSync(filePath)) return {};
-  return fs.readFileSync(filePath, "utf8").split("\n").reduce((acc, line) => {
-    const m = line.match(/^([^#=]+)=(.*)$/);
-    if (m) acc[m[1].trim()] = m[2].trim();
-    return acc;
-  }, {} as Record<string, string>);
-}
 
 async function pushSupabaseSecrets(secretKey: string, webhookSecret: string, supabaseToken: string) {
   const projectRef = process.env.SUPABASE_PROJECT_REF;
