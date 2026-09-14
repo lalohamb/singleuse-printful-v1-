@@ -23,7 +23,7 @@ async function sendEmail(to: string, subject: string, html: string) {
       subject,
       html,
     }),
-  }).catch((e) => console.error("Resend error:", e.message));
+  }).catch((e) => console.error("Resend error:", String(e.message).replace(/[\r\n]/g, " ")));
 }
 
 export async function POST(req: NextRequest) {
@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
         });
         stripeTransferId = transfer.id;
       } catch (e: any) {
-        console.error("Stripe transfer failed:", e.message);
+        console.error("Stripe transfer failed:", String(e.message).replace(/[\r\n]/g, " "));
         // Non-fatal — still mark paid and email
       }
     }

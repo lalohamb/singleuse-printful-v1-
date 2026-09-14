@@ -21,8 +21,11 @@ export async function POST(req: Request) {
   if (!file.type.startsWith("image/")) return NextResponse.json({ error: "Not an image" }, { status: 400 });
   if (file.size > 5 * 1024 * 1024) return NextResponse.json({ error: "Image must be under 5MB" }, { status: 400 });
 
-  const ext = file.name.split(".").pop();
-  const path = `${folder}/${Date.now()}.${ext}`;
+  const ALLOWED_EXTS = new Set(["jpg", "jpeg", "png", "gif", "webp", "avif", "svg"]);
+  const rawExt = file.name.split(".").pop()?.toLowerCase() ?? "";
+  if (!ALLOWED_EXTS.has(rawExt)) return NextResponse.json({ error: "Unsupported file type" }, { status: 400 });
+  const safeFolder = folder.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64) || "uploads";
+  const path = `${safeFolder}/${Date.now()}.${rawExt}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
   const { error } = await supabaseAdmin.storage.from(BUCKET).upload(path, buffer, {

@@ -11,7 +11,7 @@ import { NextResponse } from "next/server";
  * Returns a 401 NextResponse when the caller is not authenticated or not an admin.
  */
 export async function requireAdmin(): Promise<NextResponse | null> {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
 
   // Supabase stores the access token in one of these cookie names depending on
   // the client version / SSR setup.

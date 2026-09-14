@@ -49,14 +49,28 @@ export async function POST(req: NextRequest) {
 
   try {
     if (action === "refund") {
+      if (!charge_id || typeof charge_id !== "string" || !/^ch_[\w-]{1,255}$/.test(charge_id))
+        return NextResponse.json({ error: "Invalid charge_id" }, { status: 400 });
       const params: Stripe.RefundCreateParams = { charge: charge_id };
-      if (amount) params.amount = amount;
+      if (amount !== undefined) {
+        const parsed = parseInt(amount, 10);
+        if (!Number.isInteger(parsed) || parsed <= 0)
+          return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
+        params.amount = parsed;
+      }
       const refund = await stripe.refunds.create(params);
       return NextResponse.json(refund);
     }
 
     if (action === "register_webhook") {
       if (!secret_key || !webhook_url) return NextResponse.json({ error: "secret_key and webhook_url required" }, { status: 400 });
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(webhook_url);
+      } catch {
+        return NextResponse.json({ error: "Invalid webhook_url" }, { status: 400 });
+      }
+      if (parsedUrl.protocol !== "https:") return NextResponse.json({ error: "webhook_url must use https" }, { status: 400 });
       const client = new Stripe(secret_key, { apiVersion: "2026-08-26.dahlia" });
 
       // Reuse existing webhook at this URL if one exists — avoids invalidating a saved signing secret

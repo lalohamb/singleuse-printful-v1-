@@ -43,9 +43,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ account: accountData, groups: groupsData, campaigns: campaignsData, automations: [], forms: [] });
     }
     if (action === "subscribers") {
-      const limit = searchParams.get("limit") || "25";
+      const rawLimit = parseInt(searchParams.get("limit") || "25", 10);
+      const limit = Number.isFinite(rawLimit) && rawLimit > 0 && rawLimit <= 100 ? rawLimit : 25;
       const search = searchParams.get("search") || "";
-      const filter = searchParams.get("filter") || "";
+      const ALLOWED_FILTERS = new Set(["active", "unsubscribed", "bounced", "junk", "unconfirmed"]);
+      const filter = ALLOWED_FILTERS.has(searchParams.get("filter") ?? "") ? searchParams.get("filter") : "";
       let url = `${BASE}/subscribers?limit=${limit}`;
       if (search) url += `&query=${encodeURIComponent(search)}`;
       if (filter) url += `&type=${filter}`;
@@ -54,6 +56,7 @@ export async function GET(req: NextRequest) {
     }
     if (action === "subscriber") {
       const id = searchParams.get("id");
+      if (!id || !/^[\w-]{1,64}$/.test(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
       const res = await fetch(`${BASE}/subscribers/${id}`, { headers: headers() });
       return NextResponse.json(await safeJson(res), { status: res.status });
     }
@@ -63,6 +66,7 @@ export async function GET(req: NextRequest) {
     }
     if (action === "group_subscribers") {
       const id = searchParams.get("id");
+      if (!id || !/^[\w-]{1,64}$/.test(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
       const res = await fetch(`${BASE}/groups/${id}/subscribers?limit=25`, { headers: headers() });
       return NextResponse.json(await safeJson(res), { status: res.status });
     }
@@ -72,6 +76,7 @@ export async function GET(req: NextRequest) {
     }
     if (action === "campaign") {
       const id = searchParams.get("id");
+      if (!id || !/^[\w-]{1,64}$/.test(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
       const res = await fetch(`${BASE}/campaigns/${id}`, { headers: headers() });
       return NextResponse.json(await safeJson(res), { status: res.status });
     }
@@ -111,6 +116,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(await safeJson(res), { status: res.status });
     }
     if (action === "update_subscriber") {
+      if (!body.id || !/^[\w-]{1,64}$/.test(String(body.id))) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
       const res = await fetch(`${BASE}/subscribers/${body.id}`, {
         method: "PUT",
         headers: headers(),
@@ -119,10 +125,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(await safeJson(res), { status: res.status });
     }
     if (action === "delete_subscriber") {
+      if (!body.id || !/^[\w-]{1,64}$/.test(String(body.id))) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
       const res = await fetch(`${BASE}/subscribers/${body.id}`, { method: "DELETE", headers: headers() });
       return NextResponse.json({ success: res.ok || res.status === 204 });
     }
     if (action === "unsubscribe") {
+      if (!body.id || !/^[\w-]{1,64}$/.test(String(body.id))) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
       const res = await fetch(`${BASE}/subscribers/${body.id}/unsubscribe`, {
         method: "POST", headers: headers(),
       });
@@ -137,6 +145,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(await safeJson(res), { status: res.status });
     }
     if (action === "rename_group") {
+      if (!body.id || !/^[\w-]{1,64}$/.test(String(body.id))) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
       const res = await fetch(`${BASE}/groups/${body.id}`, {
         method: "PUT",
         headers: headers(),
@@ -145,6 +154,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(await safeJson(res), { status: res.status });
     }
     if (action === "delete_group") {
+      if (!body.id || !/^[\w-]{1,64}$/.test(String(body.id))) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
       const res = await fetch(`${BASE}/groups/${body.id}`, { method: "DELETE", headers: headers() });
       return NextResponse.json({ success: res.ok || res.status === 204 });
     }
@@ -168,7 +178,7 @@ export async function POST(req: NextRequest) {
         groups: groupIds.map((id: string) => ({ id })),
         type: "regular",
       };
-      console.log("[MailerLite] create_campaign payload:", JSON.stringify(createPayload));
+      console.log("[MailerLite] create_campaign payload:", JSON.stringify(createPayload).replace(/[\r\n]/g, " "));
       const createRes = await fetch(`${BASE}/campaigns`, {
         method: "POST",
         headers: headers(),
@@ -176,7 +186,7 @@ export async function POST(req: NextRequest) {
       });
       const campaign = await safeJson(createRes);
       if (!createRes.ok) {
-        console.error("[MailerLite] create_campaign failed:", createRes.status, JSON.stringify(campaign));
+        console.error("[MailerLite] create_campaign failed:", createRes.status, JSON.stringify(campaign).replace(/[\r\n]/g, " "));
         return NextResponse.json(campaign, { status: createRes.status });
       }
       const campaignId = campaign.id;
@@ -195,10 +205,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(campaign, { status: 201 });
     }
     if (action === "delete_campaign") {
+      if (!body.id || !/^[\w-]{1,64}$/.test(String(body.id))) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
       const res = await fetch(`${BASE}/campaigns/${body.id}`, { method: "DELETE", headers: headers() });
       return NextResponse.json({ success: res.ok || res.status === 204 });
     }
     if (action === "assign_group") {
+      if (!body.group_id || !/^[\w-]{1,64}$/.test(String(body.group_id))) return NextResponse.json({ error: "Invalid group_id" }, { status: 400 });
       // Classic API: POST /groups/{group_id}/subscribers with email body
       const res = await fetch(`${BASE}/groups/${body.group_id}/subscribers`, {
         method: "POST",
@@ -208,6 +220,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(await safeJson(res), { status: res.status });
     }
     if (action === "remove_from_group") {
+      if (!body.group_id || !/^[\w-]{1,64}$/.test(String(body.group_id))) return NextResponse.json({ error: "Invalid group_id" }, { status: 400 });
+      if (!body.subscriber_id || !/^[\w-]{1,64}$/.test(String(body.subscriber_id))) return NextResponse.json({ error: "Invalid subscriber_id" }, { status: 400 });
       const res = await fetch(`${BASE}/groups/${body.group_id}/subscribers/${body.subscriber_id}`, {
         method: "DELETE", headers: headers(),
       });

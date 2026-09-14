@@ -22,6 +22,15 @@ interface PopupSettings {
 
 const STORAGE_KEY = "newsletter_popup_dismissed";
 
+function sanitizeImageUrl(url: string): string {
+  if (url.startsWith("/")) return url;
+  try {
+    const { protocol } = new URL(url);
+    if (protocol === "https:" || protocol === "http:") return url;
+  } catch { /* invalid URL */ }
+  return "/ga.png";
+}
+
 function getLayout(position: string) {
   switch (position) {
     case "left":
@@ -98,7 +107,7 @@ export default function NewsletterPopup() {
         body: data.popup_settings.body || "New drops, exclusive offers, and culture — straight to your inbox.",
         ctaLabel: data.popup_settings.ctaLabel || "Subscribe",
         bgColor: data.popup_settings.bgColor || "#111111",
-        imageUrl: data.popup_settings.imageUrl || "/ga.png",
+        imageUrl: sanitizeImageUrl(data.popup_settings.imageUrl || "/ga.png"),
         groupId: data.popup_settings.groupId || "",
         position: data.popup_settings.position || "right",
         imgX: data.popup_settings.imgX ?? 0,

@@ -31,6 +31,17 @@ function errorResponse(req: Request, message: string, status = 500) {
   });
 }
 
+function sanitize<T>(value: T, depth = 0): T {
+  if (depth > 10 || value === null || typeof value !== "object") return value;
+  if (Array.isArray(value)) return value.map((v) => sanitize(v, depth + 1)) as unknown as T;
+  const safe: Record<string, unknown> = {};
+  for (const key of Object.keys(value as object)) {
+    if (key === "__proto__" || key === "constructor" || key === "prototype") continue;
+    safe[key] = sanitize((value as Record<string, unknown>)[key], depth + 1);
+  }
+  return safe as T;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders(req) });
@@ -51,7 +62,7 @@ Deno.serve(async (req: Request) => {
       apiVersion: "2024-12-18.acacia",
     });
 
-    const body = await req.json();
+    const body = sanitize(await req.json());
     const { items, shipping_address, shipping_name, email, shipping_cost, affiliate_code } = body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {

@@ -25,7 +25,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       },
       setItem: (key, value) => {
         if (typeof document === "undefined") return;
-        document.cookie = `${key}=${encodeURIComponent(value)};path=/;max-age=604800;SameSite=Lax`;
+        const secure = location.protocol === "https:" ? ";Secure" : "";
+        document.cookie = `${key}=${encodeURIComponent(value)};path=/;max-age=604800;SameSite=Lax${secure}`;
       },
       removeItem: (key) => {
         if (typeof document === "undefined") return;

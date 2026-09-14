@@ -38,15 +38,27 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(data);
 }
 
+const SEO_ALLOWED_FIELDS = new Set([
+  "site_url", "default_og_image", "sitemap_enabled", "robots_noindex_admin",
+  "jsonld_enabled", "canonical_enabled", "meta_title_suffix", "twitter_handle",
+  "google_site_verification",
+]);
+
 export async function POST(req: NextRequest) {
   const authError = await requireAdmin();
   if (authError) return authError;
 
   const sb = serviceSupabase();
-  const body = await req.json();
+  const raw = await req.json();
+  const patch: Record<string, unknown> = {};
+  for (const key of SEO_ALLOWED_FIELDS) {
+    if (key in raw) patch[key] = raw[key];
+  }
+  if (Object.keys(patch).length === 0)
+    return NextResponse.json({ error: "No valid fields provided" }, { status: 400 });
   const { error } = await sb
     .from("seo_settings")
-    .update({ ...body, updated_at: new Date().toISOString() })
+    .update({ ...patch, updated_at: new Date().toISOString() })
     .eq("id", "00000000-0000-0000-0000-000000000001");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

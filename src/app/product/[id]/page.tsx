@@ -15,9 +15,10 @@ async function getSeoSettings() {
   return data;
 }
 
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
   const [productRes, seo] = await Promise.all([
-    supabase.from("products").select("title, description, image_url").eq("id", params.id).maybeSingle(),
+    supabase.from("products").select("title, description, image_url").eq("id", id).maybeSingle(),
     getSeoSettings(),
   ]);
   if (!productRes.data) return { title: "Product Not Found" };
@@ -27,21 +28,22 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   return {
     title,
     description: description || undefined,
-    ...(seo?.canonical_enabled && { alternates: { canonical: `${base}/product/${params.id}` } }),
+    ...(seo?.canonical_enabled && { alternates: { canonical: `${base}/product/${id}` } }),
     openGraph: {
       title,
       description: description || undefined,
-      url: `${base}/product/${params.id}`,
+      url: `${base}/product/${id}`,
       type: "website",
       ...(ogImage && { images: [{ url: ogImage, width: 800, height: 800, alt: title }] }),
     },
   };
 }
 
-export default async function ProductPage({ params }: { params: { id: string } }) {
+export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const [productRes, relatedRes, seo] = await Promise.all([
-    supabase.from("products").select("*").eq("id", params.id).maybeSingle(),
-    supabase.from("products").select("*").eq("status", "active").neq("id", params.id).limit(4),
+    supabase.from("products").select("*").eq("id", id).maybeSingle(),
+    supabase.from("products").select("*").eq("status", "active").neq("id", id).limit(4),
     getSeoSettings(),
   ]);
 

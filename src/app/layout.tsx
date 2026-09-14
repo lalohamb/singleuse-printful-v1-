@@ -3,10 +3,21 @@ import "./globals.css";
 import { CartProvider } from "@/lib/cart";
 import { createClient } from "@supabase/supabase-js";
 
+const SUPABASE_ORIGIN = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).origin;
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  { global: { fetch: (url, opts) => fetch(url, { ...opts, cache: "no-store" }) } }
+  {
+    global: {
+      fetch: (url, opts) => {
+        const target = new URL(url.toString());
+        if (target.origin !== SUPABASE_ORIGIN)
+          throw new Error(`Blocked SSRF attempt to ${target.origin}`);
+        return fetch(url, { ...opts, cache: "no-store" });
+      },
+    },
+  }
 );
 
 export async function generateMetadata(): Promise<Metadata> {

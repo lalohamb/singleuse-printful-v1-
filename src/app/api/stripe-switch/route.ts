@@ -12,6 +12,8 @@ const execAsync = promisify(exec);
 
 async function pushSupabaseSecrets(secretKey: string, webhookSecret: string, supabaseToken: string) {
   const projectRef = process.env.SUPABASE_PROJECT_REF;
+  if (!projectRef || !/^[a-z0-9-]{1,40}$/.test(projectRef))
+    throw new Error("Invalid or missing SUPABASE_PROJECT_REF");
   const res = await fetch(
     `https://api.supabase.com/v1/projects/${projectRef}/secrets`,
     {
@@ -29,6 +31,10 @@ async function pushSupabaseSecrets(secretKey: string, webhookSecret: string, sup
   if (!res.ok) throw new Error(`Supabase secrets update failed: ${await res.text()}`);
 }
 
+function safePm2AppName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9_.-]/g, "").slice(0, 64) || "myapp";
+}
+
 // POST — body: { mode: "live" | "test" } or { action: "restart" }
 export async function POST(req: NextRequest) {
   const authError = await requireAdmin();
@@ -38,7 +44,7 @@ export async function POST(req: NextRequest) {
 
   // Standalone restart action
   if (body.action === "restart") {
-    const appName = process.env.PM2_APP_NAME ?? "myapp";
+    const appName = safePm2AppName(process.env.PM2_APP_NAME ?? "myapp");
     setTimeout(() => execAsync(`/usr/bin/pm2 restart ${appName} --update-env`).catch(() => {}), 500);
     return NextResponse.json({ ok: true, message: "PM2 restarted" });
   }
@@ -115,7 +121,7 @@ export async function POST(req: NextRequest) {
       steps.push("PM2 restart triggered");
     } catch {
       try {
-        await execAsync(`/usr/bin/pm2 restart ${process.env.PM2_APP_NAME ?? "myapp"} --update-env`);
+        await execAsync(`/usr/bin/pm2 restart ${safePm2AppName(process.env.PM2_APP_NAME ?? "myapp")} --update-env`);
         steps.push("PM2 restart triggered");
       } catch { /* not running under PM2 */ }
     }

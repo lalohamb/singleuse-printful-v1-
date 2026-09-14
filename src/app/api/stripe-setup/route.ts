@@ -24,6 +24,8 @@ async function pushSupabaseSecrets(secretKey: string, webhookSecret: string): Pr
   const token = process.env.SUPABASE_ACCESS_TOKEN;
   const ref = process.env.SUPABASE_PROJECT_REF;
   if (!token || !ref) return "skipped — SUPABASE_ACCESS_TOKEN or SUPABASE_PROJECT_REF not set";
+  if (!/^[a-z0-9-]{1,40}$/.test(ref))
+    throw new Error("Invalid SUPABASE_PROJECT_REF format");
   const r = await fetch(`https://api.supabase.com/v1/projects/${ref}/secrets`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -49,9 +51,13 @@ function activateMode(root: string, secretKey: string, webhookSecret: string) {
   }
 }
 
+function safePm2AppName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9_.-]/g, "").slice(0, 64) || "myapp";
+}
+
 function restartPM2(root: string) {
   const ecoPath = path.resolve(root, "ecosystem.config.js");
-  const appName = process.env.PM2_APP_NAME ?? "myapp";
+  const appName = safePm2AppName(process.env.PM2_APP_NAME ?? "myapp");
   setTimeout(async () => {
     try {
       if (fs.existsSync(ecoPath)) await execAsync(`/usr/bin/pm2 startOrReload ${ecoPath} --update-env`);

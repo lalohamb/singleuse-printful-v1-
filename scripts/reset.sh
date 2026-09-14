@@ -66,6 +66,7 @@ UPDATE settings SET
   footer_text           = '${FOOTER_TEXT}',
   footer_bottom_message = '${FOOTER_BOTTOM_MESSAGE}',
   announcement          = '${ANNOUNCEMENT}',
+  brand_values_settings = '{"advanced":false,"values":[{"stat":"100%","label":"Made for Every Body","sub":"Clothing that meets you where you are","icon":"✨","enabled":true},{"stat":"0 Waste","label":"Made to Order","sub":"Every piece printed fresh - nothing sits on a shelf","icon":"♻️","enabled":true},{"stat":"XS-5XL","label":"Size Inclusive","sub":"Style without a size limit","icon":"💯","enabled":true}],"backgroundColor":"#171717","textColor":"#ffffff","accentColor":"#d4af37","backgroundImage":"","cardBackgroundColor":"transparent","cardBorderColor":"rgba(255,255,255,0.1)","dividerColor":"rgba(255,255,255,0.1)","columns":3,"alignment":"center","divider":"vertical","padding":"spacious","animate":true}'::jsonb,
   social_links          = '{
     "instagram": {"url": "${INSTAGRAM_URL}", "enabled": true},
     "tiktok":    {"url": "${TIKTOK_URL}",    "enabled": true},

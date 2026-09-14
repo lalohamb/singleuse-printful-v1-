@@ -19,7 +19,15 @@ export function appRoot(): string {
   return cwd;
 }
 
+function assertWithinRoot(filePath: string): void {
+  const root = path.resolve(appRoot());
+  const resolved = path.resolve(filePath);
+  if (!resolved.startsWith(root + path.sep) && resolved !== root)
+    throw new Error(`Path traversal blocked: ${resolved} is outside app root`);
+}
+
 export function parseEnvFile(filePath: string): Record<string, string> {
+  assertWithinRoot(filePath);
   if (!fs.existsSync(filePath)) return {};
   return fs.readFileSync(filePath, "utf8").split("\n").reduce((acc, line) => {
     const m = line.match(/^([^#=]+)=(.*)$/);
@@ -29,5 +37,6 @@ export function parseEnvFile(filePath: string): Record<string, string> {
 }
 
 export function writeEnvFile(filePath: string, env: Record<string, string>) {
+  assertWithinRoot(filePath);
   fs.writeFileSync(filePath, Object.entries(env).map(([k, v]) => `${k}=${v}`).join("\n") + "\n", "utf8");
 }
