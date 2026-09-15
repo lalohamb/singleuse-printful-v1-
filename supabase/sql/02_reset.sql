@@ -10,7 +10,12 @@ TRUNCATE TABLE orders RESTART IDENTITY CASCADE;
 
 -- ── 2. CUSTOMER PROFILES ─────────────────────────────────────────────────────
 -- Auth users remain in Supabase Auth; this clears the local account metadata mirror.
-TRUNCATE TABLE customer_profiles RESTART IDENTITY CASCADE;
+DO $$
+BEGIN
+  IF to_regclass('public.customer_profiles') IS NOT NULL THEN
+    TRUNCATE TABLE public.customer_profiles RESTART IDENTITY CASCADE;
+  END IF;
+END $$;
 
 -- ── 3. EMAIL EVENTS ───────────────────────────────────────────────────────────
 TRUNCATE TABLE email_events RESTART IDENTITY CASCADE;

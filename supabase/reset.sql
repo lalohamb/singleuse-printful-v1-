@@ -9,7 +9,12 @@
 TRUNCATE TABLE orders RESTART IDENTITY CASCADE;
 
 -- Customer profiles (Auth users remain in Supabase Auth)
-TRUNCATE TABLE customer_profiles RESTART IDENTITY CASCADE;
+DO $$
+BEGIN
+  IF to_regclass('public.customer_profiles') IS NOT NULL THEN
+    TRUNCATE TABLE public.customer_profiles RESTART IDENTITY CASCADE;
+  END IF;
+END $$;
 
 -- Products (all of them — Printify sync will repopulate)
 TRUNCATE TABLE products RESTART IDENTITY CASCADE;
@@ -23,8 +28,6 @@ UPDATE settings SET
 
 -- Confirm what remains
 SELECT 'orders'      AS "table", COUNT(*) AS rows FROM orders
-UNION ALL
-SELECT 'customer_profiles',       COUNT(*)         FROM customer_profiles
 UNION ALL
 SELECT 'products',                COUNT(*)         FROM products
 UNION ALL

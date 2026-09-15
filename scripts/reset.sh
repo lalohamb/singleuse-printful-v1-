@@ -44,7 +44,7 @@ echo ""
 echo "  Running reset SQL..."
 if run_sql_file "$SQL_DIR/02_reset.sql" "$SUPABASE_PROJECT_REF" "$SERVICE_ROLE_KEY" "$DB_URL" "$ACCESS_TOKEN"; then
   ok "Data wiped"
-  ok "Customer profile rows cleared"
+  ok "Customer profile rows cleared when the table exists"
 else
   fail "Reset SQL failed"
   exit 1

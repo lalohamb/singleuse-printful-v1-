@@ -1,30 +1,27 @@
 import { test, expect } from "@playwright/test";
-
-const ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL || "admin@bodyandsleeves.com";
-const ADMIN_PASSWORD = process.env.TEST_ADMIN_PASSWORD || "changeme";
+import { hasAdminCredentials, signInAdmin } from "./helpers";
 
 test.describe("Admin", () => {
   test("admin login page loads", async ({ page }) => {
     await page.goto("/admin");
-    await expect(page.getByPlaceholder(/email/i)).toBeVisible();
-    await expect(page.getByPlaceholder(/password/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: /admin portal/i })).toBeVisible();
+    await expect(page.locator("input[type='email']")).toBeVisible();
+    await expect(page.locator("input[type='password']")).toBeVisible();
   });
 
   test("invalid login shows error", async ({ page }) => {
     await page.goto("/admin");
-    await page.getByPlaceholder(/email/i).fill("wrong@example.com");
-    await page.getByPlaceholder(/password/i).fill("wrongpassword");
+    await page.locator("input[type='email']").fill("wrong@example.com");
+    await page.locator("input[type='password']").fill("wrongpassword");
     await page.getByRole("button", { name: /sign in/i }).click();
     await expect(page.getByText(/invalid|error|incorrect/i)).toBeVisible({ timeout: 5000 });
   });
 
   test.describe("authenticated", () => {
+    test.skip(!hasAdminCredentials, "Set TEST_ADMIN_EMAIL and TEST_ADMIN_PASSWORD to run authenticated admin E2E tests.");
+
     test.beforeEach(async ({ page }) => {
-      await page.goto("/admin");
-      await page.getByPlaceholder(/email/i).fill(ADMIN_EMAIL);
-      await page.getByPlaceholder(/password/i).fill(ADMIN_PASSWORD);
-      await page.getByRole("button", { name: /sign in/i }).click();
-      await expect(page).toHaveURL(/\/admin\/dashboard/, { timeout: 10000 });
+      await signInAdmin(page);
     });
 
     // ── Dashboard ──────────────────────────────────────────────────────────
@@ -154,7 +151,7 @@ test.describe("Admin", () => {
     test("admin sign out works", async ({ page }) => {
       await page.goto("/admin/dashboard");
       await page.getByRole("button", { name: /sign out/i }).click();
-      await expect(page.getByPlaceholder(/email/i)).toBeVisible({ timeout: 5000 });
+      await expect(page.locator("input[type='email']")).toBeVisible({ timeout: 5000 });
     });
   });
 });

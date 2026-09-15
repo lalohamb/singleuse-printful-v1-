@@ -1,10 +1,10 @@
 import { test, expect } from "@playwright/test";
+import { firstProductLinkOrSkip } from "./helpers";
 
 // ── Helper ──────────────────────────────────────────────────────────────────
 async function addToCartAndGoToCheckout(page: any) {
-  await page.goto("/shop");
-  await page.locator("a[href^='/product/']").first().waitFor({ timeout: 10000 });
-  await page.locator("a[href^='/product/']").first().click();
+  const firstProduct = await firstProductLinkOrSkip(page);
+  await firstProduct.click();
   await page.getByRole("button", { name: /add to cart/i }).click();
   await page.goto("/checkout");
 }
