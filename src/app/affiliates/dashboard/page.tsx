@@ -259,9 +259,9 @@ export default function AffiliateDashboard() {
             <div className="text-center py-12 text-secondary-400">
               <TrendingUp size={32} className="mx-auto mb-3 text-secondary-200" />
               <p>No conversions yet. Start sharing your link!</p>
-              <a href="/" className="inline-flex items-center gap-1 text-sm text-primary-600 hover:underline mt-3">
+              <Link href="/" className="inline-flex items-center gap-1 text-sm text-primary-600 hover:underline mt-3">
                 Visit Store <ExternalLink size={13} />
-              </a>
+              </Link>
             </div>
           ) : (
             <div className="overflow-x-auto">

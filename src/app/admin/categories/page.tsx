@@ -4,6 +4,7 @@ import { Plus, Edit2, Trash2, X, Loader2, ImageOff, Check, Image, Search, Upload
 import { supabase } from "@/lib/supabase";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
 import type { Category } from "@/types";
+import AppImage from "@/components/AppImage";
 
 const BUCKET = "store-images";
 const FOLDERS = ["uploads", "settings/hero", "settings/our-why", "settings/story"];
@@ -158,7 +159,7 @@ function ImagePickerModal({ current, onSelect, onClose }: {
                         className={`relative aspect-square rounded-xl overflow-hidden bg-secondary-100 border-2 transition-all hover:border-gold-400 ${
                           current === p.image_url ? "border-gold-500 ring-2 ring-gold-300" : "border-transparent"
                         }`}>
-                        <img src={p.image_url!} alt={p.title} className="w-full h-full object-cover" />
+                        <AppImage fill src={p.image_url!} alt={p.title} className="w-full h-full object-cover" />
                         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-1.5">
                           <p className="text-white text-[10px] leading-tight truncate">{p.title}</p>
                         </div>
@@ -184,7 +185,7 @@ function ImagePickerModal({ current, onSelect, onClose }: {
                         className={`relative aspect-square rounded-xl overflow-hidden bg-secondary-100 border-2 transition-all hover:border-gold-400 ${
                           current === f.publicUrl ? "border-gold-500 ring-2 ring-gold-300" : "border-transparent"
                         }`}>
-                        <img src={f.publicUrl} alt={f.name} className="w-full h-full object-cover" />
+                        <AppImage fill src={f.publicUrl} alt={f.name} className="w-full h-full object-cover" />
                         {current === f.publicUrl && (
                           <div className="absolute inset-0 bg-gold-500/20 flex items-center justify-center">
                             <Check size={20} className="text-white drop-shadow" />
@@ -202,7 +203,7 @@ function ImagePickerModal({ current, onSelect, onClose }: {
               <input value={urlInput} onChange={(e) => setUrlInput(e.target.value)}
                 placeholder="https://images.pexels.com/…"
                 className="input-field text-sm" />
-              {urlInput && <img src={urlInput} alt="preview" className="w-full max-h-48 object-contain rounded-xl bg-secondary-100" onError={(e) => (e.currentTarget.style.display = "none")} />}
+              {urlInput && <AppImage src={urlInput} alt="preview" width={640} height={320} className="w-full max-h-48 object-contain rounded-xl bg-secondary-100" onError={(e) => (e.currentTarget.style.display = "none")} />}
               <button onClick={() => { if (urlInput.trim()) { onSelect(urlInput.trim()); onClose(); } }}
                 disabled={!urlInput.trim()} className="btn-primary w-full py-2 text-sm">Use This Image</button>
             </div>
@@ -253,7 +254,7 @@ function CategoryCard({ cat, autoImage, onEdit, onDelete, onSaved }: {
         {/* Image preview */}
         <div className="relative aspect-video bg-secondary-200">
           {displayImage
-            ? <img src={displayImage} alt={cat.name} className="absolute inset-0 w-full h-full object-cover" />
+            ? <AppImage fill src={displayImage} alt={cat.name} className="absolute inset-0 w-full h-full object-cover" />
             : <div className="absolute inset-0 flex items-center justify-center"><ImageOff size={28} className="text-secondary-300" /></div>
           }
           {dir !== "none" && (

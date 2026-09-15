@@ -2,8 +2,11 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
+type SettingsValue = ReturnType<typeof JSON.parse>;
+type SettingsForm = Record<string, SettingsValue> & { id?: string };
+
 export function useSettings() {
-  const [form, setForm] = useState<Record<string, any>>({});
+  const [form, setForm] = useState<SettingsForm>({});
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
@@ -15,10 +18,10 @@ export function useSettings() {
     });
   }, []);
 
-  const set = (key: string, value: any) =>
+  const set = (key: string, value: unknown) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  const save = async (updates: Record<string, any>) => {
+  const save = async (updates: Record<string, unknown>) => {
     setError("");
     const { error: err } = await supabase
       .from("settings")

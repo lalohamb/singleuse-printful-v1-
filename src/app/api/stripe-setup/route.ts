@@ -6,6 +6,7 @@ import { promisify } from "util";
 import Stripe from "stripe";
 import { requireAdmin } from "@/lib/require-admin";
 import { appRoot, parseEnvFile, writeEnvFile } from "@/lib/env-utils";
+import { getErrorMessage } from "@/lib/errors";
 
 export const runtime = "nodejs";
 
@@ -134,8 +135,8 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ ok: true, mode, activated: activate, steps });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message, steps }, { status: 500 });
+  } catch (e: unknown) {
+    return NextResponse.json({ error: getErrorMessage(e), steps }, { status: 500 });
   }
 }
 

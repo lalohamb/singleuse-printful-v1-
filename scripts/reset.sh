@@ -22,8 +22,8 @@ hr()   { echo -e "${CYAN}━━━━━━━━━━━━━━━━━━�
 
 hr
 echo -e "${YELLOW}  Gender Apparel — Reset${NC}"
-echo -e "  This will wipe all orders, products, and content."
-echo -e "  Admins are preserved. Settings are restored to defaults."
+echo -e "  This will wipe all orders, customer profile rows, products, and content."
+echo -e "  Admins and Supabase Auth users are preserved. Settings are restored to defaults."
 hr
 
 read -rp "  Type RESET to confirm: " confirm
@@ -44,6 +44,7 @@ echo ""
 echo "  Running reset SQL..."
 if run_sql_file "$SQL_DIR/02_reset.sql" "$SUPABASE_PROJECT_REF" "$SERVICE_ROLE_KEY" "$DB_URL" "$ACCESS_TOKEN"; then
   ok "Data wiped"
+  ok "Customer profile rows cleared"
 else
   fail "Reset SQL failed"
   exit 1

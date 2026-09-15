@@ -151,7 +151,7 @@ fi
 
 echo "  Running 01_schema.sql..."
 if run_sql_file "$SQL_DIR/01_schema.sql" "$SUPABASE_PROJECT_REF" "$SERVICE_ROLE_KEY" "$DB_URL" "$SUPABASE_ACCESS_TOKEN"; then
-  ok "Schema created"
+  ok "Schema created, including customer account profiles"
 else
   fail "Schema SQL failed — check your DB credentials"
   exit 1

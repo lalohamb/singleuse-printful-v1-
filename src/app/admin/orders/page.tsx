@@ -4,6 +4,13 @@ import { Search, Eye, X, Package, Truck, RefreshCw, CheckCircle, AlertTriangle, 
 import { supabase, formatPrice } from "@/lib/supabase";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
 import type { Order } from "@/types";
+import { getErrorMessage } from "@/lib/errors";
+import AppImage from "@/components/AppImage";
+
+type PrintifyOrderData = {
+  status?: string;
+  shipments?: { number?: string | null; url?: string | null }[];
+};
 
 const statusColors: Record<string, string> = {
   pending: "bg-warning-50 text-warning-600", paid: "bg-success-50 text-success-600",
@@ -75,8 +82,8 @@ function Orders() {
             alert(`Printify rejected the cancellation: ${err.message || "Order may already be in production."}\n\nDB status was NOT changed.`);
             return false;
           }
-        } catch (e: any) {
-          alert(`Could not reach Printify: ${e.message}\n\nDB status was NOT changed.`);
+        } catch (e: unknown) {
+          alert(`Could not reach Printify: ${getErrorMessage(e)}\n\nDB status was NOT changed.`);
           return false;
         }
       }
@@ -196,7 +203,7 @@ function Orders() {
 function OrderDetailModal({ order, onClose, onUpdateStatus }: { order: Order; onClose: () => void; onUpdateStatus: (id: string, status: string) => Promise<boolean> }) {
   const addr = order.shipping_address;
   const [localStatus, setLocalStatus] = useState(order.status);
-  const [printifyData, setPrintifyData] = useState<any>(null);
+  const [printifyData, setPrintifyData] = useState<PrintifyOrderData | null>(null);
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
   const [synced, setSynced] = useState(false);
@@ -226,8 +233,8 @@ function OrderDetailModal({ order, onClose, onUpdateStatus }: { order: Order; on
       if (!res.ok) throw new Error(`Printify returned ${res.status}`);
       const data = await res.json();
       setPrintifyData(data);
-    } catch (e: any) {
-      setCheckError(e.message);
+    } catch (e: unknown) {
+      setCheckError(getErrorMessage(e));
     }
     setChecking(false);
   };
@@ -247,13 +254,14 @@ function OrderDetailModal({ order, onClose, onUpdateStatus }: { order: Order; on
       "canceled":             "cancelled",
       "cancelled":            "cancelled",
     };
-    const newStatus = statusMap[printifyData.status] ?? localStatus;
+    const printifyStatus = printifyData.status ?? "";
+    const newStatus = statusMap[printifyStatus] ?? localStatus;
     const shipment = printifyData.shipments?.[0];
     // Write directly to DB — no need to go through updateStatus which would
     // try to cancel in Printify again when status is "cancelled".
     await supabase.from("orders").update({
       status: newStatus,
-      fulfillment_status: printifyData.status,
+      fulfillment_status: printifyStatus,
       tracking_number: shipment?.number || order.tracking_number,
       tracking_url: shipment?.url || order.tracking_url,
       updated_at: new Date().toISOString(),
@@ -294,7 +302,7 @@ function OrderDetailModal({ order, onClose, onUpdateStatus }: { order: Order; on
             <div className="space-y-3">
               {(Array.isArray(order.items) ? order.items : []).map((item, i) => (
                 <div key={i} className="flex items-center gap-3 pb-3 border-b border-secondary-50 last:border-0">
-                  <img src={item.image_url || "/genderapparel.png"} alt={item.title} className="w-14 h-14 rounded-lg object-cover bg-secondary-100" onError={async (e) => {
+                  <AppImage src={item.image_url || "/genderapparel.png"} alt={item.title} width={56} height={56} className="w-14 h-14 rounded-lg object-cover bg-secondary-100" onError={async (e) => {
                     const el = e.target as HTMLImageElement;
                     if (item.product_id) {
                       const { data } = await supabase.from("products").select("image_url").eq("id", item.product_id).maybeSingle();

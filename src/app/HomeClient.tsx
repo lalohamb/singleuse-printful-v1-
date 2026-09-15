@@ -7,6 +7,7 @@ import ProductCard from "@/components/ProductCard";
 import Reveal from "@/components/Reveal";
 import NewsletterSignup from "@/components/NewsletterSignup";
 import PromoBanner from "@/components/PromoBanner";
+import AppImage from "@/components/AppImage";
 import { formatPrice } from "@/lib/supabase";
 import { DEFAULT_AFFIRMATIONS_SETTINGS, type AffirmationsSettings } from "@/lib/affirmations-settings";
 import { DEFAULT_NEW_ARRIVALS_SETTINGS, type NewArrivalsSettings } from "@/lib/new-arrivals-settings";
@@ -34,7 +35,7 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
         <div className="absolute inset-0 bg-secondary-900">
           {/* LINE BELOW TO SET HERO IMAGE BACKGROUND TO FULL PIC>> :style={{ objectPosition: "100% " }} <<;END 09-04-2026*/}
           {/* https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/object-position*/ } 
-          <img src={settings?.hero_image_url || "https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"} alt="Gender Apparel clothing" className={`absolute inset-0 w-full h-full ${settings?.hero_image_fit === "contain" ? "object-contain" : (settings?.hero_image_scale ?? 100) === 100 ? "object-cover" : "object-contain"}`} style={{ objectPosition: settings?.hero_object_position || "center", transform: settings?.hero_image_flip ? "scaleX(-1)" : undefined, scale: `${settings?.hero_image_scale ?? 100}%` }} />
+          <AppImage fill src={settings?.hero_image_url || "https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"} alt="Gender Apparel clothing" className={`absolute inset-0 w-full h-full ${settings?.hero_image_fit === "contain" ? "object-contain" : (settings?.hero_image_scale ?? 100) === 100 ? "object-cover" : "object-contain"}`} style={{ objectPosition: settings?.hero_object_position || "center", transform: settings?.hero_image_flip ? "scaleX(-1)" : undefined, scale: `${settings?.hero_image_scale ?? 100}%` }} />
           {(() => {
             const op = (settings?.hero_gradient_opacity ?? 70) / 100;
             const dir = settings?.hero_gradient_dir ?? "left";
@@ -105,7 +106,7 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
             {categories.map((cat) => (
               <Link key={cat.id} href={`/shop?category=${cat.slug}`} className="group relative flex-1 min-w-[140px] aspect-square overflow-hidden bg-secondary-900 hover:shadow-xl hover:shadow-gold-500/10 transition-all">
                 {(cat.category_image_url || categoryImages[cat.id]) && (
-                  <img src={cat.category_image_url || categoryImages[cat.id]} alt={cat.name} className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" />
+                  <AppImage fill src={cat.category_image_url || categoryImages[cat.id]} alt={cat.name} className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" />
                 )}
                 {(() => {
                   const op = ((cat.gradient_opacity ?? 60) / 100);
@@ -134,7 +135,7 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
         <section className="relative w-full overflow-hidden" style={{ minHeight: 600, backgroundColor: newArrivalsSettings.backgroundColor, color: newArrivalsSettings.textColor }}>
           {/* background image layer */}
           <div className="absolute inset-0 transition-opacity duration-700">
-            <img src={newArrivals[slide]?.image_url || ""} alt="" className="w-full h-full object-cover opacity-20 blur-sm scale-105" />
+            <AppImage fill src={newArrivals[slide]?.image_url || ""} alt="" className="w-full h-full object-cover opacity-20 blur-sm scale-105" />
             <div className="absolute inset-0 bg-gradient-to-r from-secondary-900 via-secondary-900/90 to-secondary-900/40" />
           </div>
 
@@ -173,10 +174,12 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
 
             {/* right — product image */}
             <div className="relative w-full lg:w-[480px] flex-shrink-0 flex items-end justify-center pt-8 lg:pt-0" style={{ minHeight: 500 }}>
-              <img
+              <AppImage
                 key={slide}
                 src={newArrivals[slide]?.image_url || ""}
                 alt={newArrivals[slide]?.title}
+                width={520}
+                height={520}
                 className="relative z-10 max-h-[520px] w-auto object-contain drop-shadow-2xl animate-slide-up"
               />
             </div>
@@ -238,7 +241,7 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
                 const pos = hasOwn ? (settings?.our_why_object_position || "center") : "center";
                 const flip = hasOwn ? !!settings?.our_why_image_flip : false;
                 const fit = hasOwn ? (settings?.our_why_image_fit ?? "cover") : "cover";
-                return <img src={src} alt="Our story" className={`absolute inset-0 w-full h-full ${fit === "contain" ? "object-contain" : "object-cover"}`} style={{ objectPosition: pos, transform: flip ? "scaleX(-1)" : undefined, scale: `${scale}%` }} />;
+                return <AppImage fill src={src} alt="Our story" className={`absolute inset-0 w-full h-full ${fit === "contain" ? "object-contain" : "object-cover"}`} style={{ objectPosition: pos, transform: flip ? "scaleX(-1)" : undefined, scale: `${scale}%` }} />;
               })()}
               <div className="absolute inset-0 bg-gradient-to-t from-secondary-900/60 to-transparent" />
             </div>
@@ -294,7 +297,7 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
               };
               return (
                 <>
-                  <img src={src} alt="" className={`w-full h-full ${settings?.story_image_fit === "contain" ? "object-contain" : "object-cover"}`} style={{ objectPosition: settings?.story_object_position || "center", transform: settings?.story_image_flip ? "scaleX(-1)" : undefined, scale: `${settings?.story_image_scale ?? 100}%` }} />
+                  <AppImage fill src={src} alt="" className={`w-full h-full ${settings?.story_image_fit === "contain" ? "object-contain" : "object-cover"}`} style={{ objectPosition: settings?.story_object_position || "center", transform: settings?.story_image_flip ? "scaleX(-1)" : undefined, scale: `${settings?.story_image_scale ?? 100}%` }} />
                   {dir !== "none" && <div className="absolute inset-0" style={{ background: gradMap[dir] }} />}
                 </>
               );
@@ -323,8 +326,8 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
                 {trending.map((p, i) => (
                   <Link key={`${dup}-${p.id}`} href={`/product/${p.id}`} className="group relative w-56 sm:w-64 shrink-0">
                     <span className="absolute -top-6 -left-3 z-10 text-7xl font-display font-bold text-transparent [-webkit-text-stroke:2px_#d4af37] select-none pointer-events-none">{i + 1}</span>
-                    <div className="aspect-[3/4] rounded-xl overflow-hidden bg-secondary-800">
-                      <img src={p.image_url || ""} alt={p.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-secondary-800">
+                      <AppImage fill src={p.image_url || ""} alt={p.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                     </div>
                     <p className="mt-3 font-medium text-white truncate">{p.title}</p>
                     <p className="text-gold-400 text-sm">{formatPrice(p.price)}</p>

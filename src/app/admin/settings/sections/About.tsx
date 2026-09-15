@@ -4,6 +4,7 @@ import { Check, Save } from "lucide-react";
 import ImageUpload from "@/components/ImageUpload";
 import { supabase } from "@/lib/supabase";
 import { useSettings } from "./useSettings";
+import AppImage from "@/components/AppImage";
 import {
   DEFAULT_ABOUT_SETTINGS, DEFAULT_MISSION_CARDS, DEFAULT_CULTURE_CARDS,
   type AboutSettings, type AboutValueCard, type AboutCultureCard,
@@ -26,7 +27,7 @@ export default function About() {
   const [about, setAboutState] = useState<AboutSettings>({ ...DEFAULT_ABOUT_SETTINGS });
   const [savedSection, setSavedSection] = useState<string | null>(null);
 
-  const setAbout = (key: keyof AboutSettings, value: any) =>
+  const setAbout = <K extends keyof AboutSettings>(key: K, value: AboutSettings[K]) =>
     setAboutState((prev) => ({ ...prev, [key]: value }));
 
   const saveSection = async (sectionKey: string, keys: (keyof AboutSettings)[]) => {
@@ -73,7 +74,7 @@ export default function About() {
                   <span className="text-[10px] text-secondary-500 mt-1">{y}%</span>
                 </div>
                 <div className="flex-1 relative rounded-lg bg-secondary-900 overflow-hidden" style={{ height: 200 }}>
-                  <img src={about.heroImageUrl} alt="preview" className={`absolute inset-0 w-full h-full ${about.heroImageFit === "contain" ? "object-contain" : "object-cover"}`} style={{ objectPosition: about.heroObjectPosition || "50% 20%", transform: about.heroImageFlip ? "scaleX(-1)" : undefined, scale: `${about.heroImageScale ?? 100}%` }} />
+                  <AppImage src={about.heroImageUrl} alt="preview" fill className={`${about.heroImageFit === "contain" ? "object-contain" : "object-cover"}`} style={{ objectPosition: about.heroObjectPosition || "50% 20%", transform: about.heroImageFlip ? "scaleX(-1)" : undefined, scale: `${about.heroImageScale ?? 100}%` }} />
                   <div className="absolute inset-0" style={{ background: gradMap[dir] }} />
                   <span className="absolute bottom-2 right-2 text-xs bg-black/50 text-white px-2 py-1 rounded">Live preview</span>
                 </div>
@@ -129,16 +130,16 @@ export default function About() {
             <div key={i} className="border border-secondary-100 rounded-lg p-3 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-secondary-500">Card {i+1}</span>
-                <button type="button" onClick={() => setAbout("missionCards", (about.missionCards ?? DEFAULT_MISSION_CARDS).filter((_: any, j: number) => j !== i) as any)} className="text-xs text-red-500 hover:text-red-700">Remove</button>
+                <button type="button" onClick={() => setAbout("missionCards", (about.missionCards ?? DEFAULT_MISSION_CARDS).filter((_, j) => j !== i))} className="text-xs text-red-500 hover:text-red-700">Remove</button>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <div><label className="label-text">Icon</label><select value={card.icon} onChange={(e) => setAbout("missionCards", (about.missionCards ?? DEFAULT_MISSION_CARDS).map((c: any, j: number) => j === i ? { ...c, icon: e.target.value } : c) as any)} className="input-field">{["Heart","Sparkles","Users","Globe"].map((v) => <option key={v} value={v}>{v}</option>)}</select></div>
-                <div><label className="label-text">Title</label><input value={card.title} onChange={(e) => setAbout("missionCards", (about.missionCards ?? DEFAULT_MISSION_CARDS).map((c: any, j: number) => j === i ? { ...c, title: e.target.value } : c) as any)} className="input-field" /></div>
+                <div><label className="label-text">Icon</label><select value={card.icon} onChange={(e) => setAbout("missionCards", (about.missionCards ?? DEFAULT_MISSION_CARDS).map((c, j) => j === i ? { ...c, icon: e.target.value } : c))} className="input-field">{["Heart","Sparkles","Users","Globe"].map((v) => <option key={v} value={v}>{v}</option>)}</select></div>
+                <div><label className="label-text">Title</label><input value={card.title} onChange={(e) => setAbout("missionCards", (about.missionCards ?? DEFAULT_MISSION_CARDS).map((c, j) => j === i ? { ...c, title: e.target.value } : c))} className="input-field" /></div>
               </div>
-              <div><label className="label-text">Description</label><input value={card.desc} onChange={(e) => setAbout("missionCards", (about.missionCards ?? DEFAULT_MISSION_CARDS).map((c: any, j: number) => j === i ? { ...c, desc: e.target.value } : c) as any)} className="input-field" /></div>
+              <div><label className="label-text">Description</label><input value={card.desc} onChange={(e) => setAbout("missionCards", (about.missionCards ?? DEFAULT_MISSION_CARDS).map((c, j) => j === i ? { ...c, desc: e.target.value } : c))} className="input-field" /></div>
             </div>
           ))}
-          <button type="button" onClick={() => setAbout("missionCards", [...(about.missionCards ?? DEFAULT_MISSION_CARDS), { icon: "Sparkles", title: "New Value", desc: "" }] as any)} className="btn-outline py-1.5 text-sm w-full">+ Add Card</button>
+          <button type="button" onClick={() => setAbout("missionCards", [...(about.missionCards ?? DEFAULT_MISSION_CARDS), { icon: "Sparkles", title: "New Value", desc: "" }])} className="btn-outline py-1.5 text-sm w-full">+ Add Card</button>
         </div>
         <SectionSaveBtn onSave={() => saveSection("mission", ["missionEyebrow","missionTitle","missionBody","missionBackground","missionTextColor","missionCards"])} saved={savedSection === "mission"} />
       </div>
@@ -160,16 +161,16 @@ export default function About() {
             <div key={i} className="border border-secondary-100 rounded-lg p-3 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-secondary-500">Card {i+1}</span>
-                <button type="button" onClick={() => setAbout("cultureCards", (about.cultureCards ?? DEFAULT_CULTURE_CARDS).filter((_: any, j: number) => j !== i) as any)} className="text-xs text-red-500 hover:text-red-700">Remove</button>
+                <button type="button" onClick={() => setAbout("cultureCards", (about.cultureCards ?? DEFAULT_CULTURE_CARDS).filter((_, j) => j !== i))} className="text-xs text-red-500 hover:text-red-700">Remove</button>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <div><label className="label-text">Emoji</label><input value={card.emoji} onChange={(e) => setAbout("cultureCards", (about.cultureCards ?? DEFAULT_CULTURE_CARDS).map((c: any, j: number) => j === i ? { ...c, emoji: e.target.value } : c) as any)} className="input-field" /></div>
-                <div><label className="label-text">Title</label><input value={card.title} onChange={(e) => setAbout("cultureCards", (about.cultureCards ?? DEFAULT_CULTURE_CARDS).map((c: any, j: number) => j === i ? { ...c, title: e.target.value } : c) as any)} className="input-field" /></div>
+                <div><label className="label-text">Emoji</label><input value={card.emoji} onChange={(e) => setAbout("cultureCards", (about.cultureCards ?? DEFAULT_CULTURE_CARDS).map((c, j) => j === i ? { ...c, emoji: e.target.value } : c))} className="input-field" /></div>
+                <div><label className="label-text">Title</label><input value={card.title} onChange={(e) => setAbout("cultureCards", (about.cultureCards ?? DEFAULT_CULTURE_CARDS).map((c, j) => j === i ? { ...c, title: e.target.value } : c))} className="input-field" /></div>
               </div>
-              <div><label className="label-text">Description</label><input value={card.desc} onChange={(e) => setAbout("cultureCards", (about.cultureCards ?? DEFAULT_CULTURE_CARDS).map((c: any, j: number) => j === i ? { ...c, desc: e.target.value } : c) as any)} className="input-field" /></div>
+              <div><label className="label-text">Description</label><input value={card.desc} onChange={(e) => setAbout("cultureCards", (about.cultureCards ?? DEFAULT_CULTURE_CARDS).map((c, j) => j === i ? { ...c, desc: e.target.value } : c))} className="input-field" /></div>
             </div>
           ))}
-          <button type="button" onClick={() => setAbout("cultureCards", [...(about.cultureCards ?? DEFAULT_CULTURE_CARDS), { emoji: "✨", title: "New Card", desc: "" }] as any)} className="btn-outline py-1.5 text-sm w-full">+ Add Card</button>
+          <button type="button" onClick={() => setAbout("cultureCards", [...(about.cultureCards ?? DEFAULT_CULTURE_CARDS), { emoji: "✨", title: "New Card", desc: "" }])} className="btn-outline py-1.5 text-sm w-full">+ Add Card</button>
         </div>
         <SectionSaveBtn onSave={() => saveSection("culture", ["cultureEyebrow","cultureTitle","cultureBody","cultureCreed","cultureBackground","cultureTextColor","cultureCards"])} saved={savedSection === "culture"} />
       </div>

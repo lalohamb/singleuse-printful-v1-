@@ -5,6 +5,7 @@ import { Package, ShoppingBag, DollarSign, TrendingUp, Clock, CheckCircle, Pause
 import { supabase, formatPrice } from "@/lib/supabase";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
 import type { Order, Product, StoreSettings } from "@/types";
+import AppImage from "@/components/AppImage";
 
 function Dashboard() {
   const [stats, setStats] = useState({ totalOrders: 0, totalRevenue: 0, pendingOrders: 0, totalProducts: 0 });
@@ -142,7 +143,7 @@ function Dashboard() {
             <div className="space-y-2">
               {recentProducts.map((p) => (
                 <div key={p.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-secondary-50 transition-colors">
-                  <img src={p.image_url || ""} alt={p.title} className="w-12 h-12 rounded-lg object-cover bg-secondary-100" />
+                  <AppImage src={p.image_url || ""} alt={p.title} width={48} height={48} className="w-12 h-12 rounded-lg object-cover bg-secondary-100" />
                   <div className="flex-1 min-w-0"><p className="font-medium text-sm text-secondary-900 truncate">{p.title}</p><p className="text-xs text-secondary-500">{formatPrice(p.price)}</p></div>
                   <span className={`text-xs px-2 py-1 rounded-full ${p.status === "active" ? "bg-success-50 text-success-600" : "bg-secondary-100 text-secondary-500"}`}>{p.status}</span>
                 </div>

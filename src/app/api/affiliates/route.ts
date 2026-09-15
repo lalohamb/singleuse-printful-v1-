@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 import { requireAdmin } from "@/lib/require-admin";
+import { getErrorMessage } from "@/lib/errors";
 
 export const runtime = "nodejs";
 
@@ -10,6 +11,14 @@ const sb = () => createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
   { auth: { autoRefreshToken: false, persistSession: false } }
 );
+
+type AffiliatePayoutProfile = {
+  name?: string | null;
+  email: string;
+  code: string;
+  payout_method?: string | null;
+  payout_handle?: string | null;
+};
 
 async function sendEmail(to: string, subject: string, html: string) {
   const key = process.env.RESEND_API_KEY;
@@ -86,7 +95,7 @@ export async function POST(req: NextRequest) {
 
     if (!payout) return NextResponse.json({ error: "Payout not found" }, { status: 404 });
 
-    const aff = payout.affiliates as any;
+    const aff = payout.affiliates as AffiliatePayoutProfile;
     let stripeTransferId: string | null = null;
 
     // Attempt Stripe transfer if connected account exists
@@ -107,8 +116,8 @@ export async function POST(req: NextRequest) {
           },
         });
         stripeTransferId = transfer.id;
-      } catch (e: any) {
-        console.error("Stripe transfer failed:", String(e.message).replace(/[\r\n]/g, " "));
+      } catch (e: unknown) {
+        console.error("Stripe transfer failed:", getErrorMessage(e).replace(/[\r\n]/g, " "));
         // Non-fatal — still mark paid and email
       }
     }
@@ -127,11 +136,12 @@ export async function POST(req: NextRequest) {
 
     // Email affiliate
     const dashUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "https://genderapparel.example"}/affiliates/dashboard`;
+    const affiliateFirstName = (aff.name || aff.email).split(" ")[0];
     await sendEmail(
       aff.email,
       `Your affiliate payout of $${payout.total_amount.toFixed(2)} has been sent 💸`,
       `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px">
-        <h2 style="color:#111">Payout Sent, ${aff.name.split(" ")[0]}!</h2>
+        <h2 style="color:#111">Payout Sent, ${affiliateFirstName}!</h2>
         <p>We've sent your affiliate payout for <strong>${payout.period}</strong>.</p>
         <table style="width:100%;border-collapse:collapse;margin:24px 0">
           <tr><td style="padding:8px 0;color:#666">Amount</td><td style="padding:8px 0;font-weight:600;text-align:right">$${payout.total_amount.toFixed(2)}</td></tr>

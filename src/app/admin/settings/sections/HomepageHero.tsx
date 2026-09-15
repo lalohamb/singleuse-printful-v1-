@@ -4,6 +4,7 @@ import ImageUpload from "@/components/ImageUpload";
 import ProductImagePicker from "../ProductImagePicker";
 import { useSettings } from "./useSettings";
 import { SaveBar } from "./SaveBar";
+import AppImage from "@/components/AppImage";
 import {
   DEFAULT_AFFIRMATIONS_SETTINGS,
   type AffirmationsSettings,
@@ -99,7 +100,7 @@ export default function HomepageHero() {
               <span className="text-[10px] text-secondary-500 mt-1">{heroPreviewH}vh</span>
             </div>
             <div className="flex-1 relative rounded-lg bg-secondary-900 overflow-hidden" style={{ height: Math.max(240, heroPreviewH * 4) }}>
-              <img src={form.hero_image_url} alt="Hero preview" className={`absolute inset-0 w-full h-full ${form.hero_image_fit === "contain" ? "object-contain" : (form.hero_image_scale ?? 100) === 100 ? "object-cover" : "object-contain"}`} style={{ objectPosition: form.hero_object_position || "center", transform: form.hero_image_flip ? "scaleX(-1)" : undefined, scale: `${form.hero_image_scale ?? 100}%` }} />
+              <AppImage fill src={form.hero_image_url} alt="Hero preview" className={`absolute inset-0 w-full h-full ${form.hero_image_fit === "contain" ? "object-contain" : (form.hero_image_scale ?? 100) === 100 ? "object-cover" : "object-contain"}`} style={{ objectPosition: form.hero_object_position || "center", transform: form.hero_image_flip ? "scaleX(-1)" : undefined, scale: `${form.hero_image_scale ?? 100}%` }} />
               <div className="absolute inset-0" style={{ background: gradMap[dir] }} />
               <span className="absolute bottom-2 right-2 text-xs bg-black/50 text-white px-2 py-1 rounded">Live preview</span>
             </div>
@@ -167,7 +168,7 @@ export default function HomepageHero() {
           {(["backgroundColor","textColor","accentColor"] as const).map((k) => (
             <label key={k} className="label-text capitalize">
               {k.replace("Color"," color").replace("background","Background")}
-              <input type="color" value={(affirmations as any)[k]} onChange={(e) => setAffirmations((a) => ({ ...a, [k]: e.target.value }))} className="mt-1 h-10 w-full cursor-pointer" />
+              <input type="color" value={affirmations[k]} onChange={(e) => setAffirmations((a) => ({ ...a, [k]: e.target.value }))} className="mt-1 h-10 w-full cursor-pointer" />
             </label>
           ))}
         </div>

@@ -10,7 +10,7 @@ export default function AdminMenu() {
   const { save, saved, error } = useSettings();
   const [s, setS] = useState<SiteMenuSettings>(DEFAULT_SITE_MENU_SETTINGS);
   const [categories, setCategories] = useState<Category[]>([]);
-  const upd = (k: keyof SiteMenuSettings, v: any) => setS((prev) => ({ ...prev, [k]: v }));
+  const upd = <K extends keyof SiteMenuSettings>(k: K, v: SiteMenuSettings[K]) => setS((prev) => ({ ...prev, [k]: v }));
 
   useEffect(() => {
     supabase.from("categories").select("id, name, slug").order("name").then(({ data }) => {
@@ -42,10 +42,10 @@ export default function AdminMenu() {
         <label className="label-text">Menu font color<input type="color" value={s.textColor} onChange={(e) => upd("textColor", e.target.value)} className="mt-1 h-10 w-full cursor-pointer" /></label>
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <label className="label-text">Font type<select value={s.fontFamily} onChange={(e) => upd("fontFamily", e.target.value)} className="input-field mt-1"><option value="sans">Sans</option><option value="display">Display</option></select></label>
-        <label className="label-text">Font size<select value={s.fontSize} onChange={(e) => upd("fontSize", e.target.value)} className="input-field mt-1"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></label>
-        <label className="label-text">Font weight<select value={s.fontWeight} onChange={(e) => upd("fontWeight", e.target.value)} className="input-field mt-1"><option value="normal">Normal</option><option value="medium">Medium</option><option value="semibold">Semibold</option></select></label>
-        <label className="label-text">Letter spacing<select value={s.letterSpacing} onChange={(e) => upd("letterSpacing", e.target.value)} className="input-field mt-1"><option value="normal">Normal</option><option value="relaxed">Relaxed</option><option value="wide">Wide</option></select></label>
+        <label className="label-text">Font type<select value={s.fontFamily} onChange={(e) => upd("fontFamily", e.target.value as SiteMenuSettings["fontFamily"])} className="input-field mt-1"><option value="sans">Sans</option><option value="display">Display</option></select></label>
+        <label className="label-text">Font size<select value={s.fontSize} onChange={(e) => upd("fontSize", e.target.value as SiteMenuSettings["fontSize"])} className="input-field mt-1"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></label>
+        <label className="label-text">Font weight<select value={s.fontWeight} onChange={(e) => upd("fontWeight", e.target.value as SiteMenuSettings["fontWeight"])} className="input-field mt-1"><option value="normal">Normal</option><option value="medium">Medium</option><option value="semibold">Semibold</option></select></label>
+        <label className="label-text">Letter spacing<select value={s.letterSpacing} onChange={(e) => upd("letterSpacing", e.target.value as SiteMenuSettings["letterSpacing"])} className="input-field mt-1"><option value="normal">Normal</option><option value="relaxed">Relaxed</option><option value="wide">Wide</option></select></label>
       </div>
 
       <div className="border-t border-secondary-100 pt-4">

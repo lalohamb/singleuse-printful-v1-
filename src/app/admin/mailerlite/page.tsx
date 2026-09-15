@@ -2,8 +2,10 @@
 import { useEffect, useState } from "react";
 import { Users, Mail, BarChart2, RefreshCw, Plus, Trash2, X, Loader2, Check, AlertCircle, ExternalLink, FolderOpen, Search, Edit2, UserMinus, Zap, FileText, ChevronLeft, ChevronRight } from "lucide-react";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
+import { getErrorMessage } from "@/lib/errors";
 
-interface Subscriber { id: string; email: string; status: string; type: string; date_created: string; fields?: { key: string; value: string }[] }
+interface SubscriberField { key: string; value: string }
+interface Subscriber { id: string; email: string; status: string; type: string; date_created: string; fields?: SubscriberField[] }
 interface Group { id: string; name: string; total: number; active: number }
 interface Campaign { id: string; name: string; status: string; date_created: string; opened: number; clicked: number; sent: number; unsubscribed: number; open_rate: number; click_rate: number }
 interface Automation { id: string; name: string; enabled: boolean; steps_count: number }
@@ -64,7 +66,7 @@ function AddSubscriberModal({ groups, onClose, onDone }: { groups: Group[]; onCl
 
 function EditSubscriberModal({ subscriber, groups, onClose, onDone }: { subscriber: Subscriber; groups: Group[]; onClose: () => void; onDone: (patch?: Partial<Subscriber>) => void }) {
   const [status, setStatus] = useState(subscriber.type || subscriber.status);
-  const [name, setName] = useState(subscriber.fields?.find((f: any) => f.key === "name")?.value || "");
+  const [name, setName] = useState(subscriber.fields?.find((f) => f.key === "name")?.value || "");
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -247,7 +249,7 @@ function MailerLiteDashboard() {
       setForms([]);
       setSubscribers(Array.isArray(subsData) ? subsData : (subsData.data || []));
       setSubMeta(subsData.meta || null);
-    } catch (e: any) { setError(e.message); }
+    } catch (e: unknown) { setError(getErrorMessage(e)); }
     setLoading(false);
   };
 
@@ -308,11 +310,11 @@ function MailerLiteDashboard() {
           </li>
           <li className="flex items-start gap-2">
             <span className="text-primary-500 mt-0.5 flex-shrink-0">✦</span>
-            <span><strong>At least one group required</strong> — MailerLite's API requires subscribers to be in a group. Campaigns sent to "All subscribers" will automatically include all groups in your account.</span>
+            <span><strong>At least one group required</strong> — MailerLite&apos;s API requires subscribers to be in a group. Campaigns sent to &quot;All subscribers&quot; will automatically include all groups in your account.</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-primary-500 mt-0.5 flex-shrink-0">✦</span>
-            <span><strong>HTML email body</strong> — paste plain text or basic HTML. For rich drag-and-drop designs, build the campaign directly in <a href="https://app.mailerlite.com" target="_blank" rel="noopener noreferrer" className="text-primary-600 underline hover:text-primary-700">MailerLite's editor</a> and send from there.</span>
+            <span><strong>HTML email body</strong> — paste plain text or basic HTML. For rich drag-and-drop designs, build the campaign directly in <a href="https://app.mailerlite.com" target="_blank" rel="noopener noreferrer" className="text-primary-600 underline hover:text-primary-700">MailerLite&apos;s editor</a> and send from there.</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-primary-500 mt-0.5 flex-shrink-0">✦</span>
@@ -392,7 +394,7 @@ function MailerLiteDashboard() {
                     {subscribers.map((sub) => (
                       <tr key={sub.id} className="hover:bg-secondary-50 transition-colors">
                         <td className="px-4 py-3 text-sm font-medium text-secondary-900">{sub.email}</td>
-                        <td className="px-4 py-3 text-sm text-secondary-500">{sub.fields?.find((f: any) => f.key === "name")?.value || "—"}</td>
+                        <td className="px-4 py-3 text-sm text-secondary-500">{sub.fields?.find((f) => f.key === "name")?.value || "—"}</td>
                         <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded-full ${statusBadge[sub.type] || statusBadge[sub.status] || "bg-secondary-100 text-secondary-500"}`}>{sub.type || sub.status}</span></td>
                         <td className="px-4 py-3 text-sm text-secondary-500">{sub.date_created ? new Date(sub.date_created).toLocaleDateString() : "—"}</td>
                         <td className="px-4 py-3">

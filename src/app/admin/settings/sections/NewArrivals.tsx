@@ -7,7 +7,7 @@ import { DEFAULT_NEW_ARRIVALS_SETTINGS, type NewArrivalsSettings } from "@/lib/n
 export default function NewArrivals() {
   const { form, save, saved, error } = useSettings();
   const [s, setS] = useState<NewArrivalsSettings>(DEFAULT_NEW_ARRIVALS_SETTINGS);
-  const upd = (k: keyof NewArrivalsSettings, v: any) => setS((prev) => ({ ...prev, [k]: v }));
+  const upd = <K extends keyof NewArrivalsSettings>(k: K, v: NewArrivalsSettings[K]) => setS((prev) => ({ ...prev, [k]: v }));
 
   return (
     <div className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6 space-y-4">
@@ -34,7 +34,7 @@ export default function NewArrivals() {
         {(["backgroundColor","textColor","accentColor"] as const).map((k) => (
           <label key={k} className="label-text capitalize">
             {k.replace("Color"," color").replace("background","Background")}
-            <input type="color" value={(s as any)[k]} onChange={(e) => upd(k, e.target.value)} className="mt-1 h-10 w-full cursor-pointer" />
+            <input type="color" value={s[k]} onChange={(e) => upd(k, e.target.value)} className="mt-1 h-10 w-full cursor-pointer" />
           </label>
         ))}
       </div>

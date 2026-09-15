@@ -40,6 +40,16 @@ export function formatPrice(cents: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents);
 }
 
+type ShippingProfile = {
+  countries?: string[];
+  first_item?: { cost?: number | string };
+  additional_items?: { cost?: number | string };
+};
+
+type ShippingInfo = {
+  profiles?: ShippingProfile[];
+};
+
 export async function getShippingQuote({
   country,
   items,
@@ -58,26 +68,27 @@ export async function getShippingQuote({
 
   if (!products?.length) return 6.99;
 
-  const shippingMap = new Map<string, any>();
-  for (const p of products) shippingMap.set(p.id, p.shipping_info);
+  const shippingMap = new Map<string, ShippingInfo>();
+  for (const p of products) shippingMap.set(p.id, p.shipping_info as ShippingInfo);
 
   let total = 0;
   let covered = 0;
 
   for (const item of items) {
     const info = shippingMap.get(item.product_id);
-    if (!info?.profiles?.length) continue;
+    const profiles = info?.profiles;
+    if (!profiles?.length) continue;
 
     // Find the profile that covers this country, fall back to "REST_OF_THE_WORLD"
     const profile =
-      info.profiles.find((p: any) =>
+      profiles.find((p) =>
         Array.isArray(p.countries) &&
         (p.countries.includes(country) || p.countries.includes("*"))
       ) ??
-      info.profiles.find((p: any) =>
+      profiles.find((p) =>
         Array.isArray(p.countries) && p.countries.includes("REST_OF_THE_WORLD")
       ) ??
-      info.profiles[0];
+      profiles[0];
 
     if (!profile) continue;
 

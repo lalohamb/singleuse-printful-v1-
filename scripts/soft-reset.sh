@@ -4,7 +4,7 @@
 #
 # Clears:  orders, products, email events
 # Resets:  Printify/Stripe connection flags, brand_values_settings to defaults
-# Keeps:   settings & branding, categories, SEO settings, policies, admins
+# Keeps:   settings & branding, categories, SEO settings, policies, admins, customer profiles
 # =============================================================================
 set -euo pipefail
 
@@ -26,7 +26,7 @@ hr
 echo -e "${YELLOW}  Gender Apparel — Soft Reset${NC}"
 echo -e "  Clears:  orders, products, email events"
 echo -e "  Resets:  Printify/Stripe flags, brand values to defaults"
-echo -e "  Keeps:   settings, categories, SEO, policies, admins"
+echo -e "  Keeps:   settings, categories, SEO, policies, admins, customer profiles"
 hr
 
 read -rp "  Type SOFT RESET to confirm: " confirm
@@ -93,5 +93,5 @@ fi
 
 hr
 echo -e "${GREEN}  ✅ Soft reset complete!${NC}"
-echo -e "  Settings, categories, SEO, policies, and admins are untouched."
+echo -e "  Settings, categories, SEO, policies, admins, and customer profiles are untouched."
 hr

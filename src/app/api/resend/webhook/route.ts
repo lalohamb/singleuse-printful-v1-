@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createHmac, timingSafeEqual } from "crypto";
+import { getErrorMessage } from "@/lib/errors";
 
 export const runtime = "nodejs";
 
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ received: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: getErrorMessage(err) }, { status: 500 });
   }
 }

@@ -5,12 +5,14 @@ import { useRouter, usePathname } from "next/navigation";
 import { LayoutDashboard, Package, ShoppingBag, LogOut, Menu, FolderTree, ExternalLink, Mail, CreditCard, Send, Search, Truck, Image, FileText, AlertTriangle, Palette, Home, Users, PanelBottom, Plug, Share2, Megaphone, Store, Sparkles, BarChart3, Heart, BookOpen, MessageCircle, Link2, DollarSign } from "lucide-react";
 import { useAdminAuth } from "@/lib/admin-auth";
 import { supabase } from "@/lib/supabase";
+import AppImage from "@/components/AppImage";
 
 const navItems = [
   { path: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { path: "/admin/products", label: "Products", icon: Package },
   { path: "/admin/categories", label: "Categories", icon: FolderTree },
   { path: "/admin/orders", label: "Orders - Printify", icon: ShoppingBag },
+  { path: "/admin/customers", label: "Customers", icon: Users },
   { path: "/admin/email", label: "Email - Resend", icon: Mail },
   { path: "/admin/stripe", label: "Stripe - Payments", icon: CreditCard },
   { path: "/admin/mailerlite", label: "MailerLite", icon: Send },
@@ -92,7 +94,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         <div className="p-6 border-b border-secondary-700 flex-shrink-0">
           <Link href="/admin/dashboard" className="flex items-center gap-2">
             {logoUrl
-              ? <img src={logoUrl} alt={storeName || "Admin"} style={{ height: "28px", width: "auto" }} />
+              ? <AppImage src={logoUrl} alt={storeName || "Admin"} width={160} height={40} style={{ height: "28px", width: "auto" }} />
               : <span className="font-display text-xl font-bold">{storeName || "Admin"}</span>}
           </Link>
           <p className="text-secondary-400 text-xs mt-1">Admin Panel</p>

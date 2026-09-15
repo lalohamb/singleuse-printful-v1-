@@ -3,11 +3,15 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { ChevronLeft, Lock, Check, Loader2, Truck } from "lucide-react";
 import { useCart } from "@/lib/cart";
+import { getCustomerProfile } from "@/lib/account-data";
+import { useCustomerAuth } from "@/lib/customer-auth";
 import { formatPrice, createStripeCheckout, getShippingQuote, getAffiliateCode } from "@/lib/supabase";
 import type { CartItem } from "@/types";
+import AppImage from "@/components/AppImage";
 
 export default function CheckoutPage() {
   const { items, subtotal, clearCart } = useCart();
+  const { user } = useCustomerAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ email: "", firstName: "", lastName: "", address1: "", address2: "", city: "", state: "", zip: "", country: "US" });
@@ -24,6 +28,24 @@ export default function CheckoutPage() {
       });
     });
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const profile = getCustomerProfile(user);
+    const [firstName = "", ...lastNameParts] = profile.fullName.split(" ");
+    setForm((prev) => ({
+      ...prev,
+      email: prev.email || profile.email,
+      firstName: prev.firstName || firstName,
+      lastName: prev.lastName || lastNameParts.join(" "),
+      address1: prev.address1 || profile.address.line1,
+      address2: prev.address2 || profile.address.line2 || "",
+      city: prev.city || profile.address.city,
+      state: prev.state || profile.address.state,
+      zip: prev.zip || profile.address.zip,
+      country: prev.country || profile.address.country,
+    }));
+  }, [user]);
 
   // Fetch real shipping quote whenever country changes
   useEffect(() => {
@@ -125,7 +147,7 @@ export default function CheckoutPage() {
             <div className="space-y-4 max-h-64 overflow-y-auto">
               {items.map((item) => (
                 <div key={`${item.product_id}-${item.variant_id}`} className="flex gap-3">
-                  <img src={item.image_url} alt={item.title} className="w-16 h-16 object-cover rounded-lg bg-white flex-shrink-0" />
+                  <AppImage src={item.image_url} alt={item.title} width={64} height={64} className="w-16 h-16 object-cover rounded-lg bg-white flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm text-secondary-900 truncate">{item.title}</p>
                     <p className="text-xs text-secondary-500">{item.variant_label}</p>

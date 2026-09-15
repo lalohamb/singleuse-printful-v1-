@@ -5,6 +5,7 @@
 -- =============================================================================
 
 DROP TABLE IF EXISTS email_events   CASCADE;
+DROP TABLE IF EXISTS customer_profiles CASCADE;
 DROP TABLE IF EXISTS orders         CASCADE;
 DROP TABLE IF EXISTS products       CASCADE;
 DROP TABLE IF EXISTS categories     CASCADE;

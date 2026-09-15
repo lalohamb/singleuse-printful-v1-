@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Save, Loader2, Check, Search, Globe, FileText, Code2, Link2, Map, Bot, ExternalLink, RefreshCw } from "lucide-react";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
+import AppImage from "@/components/AppImage";
 
 interface SeoSettings {
   site_url: string;
@@ -147,7 +148,7 @@ function SeoPanel() {
         </div>
         {form.default_og_image && (
           <div className="mt-4 rounded-lg overflow-hidden border border-secondary-100 max-w-sm">
-            <img src={form.default_og_image} alt="OG preview" className="w-full h-auto object-cover" />
+            <AppImage src={form.default_og_image} alt="OG preview" width={1200} height={630} className="w-full h-auto object-cover" />
             <p className="text-xs text-secondary-400 p-2">OG image preview</p>
           </div>
         )}

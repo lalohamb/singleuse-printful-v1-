@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# destroy.sh — Full teardown: drops all tables, removes env files
+# destroy.sh — Full teardown: drops all app tables, removes env files
 # =============================================================================
 set -euo pipefail
 
@@ -21,7 +21,7 @@ hr()   { echo -e "${CYAN}━━━━━━━━━━━━━━━━━━�
 
 hr
 echo -e "${RED}  Gender Apparel — DESTROY${NC}"
-echo -e "  This will drop ALL tables and delete .env.live and .env.test."
+echo -e "  This will drop ALL app tables, including customer_profiles, and delete .env.live and .env.test."
 echo -e "  This cannot be undone."
 hr
 

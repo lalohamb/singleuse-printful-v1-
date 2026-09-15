@@ -19,7 +19,7 @@ export default function CustomerLove() {
 
   return (
     <div className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6 space-y-6">
-      <p className="text-sm text-secondary-500">Edit the testimonials shown in the "What the Culture is Saying" section.</p>
+      <p className="text-sm text-secondary-500">Edit the testimonials shown in the &quot;What the Culture is Saying&quot; section.</p>
       {testimonials.map((t, i) => (
         <div key={i} className="space-y-3 p-4 bg-secondary-50 rounded-lg">
           <div className="flex items-center justify-between">

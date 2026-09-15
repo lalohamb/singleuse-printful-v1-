@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/require-admin";
+import { getErrorMessage } from "@/lib/errors";
 
 export const runtime = "nodejs";
 
@@ -89,8 +90,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json([]);
     }
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: getErrorMessage(err) }, { status: 500 });
   }
 }
 
@@ -165,7 +166,7 @@ export async function POST(req: NextRequest) {
       if (groupIds.length === 0) {
         const allGroupsRes = await fetch(`${BASE}/groups?limit=100`, { headers: headers() });
         const allGroups = await safeJson(allGroupsRes);
-        groupIds = Array.isArray(allGroups) ? allGroups.map((g: any) => String(g.id)) : [];
+        groupIds = Array.isArray(allGroups) ? allGroups.map((g: { id: string | number }) => String(g.id)) : [];
       }
       if (groupIds.length === 0) {
         return NextResponse.json({ error: "No groups found in your MailerLite account. Create at least one group first." }, { status: 422 });
@@ -228,7 +229,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: res.ok || res.status === 204 });
     }
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: getErrorMessage(err) }, { status: 500 });
   }
 }

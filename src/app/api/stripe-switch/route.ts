@@ -5,6 +5,7 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import { requireAdmin } from "@/lib/require-admin";
 import { appRoot, parseEnvFile } from "@/lib/env-utils";
+import { getErrorMessage } from "@/lib/errors";
 
 export const runtime = "nodejs";
 
@@ -89,8 +90,8 @@ export async function POST(req: NextRequest) {
     try {
       await pushSupabaseSecrets(secretKey, webhookSecret, supabaseToken);
       steps.push("Supabase secrets updated");
-    } catch (e: any) {
-      return NextResponse.json({ error: e.message, steps }, { status: 500 });
+    } catch (e: unknown) {
+      return NextResponse.json({ error: getErrorMessage(e), steps }, { status: 500 });
     }
   } else {
     steps.push(`Supabase secrets skipped (${!supabaseToken ? "SUPABASE_ACCESS_TOKEN" : "SUPABASE_PROJECT_REF"} not set)`);

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Upload, Loader2, X, Image as ImageIcon, Check } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import AppImage from "@/components/AppImage";
 
 const BUCKET = "store-images";
 const FOLDERS = ["uploads", "settings/hero", "settings/our-why", "settings/story", "settings/logo", "settings/about", "settings/popup"];
@@ -93,7 +94,7 @@ export default function ImageUpload({ value, onChange, folder = "uploads", label
       {error && <p className="text-xs text-error-600">{error}</p>}
 
       {preview && value && (
-        <img src={value} alt="Preview" className="w-full max-h-48 object-contain rounded-lg bg-secondary-100 mt-1" />
+        <AppImage src={value} alt="Preview" width={640} height={320} className="w-full max-h-48 object-contain rounded-lg bg-secondary-100 mt-1" />
       )}
 
       {/* Media picker modal */}
@@ -128,7 +129,7 @@ export default function ImageUpload({ value, onChange, folder = "uploads", label
                       onClick={() => { onChange(f.publicUrl); setPickerOpen(false); }}
                       className={`group relative aspect-square rounded-xl overflow-hidden bg-secondary-100 border-2 transition-all hover:border-gold-500 ${value === f.publicUrl ? "border-gold-500" : "border-transparent"}`}
                     >
-                      <img src={f.publicUrl} alt={f.name} className="w-full h-full object-cover" />
+                      <AppImage fill src={f.publicUrl} alt={f.name} className="w-full h-full object-cover" />
                       {value === f.publicUrl && (
                         <div className="absolute inset-0 bg-gold-500/20 flex items-center justify-center">
                           <div className="bg-gold-500 rounded-full p-1"><Check size={14} className="text-white" /></div>

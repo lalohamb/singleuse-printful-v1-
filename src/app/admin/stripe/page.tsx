@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { RefreshCw, ExternalLink, DollarSign, TrendingUp, CreditCard, ArrowDownCircle, X, Loader2, Check, AlertCircle, Eye, EyeOff } from "lucide-react";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
+import { getErrorMessage } from "@/lib/errors";
 
 interface Balance {
   available: { amount: number; currency: string }[];
@@ -53,7 +54,7 @@ function RefundModal({ charge, onClose, onRefunded }: { charge: Charge; onClose:
 
   const handleRefund = async () => {
     setLoading(true); setError(null);
-    const body: any = { action: "refund", charge_id: charge.id };
+    const body: { action: string; charge_id: string; amount?: number } = { action: "refund", charge_id: charge.id };
     if (partial && amount) body.amount = Math.round(parseFloat(amount) * 100);
     const res = await fetch("/api/stripe-admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const data = await res.json();
@@ -276,7 +277,7 @@ function StripeSetup({ activeMode: activeModeOverride, onActivated }: { activeMo
             {activating ? <><Loader2 size={14} className="mr-1 animate-spin" />Activating...</> : "Save & Activate"}
           </button>
         </div>
-        <p className="text-xs text-secondary-400">"Save Only" stores the key without switching active mode. "Save &amp; Activate" saves and immediately switches to this mode.</p>
+        <p className="text-xs text-secondary-400">&quot;Save Only&quot; stores the key without switching active mode. &quot;Save &amp; Activate&quot; saves and immediately switches to this mode.</p>
       </div>
     </div>
   );
@@ -326,8 +327,8 @@ function StripeDashboard() {
       } else {
         setOrderMap({});
       }
-    } catch (e: any) {
-      if (showSpinner) setError(e.message);
+    } catch (e: unknown) {
+      if (showSpinner) setError(getErrorMessage(e));
       else setRefreshError("Data refresh failed after mode switch — click Refresh to retry.");
     }
     if (showSpinner) setLoading(false);

@@ -3,6 +3,7 @@ import { Mail } from "lucide-react";
 import NewsletterSignup from "@/components/NewsletterSignup";
 import { createClient } from "@supabase/supabase-js";
 import type { StoreSettings } from "@/types";
+import AppImage from "@/components/AppImage";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -96,7 +97,7 @@ export default async function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-12">
           <div className="col-span-1 md:col-span-2">
-            <img src={logoUrl} alt="Gender Apparel" style={{ height: `${logoSize}px`, width: "auto" }} />
+            <AppImage src={logoUrl} alt="Gender Apparel" width={220} height={80} style={{ height: `${logoSize}px`, width: "auto" }} />
             <p className="mt-4 text-secondary-400 max-w-md">{footerText}</p>
             <div className="flex items-center gap-4 mt-6 flex-wrap">
               {(Object.keys(ICON_MAP) as Array<keyof typeof ICON_MAP>).map((key) => {

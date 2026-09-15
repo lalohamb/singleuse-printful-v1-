@@ -13,7 +13,7 @@
 │   │  Ubuntu 22.04        │        │  ┌──────────────┐  ┌──────────────────┐  │  │
 │   │                      │        │  │  PostgreSQL   │  │  Edge Functions  │  │  │
 │   │  Node.js 22          │◄──────►│  │  (+ RLS)      │  │  (Deno runtime)  │  │  │
-│   │  Next.js 14          │        │  └──────────────┘  └──────────────────┘  │  │
+│   │  Next.js 15          │        │  └──────────────┘  └──────────────────┘  │  │
 │   │  PM2 (process mgr)   │        │  ┌──────────────┐  ┌──────────────────┐  │  │
 │   │  Nginx (reverse proxy│        │  │  Auth         │  │  Storage         │  │  │
 │   │  port 80/443 → 3000) │        │  └──────────────┘  └──────────────────┘  │  │
@@ -32,11 +32,11 @@
 
 | Layer | Technology | Version |
 |---|---|---|
-| Framework | Next.js | 14.2.35 |
+| Framework | Next.js | 15.5.25 |
 | Language | TypeScript | ^5 |
 | Runtime (server) | Node.js | 22.x |
 | Runtime (edge functions) | Deno | latest (Supabase managed) |
-| UI library | React / React DOM | ^18 |
+| UI library | React / React DOM | ^19 |
 | Styling | Tailwind CSS | ^3.4.1 |
 | Icons | lucide-react | ^1.40.0 |
 | Fonts | Inter (sans), Playfair Display (display) | Google Fonts via CSS |
@@ -128,7 +128,7 @@ Internet
                    │
                    ▼
 ┌─────────────────────────────────────────┐
-│  Next.js 14 standalone server           │
+│  Next.js 15 standalone server           │
 │  /var/www/bodyandsleeves                │
 │  .env.local  (chmod 600)                │
 └─────────────────────────────────────────┘

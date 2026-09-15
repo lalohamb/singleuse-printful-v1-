@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Loader2 } from "lucide-react";
+import AppImage from "@/components/AppImage";
 
 const BUCKET = "store-images";
 const FOLDERS = ["settings/about", "settings/story", "settings/hero", "settings/our-why", "uploads", "settings/logo", "settings/popup"];
@@ -88,9 +89,9 @@ export default function ProductImagePicker({ onSelect, onClose }: { onSelect: (u
               {filtered.map((item, i) => (
                 <button key={`${item.url}-${i}`} type="button" title={item.title}
                   onClick={() => onSelect(item.url)}
-                  className="aspect-square rounded-lg border-2 border-transparent hover:border-gold-500 transition-colors p-1"
+                  className="relative aspect-square rounded-lg border-2 border-transparent hover:border-gold-500 transition-colors p-1"
                 >
-                  <img src={item.url} alt={item.title} className="w-full h-full object-cover rounded" />
+                  <AppImage fill src={item.url} alt={item.title} className="w-full h-full object-cover rounded" />
                 </button>
               ))}
             </div>

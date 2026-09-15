@@ -5,6 +5,7 @@ import { supabase, formatPrice } from "@/lib/supabase";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
 import { ACTIVE_FLAGS } from "@/lib/productFlags";
 import type { Product, Category } from "@/types";
+import AppImage from "@/components/AppImage";
 
 function Products() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -120,7 +121,7 @@ function Products() {
           <div className="flex items-start gap-2 text-sm text-amber-800">
             <AlertTriangle size={16} className="flex-shrink-0 mt-0.5 text-amber-500" />
             <span>
-              <strong>Printify sync flow:</strong> Products are automatically pulled from your connected Printify store — no need to click "Publish" in Printify. That button is misleading and redundant here. Just make sure the product is <em>visible</em> in your Printify store, then click <strong>Sync Printify</strong> below to pull it in and set status as <span className="text-xs px-2 py-0.5 rounded-full bg-success-50 text-success-600 font-medium">active</span><span className="ml-1 text-[10px] text-secondary-400">via Printify</span>.
+              <strong>Printify sync flow:</strong> Products are automatically pulled from your connected Printify store — no need to click &quot;Publish&quot; in Printify. That button is misleading and redundant here. Just make sure the product is <em>visible</em> in your Printify store, then click <strong>Sync Printify</strong> below to pull it in and set status as <span className="text-xs px-2 py-0.5 rounded-full bg-success-50 text-success-600 font-medium">active</span><span className="ml-1 text-[10px] text-secondary-400">via Printify</span>.
             </span>
           </div>
           <button onClick={() => setWebhookInfoDismissed(true)} className="flex-shrink-0 text-amber-500 hover:text-amber-700"><X size={16} /></button>
@@ -187,7 +188,7 @@ function Products() {
                     {activeFiltered.map((p) => (
                       <tr key={p.id} className={`hover:bg-secondary-50 transition-colors ${selectedIds.has(p.id) ? "bg-primary-50/50" : ""}`}>
                         <td className="px-4 py-3"><input type="checkbox" aria-label={`Select ${p.title}`} checked={selectedIds.has(p.id)} onChange={() => toggleRow(p.id)} className="w-4 h-4 rounded" /></td>
-                        <td className="px-4 py-3"><div className="flex items-center gap-3"><img src={p.image_url || ""} alt={p.title} className="w-12 h-12 rounded-lg object-cover bg-secondary-100 flex-shrink-0" /><div className="min-w-0 max-w-[240px]"><p className="font-medium text-secondary-900 truncate flex items-center gap-1">{p.content_locked && <Lock size={12} className="text-warning-500 flex-shrink-0" aria-label="Content locked" />}{p.title}</p>{p.printify_id && <p className="text-xs text-secondary-400 truncate">Printify: {p.printify_id}</p>}</div></div></td>
+                        <td className="px-4 py-3"><div className="flex items-center gap-3"><AppImage src={p.image_url || ""} alt={p.title} width={48} height={48} className="w-12 h-12 rounded-lg object-cover bg-secondary-100 flex-shrink-0" /><div className="min-w-0 max-w-[240px]"><p className="font-medium text-secondary-900 truncate flex items-center gap-1">{p.content_locked && <Lock size={12} className="text-warning-500 flex-shrink-0" aria-label="Content locked" />}{p.title}</p>{p.printify_id && <p className="text-xs text-secondary-400 truncate">Printify: {p.printify_id}</p>}</div></div></td>
                         <td className="px-4 py-3 text-sm text-secondary-600 hidden md:table-cell">{categories.find((c) => c.id === p.category_id)?.name || "Uncategorized"}</td>
                         <td className="px-4 py-3 font-medium text-secondary-900">{formatPrice(p.price)}</td>
                         <td className="px-4 py-3 hidden lg:table-cell">
@@ -235,7 +236,7 @@ function Products() {
                   <tr key={p.id} className="hover:bg-secondary-50 transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <img src={p.image_url || ""} alt={p.title} className="w-12 h-12 rounded-lg object-cover bg-secondary-100 flex-shrink-0 opacity-60" />
+                        <AppImage src={p.image_url || ""} alt={p.title} width={48} height={48} className="w-12 h-12 rounded-lg object-cover bg-secondary-100 flex-shrink-0 opacity-60" />
                         <div className="min-w-0 max-w-[240px]">
                           <p className="font-medium text-secondary-700 truncate">{p.title}</p>
                           <p className="text-xs text-secondary-400">{formatPrice(p.price)}</p>
@@ -260,7 +261,7 @@ function Products() {
                         : <span className="inline-flex items-center gap-1 text-xs text-warning-600"><AlertTriangle size={12} />Missing</span>}
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
-                      {(p.shipping_info as any)?.profiles?.length > 0
+                      {Array.isArray(p.shipping_info?.profiles) && p.shipping_info.profiles.length > 0
                         ? <span className="inline-flex items-center gap-1 text-xs text-success-600"><CheckCircle size={12} />Stored</span>
                         : <span className="inline-flex items-center gap-1 text-xs text-warning-600"><AlertTriangle size={12} />Missing — sync</span>}
                     </td>
@@ -417,7 +418,7 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
             <div><label className="label-text">Price ($)</label><input type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="input-field" placeholder="32.00" /></div>
             <div><label className="label-text">Cost ($)</label><input type="number" step="0.01" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} className="input-field" placeholder="12.50" /></div>
           </div>
-          <div><label className="label-text">Image URL</label><div className="grid grid-cols-4 gap-2 mb-2">{Array.from(new Set([...(product?.images ?? []), ...(product?.image_url ? [product.image_url] : [])])).map((url, i) => (<button key={i} type="button" onClick={() => setForm({ ...form, image_url: url })} className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-colors ${form.image_url === url ? "border-gold-500" : "border-transparent"}`}><img src={url} alt="" className="w-full h-full object-cover" />{form.image_url === url && <span className="absolute inset-0 flex items-center justify-center bg-black/30 text-white text-lg">✓</span>}</button>))}</div><input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} className="input-field" placeholder="https://..." /></div>
+          <div><label className="label-text">Image URL</label><div className="grid grid-cols-4 gap-2 mb-2">{Array.from(new Set([...(product?.images ?? []), ...(product?.image_url ? [product.image_url] : [])])).map((url, i) => (<button key={i} type="button" onClick={() => setForm({ ...form, image_url: url })} className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-colors ${form.image_url === url ? "border-gold-500" : "border-transparent"}`}><AppImage fill src={url} alt="" className="w-full h-full object-cover" />{form.image_url === url && <span className="absolute inset-0 flex items-center justify-center bg-black/30 text-white text-lg">✓</span>}</button>))}</div><input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} className="input-field" placeholder="https://..." /></div>
           <div><label className="label-text">Category</label><select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })} className="input-field"><option value="">Uncategorized</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
 
           <div>

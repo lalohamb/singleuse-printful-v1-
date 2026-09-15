@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { X, ArrowRight, Check, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import AppImage from "@/components/AppImage";
 
 interface PopupSettings {
   active: boolean;
@@ -20,7 +21,23 @@ interface PopupSettings {
   popupImageFit: string;
 }
 
-const STORAGE_KEY = "newsletter_popup_dismissed";
+const STORAGE_KEY_PREFIX = "newsletter_popup_dismissed";
+
+function getDismissKey(settings: PopupSettings): string {
+  const signature = JSON.stringify({
+    title: settings.title,
+    body: settings.body,
+    ctaLabel: settings.ctaLabel,
+    imageUrl: settings.imageUrl,
+    position: settings.position,
+    delay: settings.delay,
+  });
+  let hash = 0;
+  for (let i = 0; i < signature.length; i += 1) {
+    hash = ((hash << 5) - hash + signature.charCodeAt(i)) | 0;
+  }
+  return `${STORAGE_KEY_PREFIX}_${Math.abs(hash).toString(36)}`;
+}
 
 function sanitizeImageUrl(url: string): string {
   if (url.startsWith("/")) return url;
@@ -92,12 +109,13 @@ export default function NewsletterPopup() {
   const [state, setState] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [dismissDays, setDismissDays] = useState(7);
+  const [dismissKey, setDismissKey] = useState(STORAGE_KEY_PREFIX);
 
   useEffect(() => {
-    const dismissed = localStorage.getItem(STORAGE_KEY);
-    if (dismissed && Date.now() < parseInt(dismissed, 10)) return;
-
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
     supabase.from("settings").select("popup_settings").limit(1).maybeSingle().then(({ data }) => {
+      if (cancelled) return;
       if (!data?.popup_settings?.active) return;
       setDismissDays(data.popup_settings.dismissDays ?? 7);
       const s: PopupSettings = {
@@ -116,15 +134,25 @@ export default function NewsletterPopup() {
         popupImageFlip: data.popup_settings.popupImageFlip ?? false,
         popupImageFit: data.popup_settings.popupImageFit || "cover",
       };
+      const currentDismissKey = getDismissKey(s);
+      const dismissed = localStorage.getItem(currentDismissKey);
+      if (dismissed && Date.now() < parseInt(dismissed, 10)) return;
+      setDismissKey(currentDismissKey);
       setSettings(s);
-      const timer = setTimeout(() => setVisible(true), s.delay * 1000);
-      return () => clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (!cancelled) setVisible(true);
+      }, s.delay * 1000);
     });
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
   }, []);
 
   const dismiss = () => {
     setVisible(false);
-    localStorage.setItem(STORAGE_KEY, String(Date.now() + dismissDays * 86400000));
+    localStorage.setItem(dismissKey, String(Date.now() + dismissDays * 86400000));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -169,7 +197,7 @@ export default function NewsletterPopup() {
 
           {settings.imageUrl && (
             <div className="relative flex-shrink-0 overflow-hidden" style={{ height: settings.position === "left" || settings.position === "right" ? "13rem" : "9rem" }}>
-              <img src={settings.imageUrl} alt="" className={`w-full h-full ${
+              <AppImage fill src={settings.imageUrl} alt="" className={`w-full h-full ${
                   settings.popupImageFit === "contain" ? "object-contain" :
                   settings.popupImageScale === 100 ? "object-cover" : "object-contain"
                 }`} style={{

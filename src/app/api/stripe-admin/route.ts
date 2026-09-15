@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { requireAdmin } from "@/lib/require-admin";
+import { getErrorMessage } from "@/lib/errors";
 
 export const runtime = "nodejs";
 
@@ -31,8 +32,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(payouts);
     }
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: getErrorMessage(err) }, { status: 500 });
   }
 }
 
@@ -91,7 +92,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: getErrorMessage(err) }, { status: 500 });
   }
 }

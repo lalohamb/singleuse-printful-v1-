@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { X, Plus, Minus, ShoppingBag, Trash2, PauseCircle } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { formatPrice, supabase } from "@/lib/supabase";
+import AppImage from "@/components/AppImage";
 
 export default function CartDrawer() {
   const { items, isOpen, closeCart, updateQuantity, removeFromCart, subtotal, itemCount } = useCart();
@@ -55,7 +56,7 @@ export default function CartDrawer() {
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
               {items.map((item) => (
                 <div key={`${item.product_id}-${item.variant_id}`} className="flex gap-4 pb-4 border-b border-secondary-100 last:border-0">
-                  <img src={item.image_url} alt={item.title} className="w-20 h-20 object-cover rounded-lg bg-secondary-50 flex-shrink-0" />
+                  <AppImage src={item.image_url} alt={item.title} width={80} height={80} className="w-20 h-20 object-cover rounded-lg bg-secondary-50 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 min-w-0">
                       <div className="min-w-0 flex-1">

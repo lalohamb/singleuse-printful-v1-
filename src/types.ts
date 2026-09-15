@@ -167,3 +167,17 @@ export interface AdminUser {
   email: string;
   role: string;
 }
+
+export interface CustomerProfileRow {
+  id: string;
+  email: string;
+  username: string | null;
+  full_name: string | null;
+  phone: string | null;
+  newsletter_opt_in: boolean;
+  address: Record<string, unknown>;
+  preferences: Record<string, unknown>;
+  last_seen_at: string | null;
+  created_at: string;
+  updated_at: string;
+}

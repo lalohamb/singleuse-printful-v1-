@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import ImageUpload from "@/components/ImageUpload";
 import { useSettings } from "./useSettings";
 import { SaveBar } from "./SaveBar";
-import { DEFAULT_BRAND_VALUES_SETTINGS, type BrandValuesSettings } from "@/lib/brand-values-settings";
+import { DEFAULT_BRAND_VALUES_SETTINGS, type BrandValue, type BrandValuesSettings } from "@/lib/brand-values-settings";
 
 export default function BrandValues() {
   const { form, save, saved, error } = useSettings();
@@ -16,8 +16,8 @@ export default function BrandValues() {
     }
   }, [form?.brand_values_settings]);
 
-  const upd = (k: keyof BrandValuesSettings, v: any) => setS((prev) => ({ ...prev, [k]: v }));
-  const updValue = (i: number, field: string, v: any) =>
+  const upd = <K extends keyof BrandValuesSettings>(k: K, v: BrandValuesSettings[K]) => setS((prev) => ({ ...prev, [k]: v }));
+  const updValue = <K extends keyof BrandValue>(i: number, field: K, v: BrandValue[K]) =>
     setS((prev) => ({ ...prev, values: prev.values.map((item, idx) => idx === i ? { ...item, [field]: v } : item) }));
   const moveValue = (i: number, dir: -1 | 1) =>
     setS((prev) => { const vals = [...prev.values]; [vals[i], vals[i + dir]] = [vals[i + dir], vals[i]]; return { ...prev, values: vals }; });
@@ -39,7 +39,7 @@ export default function BrandValues() {
         {(["backgroundColor","textColor","accentColor"] as const).map((k) => (
           <label key={k} className="label-text capitalize">
             {k.replace("Color"," color").replace("background","Background")}
-            <input type="color" value={(s as any)[k]} onChange={(e) => upd(k, e.target.value)} className="mt-1 h-10 w-full cursor-pointer" />
+            <input type="color" value={s[k]} onChange={(e) => upd(k, e.target.value)} className="mt-1 h-10 w-full cursor-pointer" />
           </label>
         ))}
       </div>
@@ -51,16 +51,16 @@ export default function BrandValues() {
         <div className="border-t border-secondary-100 pt-4 space-y-4">
           <ImageUpload label="Background Image" value={s.backgroundImage} onChange={(url) => upd("backgroundImage", url)} folder="settings/brand-values" preview={false} />
           <div className="grid grid-cols-2 gap-3">
-            <label className="label-text">Columns<select value={s.columns} onChange={(e) => upd("columns", Number(e.target.value))} className="input-field mt-1">{[1,2,3,4].map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
-            <label className="label-text">Alignment<select value={s.alignment} onChange={(e) => upd("alignment", e.target.value)} className="input-field mt-1"><option value="center">Center</option><option value="left">Left</option></select></label>
-            <label className="label-text">Divider<select value={s.divider} onChange={(e) => upd("divider", e.target.value)} className="input-field mt-1"><option value="none">None</option><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></label>
-            <label className="label-text">Padding<select value={s.padding} onChange={(e) => upd("padding", e.target.value)} className="input-field mt-1"><option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="spacious">Spacious</option></select></label>
+            <label className="label-text">Columns<select value={s.columns} onChange={(e) => upd("columns", Number(e.target.value) as BrandValuesSettings["columns"])} className="input-field mt-1">{[1,2,3,4].map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
+            <label className="label-text">Alignment<select value={s.alignment} onChange={(e) => upd("alignment", e.target.value as BrandValuesSettings["alignment"])} className="input-field mt-1"><option value="center">Center</option><option value="left">Left</option></select></label>
+            <label className="label-text">Divider<select value={s.divider} onChange={(e) => upd("divider", e.target.value as BrandValuesSettings["divider"])} className="input-field mt-1"><option value="none">None</option><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></label>
+            <label className="label-text">Padding<select value={s.padding} onChange={(e) => upd("padding", e.target.value as BrandValuesSettings["padding"])} className="input-field mt-1"><option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="spacious">Spacious</option></select></label>
           </div>
           <div className="grid grid-cols-3 gap-4">
             {(["cardBackgroundColor", "cardBorderColor", "dividerColor"] as const).map((k) => (
               <label key={k} className="label-text">
                 {k === "cardBackgroundColor" ? "Card background" : k === "cardBorderColor" ? "Card border" : "Divider color"}
-                <input type="color" value={(s as any)[k]} onChange={(e) => upd(k, e.target.value)} className="mt-1 h-10 w-full cursor-pointer" />
+                <input type="color" value={s[k]} onChange={(e) => upd(k, e.target.value)} className="mt-1 h-10 w-full cursor-pointer" />
               </label>
             ))}
           </div>

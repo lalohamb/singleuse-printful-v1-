@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requireAdmin } from "@/lib/require-admin";
+import { getErrorMessage } from "@/lib/errors";
 
 export const runtime = "nodejs";
 
@@ -13,7 +14,7 @@ const serviceSupabase = () =>
 
 async function deleteAll(sb: ReturnType<typeof serviceSupabase>, table: string) {
   // Use gt id filter — works for both uuid and text PKs to satisfy the "must have a filter" requirement
-  const { error } = await (sb.from(table) as any).delete().gte("created_at", "1970-01-01");
+  const { error } = await sb.from(table).delete().gte("created_at", "1970-01-01");
   if (error) throw new Error(`Delete ${table}: ${error.message}`);
 }
 
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest) {
       if (catErr) throw new Error(`Upsert categories: ${catErr.message}`);
 
       // Reset settings — delete all rows and re-insert one clean row
-      await (sb.from("settings") as any).delete().gte("updated_at", "1970-01-01");
+      await sb.from("settings").delete().gte("updated_at", "1970-01-01");
       const { error: setErr } = await sb.from("settings").insert({
         store_name: "Gender Apparel",
         tagline: "Made for Every Body.",
@@ -166,7 +167,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ ok: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: getErrorMessage(err) }, { status: 500 });
   }
 }

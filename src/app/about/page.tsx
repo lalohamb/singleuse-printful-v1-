@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Heart, Sparkles, Users, Globe, Mail, Quote } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
 import { DEFAULT_ABOUT_SETTINGS, DEFAULT_MISSION_CARDS, DEFAULT_CULTURE_CARDS, type AboutSettings } from "@/lib/about-settings";
+import AppImage from "@/components/AppImage";
 
 function InstagramIcon({ size = 20 }: { size?: number }) {
   return (
@@ -60,7 +61,8 @@ export default async function AboutPage() {
               };
               return (
                 <>
-                  <img
+                  <AppImage
+                    fill
                     src={about.heroImageUrl}
                     alt={about.storyImageAlt}
                     className={`w-full h-full ${about.heroImageFit === "contain" ? "object-contain" : "object-cover"}`}
@@ -91,9 +93,11 @@ export default async function AboutPage() {
             </div>
             <div className="order-1 lg:order-2 lg:sticky lg:top-24">
               <div className="relative rounded-2xl overflow-hidden shadow-2xl">
-                <img
+                <AppImage
                   src={about.storyImageUrl}
                   alt={about.storyImageAlt}
+                  width={900}
+                  height={600}
                   className={`w-full ${about.storyImageFit === "contain" ? "object-contain" : "object-cover"}`}
                   style={{
                     maxHeight: "600px",

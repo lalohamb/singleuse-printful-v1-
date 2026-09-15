@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import { Trash2, Upload, Loader2, Copy, Check, Search, RefreshCw, Pencil, X, FolderOpen } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
+import AppImage from "@/components/AppImage";
 
 const BUCKET = "store-images";
 const FOLDERS = ["uploads", "settings/hero", "settings/our-why", "settings/story", "settings/logo"];
@@ -184,7 +185,7 @@ function Media() {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {filtered.map((f) => (
                 <div key={f.id} className={`group relative aspect-square rounded-xl overflow-hidden bg-secondary-100 cursor-pointer border-2 transition-all ${selected?.id === f.id ? "border-gold-500" : selectedIds.has(f.id) ? "border-primary-400" : "border-transparent hover:border-secondary-300"}`}>
-                  <img src={f.publicUrl} alt={f.name} className="w-full h-full object-cover" onClick={() => setSelected(f)} />
+                  <AppImage fill src={f.publicUrl} alt={f.name} className="w-full h-full object-cover" onClick={() => setSelected(f)} />
                   {/* checkbox */}
                   <div className="absolute top-2 left-2">
                     <input type="checkbox" checked={selectedIds.has(f.id)} onChange={() => toggleSelect(f.id)} onClick={(e) => e.stopPropagation()} className="w-4 h-4 rounded accent-primary-500 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -237,7 +238,7 @@ function Media() {
                       <td className="px-4 py-3"><input type="checkbox" checked={selectedIds.has(f.id)} onChange={() => toggleSelect(f.id)} className="w-4 h-4 rounded" /></td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3 cursor-pointer" onClick={() => setSelected(f)}>
-                          <img src={f.publicUrl} alt={f.name} className="w-10 h-10 rounded-lg object-cover bg-secondary-100 flex-shrink-0" />
+                          <AppImage src={f.publicUrl} alt={f.name} width={40} height={40} className="w-10 h-10 rounded-lg object-cover bg-secondary-100 flex-shrink-0" />
                           {renaming === f.id ? (
                             <div className="flex items-center gap-2 flex-1" onClick={(e) => e.stopPropagation()}>
                               <input ref={renameRef} value={renameValue} onChange={(e) => setRenameValue(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleRename(f); if (e.key === "Escape") setRenaming(null); }} className="input-field text-sm py-1 flex-1" />
@@ -278,7 +279,7 @@ function Media() {
               <p className="text-sm font-semibold text-secondary-900">File Details</p>
               <button onClick={() => setSelected(null)} className="text-secondary-400 hover:text-secondary-700"><X size={16} /></button>
             </div>
-            <img src={selected.publicUrl} alt={selected.name} className="w-full aspect-square object-contain rounded-lg bg-secondary-50" />
+            <AppImage src={selected.publicUrl} alt={selected.name} width={400} height={400} className="w-full aspect-square object-contain rounded-lg bg-secondary-50" />
             <div className="space-y-1.5 text-sm">
               <div><span className="text-secondary-500 text-xs">Name</span><p className="font-medium text-secondary-900 break-all">{selected.name}</p></div>
               <div><span className="text-secondary-500 text-xs">Folder</span><p className="text-secondary-700">{selected.folder}</p></div>

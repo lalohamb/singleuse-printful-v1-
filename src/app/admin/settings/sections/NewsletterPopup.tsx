@@ -5,6 +5,26 @@ import ImageUpload from "@/components/ImageUpload";
 import ProductImagePicker from "../ProductImagePicker";
 import { useSettings } from "./useSettings";
 import { supabase } from "@/lib/supabase";
+import AppImage from "@/components/AppImage";
+
+type PopupSettings = {
+  active?: boolean;
+  title?: string;
+  delay?: number;
+  dismissDays?: number;
+  body?: string;
+  ctaLabel?: string;
+  groupId?: string;
+  position?: string;
+  bgColor?: string;
+  imageUrl?: string;
+  imgX?: number;
+  imgY?: number;
+  popupPreviewH?: number;
+  popupImageFit?: string;
+  popupImageScale?: number;
+  popupImageFlip?: boolean;
+};
 
 export default function NewsletterPopup() {
   const { form, set, error } = useSettings();
@@ -20,8 +40,8 @@ export default function NewsletterPopup() {
     }).catch(() => {});
   }, []);
 
-  const ps = form.popup_settings || {};
-  const setPop = (updates: Record<string, any>) => set("popup_settings", { ...ps, ...updates });
+  const ps = (form.popup_settings || {}) as PopupSettings;
+  const setPop = (updates: Partial<PopupSettings>) => set("popup_settings", { ...ps, ...updates });
 
   const handleSave = async () => {
     const { error: err } = await supabase.from("settings").update({ popup_settings: form.popup_settings, updated_at: new Date().toISOString() }).eq("id", form.id);
@@ -91,7 +111,7 @@ export default function NewsletterPopup() {
               <span className="text-[10px] text-secondary-500 mt-1">{ps.popupPreviewH ?? 60}vh</span>
             </div>
             <div className="flex-1 relative rounded-lg bg-secondary-900 overflow-hidden" style={{ height: Math.max(200, (ps.popupPreviewH ?? 60) * 3) }}>
-              <img src={ps.imageUrl || "/ga.png"} alt="Popup preview" className={`absolute inset-0 w-full h-full ${ps.popupImageFit === "contain" ? "object-contain" : (ps.popupImageScale ?? 100) === 100 ? "object-cover" : "object-contain"}`} style={{ objectPosition: `${x}px ${y}px`, transform: ps.popupImageFlip ? "scaleX(-1)" : undefined, scale: `${ps.popupImageScale ?? 100}%` }} />
+              <AppImage fill src={ps.imageUrl || "/ga.png"} alt="Popup preview" className={`absolute inset-0 w-full h-full ${ps.popupImageFit === "contain" ? "object-contain" : (ps.popupImageScale ?? 100) === 100 ? "object-cover" : "object-contain"}`} style={{ objectPosition: `${x}px ${y}px`, transform: ps.popupImageFlip ? "scaleX(-1)" : undefined, scale: `${ps.popupImageScale ?? 100}%` }} />
               <span className="absolute bottom-2 right-2 text-xs bg-black/50 text-white px-2 py-1 rounded">Live preview</span>
             </div>
             <div className="flex flex-col items-center gap-1 w-10 flex-shrink-0">

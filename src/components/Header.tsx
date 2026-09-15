@@ -2,20 +2,26 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ShoppingBag, Menu, X, Search } from "lucide-react";
+import { ShoppingBag, Menu, X, Search, UserCircle } from "lucide-react";
 import { useCart } from "@/lib/cart";
+import { useCustomerAuth } from "@/lib/customer-auth";
 import { supabase } from "@/lib/supabase";
 import type { StoreSettings, Category } from "@/types";
 import { DEFAULT_SITE_MENU_SETTINGS, type SiteMenuSettings } from "@/lib/site-menu-settings";
+import AppImage from "@/components/AppImage";
 
 export default function Header() {
   const { itemCount, toggleCart } = useCart();
+  const { user } = useCustomerAuth();
   const router = useRouter();
   const [settings, setSettings] = useState<StoreSettings | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const menuSettings: SiteMenuSettings = { ...DEFAULT_SITE_MENU_SETTINGS, ...((settings as any)?.site_menu_settings || {}) };
+  const menuSettings: SiteMenuSettings = {
+    ...DEFAULT_SITE_MENU_SETTINGS,
+    ...((settings?.site_menu_settings as Partial<SiteMenuSettings> | null) || {}),
+  };
   const menuCategories = menuSettings.categorySlugs.length ? categories.filter((category) => menuSettings.categorySlugs.includes(category.slug)) : categories;
   const menuTypography = {
     fontFamily: menuSettings.fontFamily === "display" ? "var(--font-display, Georgia, serif)" : "var(--font-sans, Inter, sans-serif)",
@@ -46,9 +52,9 @@ export default function Header() {
               </button>
               <Link href="/" className="flex items-center gap-2">
                 {settings?.logo_url ? (
-                  <img src={settings.logo_url} alt={settings.store_name || "Gender Apparel"} style={{ height: `${settings.logo_size ?? 40}px`, width: "auto" }} />
+                  <AppImage src={settings.logo_url} alt={settings.store_name || "Gender Apparel"} width={240} height={80} style={{ height: `${settings.logo_size ?? 40}px`, width: "auto" }} />
                 ) : (
-                  <img src="/genderapparel.png" alt="Gender Apparel" style={{ height: `${settings?.logo_size ?? 40}px`, width: "auto" }} />
+                  <AppImage src="/genderapparel.png" alt="Gender Apparel" width={240} height={80} style={{ height: `${settings?.logo_size ?? 40}px`, width: "auto" }} />
                 )}
               </Link>
             </div>
@@ -60,6 +66,10 @@ export default function Header() {
               <Link href="/about" className="transition-colors" style={{ color: menuSettings.textColor }}>About</Link>
             </nav>
             <div className="flex items-center gap-2 sm:gap-4">
+              <Link href="/account" className="hidden sm:flex items-center gap-1.5 text-sm font-medium transition-colors" style={{ color: menuSettings.textColor }}>
+                <UserCircle size={20} />
+                {user ? "My Account" : "Account"}
+              </Link>
               <button onClick={() => router.push("/shop")} className="p-2 transition-colors" style={{ color: menuSettings.textColor }} aria-label="Search products"><Search size={22} /></button>
               <button onClick={toggleCart} className="relative p-2 transition-colors" style={{ color: menuSettings.textColor }} aria-label="Open cart">
                 <ShoppingBag size={22} />
@@ -83,6 +93,7 @@ export default function Header() {
                 <Link key={cat.id} href={`/shop?category=${cat.slug}`} onClick={() => setMobileOpen(false)} className="py-2" style={{ color: menuSettings.textColor }}>{cat.name}</Link>
               ))}
               <Link href="/about" onClick={() => setMobileOpen(false)} className="py-2" style={{ color: menuSettings.textColor }}>About</Link>
+              <Link href="/account" onClick={() => setMobileOpen(false)} className="py-2" style={{ color: menuSettings.textColor }}>{user ? "My Account" : "Account"}</Link>
               <Link href="/admin" onClick={() => setMobileOpen(false)} className="py-2" style={{ color: menuSettings.textColor }}>Admin</Link>
             </nav>
           </div>

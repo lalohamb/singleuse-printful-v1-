@@ -8,6 +8,11 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+type ShippingProfile = {
+  countries?: string[];
+  first_item?: { cost?: number | string | null };
+};
+
 export async function GET() {
   // 1. Settings
   const { data: settings } = await supabase
@@ -46,12 +51,12 @@ export async function GET() {
   const sampleP = products?.find((p) => Array.isArray(p.shipping_info?.profiles) && p.shipping_info.profiles.length > 0);
   if (sampleP) {
     const profile =
-      sampleP.shipping_info.profiles.find((p: any) =>
-        Array.isArray(p.countries) &&
-        (p.countries.includes("US") || p.countries.includes("*"))
+      sampleP.shipping_info.profiles.find((profile: ShippingProfile) =>
+        Array.isArray(profile.countries) &&
+        (profile.countries.includes("US") || profile.countries.includes("*"))
       ) ??
-      sampleP.shipping_info.profiles.find((p: any) =>
-        Array.isArray(p.countries) && p.countries.includes("REST_OF_THE_WORLD")
+      sampleP.shipping_info.profiles.find((profile: ShippingProfile) =>
+        Array.isArray(profile.countries) && profile.countries.includes("REST_OF_THE_WORLD")
       ) ??
       sampleP.shipping_info.profiles[0];
 
