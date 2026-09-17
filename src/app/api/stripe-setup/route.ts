@@ -38,35 +38,35 @@ export async function POST(req: NextRequest) {
   const steps: string[] = [];
 
   try {
-    // 1. Register or reuse webhook in Stripe
-    const client = new Stripe(secret_key, { apiVersion: "2026-08-26.dahlia" });
+    // Save keys to DB directly — webhook registration is optional and can be done separately
     const webhookUrl = getWebhookUrl();
+    const client = new Stripe(secret_key, { apiVersion: "2026-08-26.dahlia" });
     const existing = await client.webhookEndpoints.list({ limit: 20 });
     const match = existing.data.find((ep) => ep.url === webhookUrl);
 
-    let webhookSecret: string;
+    let webhookSecret: string | null = null;
 
     if (match) {
-      // Stripe never re-exposes the secret — read from DB
+      // Reuse saved webhook secret from DB if available
       const saved = await getStripeSettings();
       const savedSecret = mode === "live" ? saved?.stripe_live_webhook_secret : saved?.stripe_test_webhook_secret;
-      if (!savedSecret)
-        return NextResponse.json({
-          error: "Webhook already exists in Stripe but no signing secret is saved. Delete the webhook at dashboard.stripe.com/webhooks then re-run setup.",
-        }, { status: 409 });
-      webhookSecret = savedSecret;
-      steps.push("Webhook already registered — reused existing endpoint");
+      webhookSecret = savedSecret ?? null;
+      if (webhookSecret) steps.push("Webhook already registered — reused existing endpoint");
+      else steps.push("Webhook exists in Stripe — signing secret already saved in DB");
     } else {
-      const endpoint = await client.webhookEndpoints.create({ url: webhookUrl, enabled_events: WEBHOOK_EVENTS });
-      webhookSecret = endpoint.secret!;
-      steps.push("Webhook registered in Stripe");
+      try {
+        const endpoint = await client.webhookEndpoints.create({ url: webhookUrl, enabled_events: WEBHOOK_EVENTS });
+        webhookSecret = endpoint.secret!;
+        steps.push("Webhook registered in Stripe");
+      } catch {
+        steps.push("Webhook registration skipped — keys saved without webhook");
+      }
     }
 
-    // 2. Save keys to DB
-    await saveStripeKeys(mode, secret_key, webhookSecret);
+    // Save keys to DB (webhook secret optional)
+    await saveStripeKeys(mode, secret_key, webhookSecret ?? "");
     steps.push(`${mode} keys saved to database`);
 
-    // 3. Optionally activate mode
     if (activate) {
       await setStripeMode(mode);
       steps.push(`stripe_mode set to ${mode}`);
