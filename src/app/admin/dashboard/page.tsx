@@ -39,11 +39,14 @@ function Dashboard() {
 
     const onVisible = () => { if (document.visibilityState === "visible") fetchStripeMode(); };
     const onModeChanged = (e: Event) => { setStripeLive((e as CustomEvent).detail === "live"); };
+    const onFocus = () => fetchStripeMode();
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("stripe-mode-changed", onModeChanged);
+    window.addEventListener("focus", onFocus);
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("stripe-mode-changed", onModeChanged);
+      window.removeEventListener("focus", onFocus);
     };
   }, []);
 
