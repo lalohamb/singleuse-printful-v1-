@@ -111,7 +111,6 @@ function StripeSetup({ activeMode: activeModeOverride, onActivated }: { activeMo
   const [loading, setLoading] = useState(false);
   const [activating, setActivating] = useState(false);
   const [result, setResult] = useState<{ type: "success" | "error"; msg: string } | null>(null);
-  const [restarting, setRestarting] = useState(false);
 
   const fetchStatus = async () => {
     const r = await fetch("/api/stripe-setup");
@@ -138,25 +137,9 @@ function StripeSetup({ activeMode: activeModeOverride, onActivated }: { activeMo
       setKey("");
       if (activate) {
         const activatedMode = key.startsWith("sk_live_") ? "live" : "test";
-        setRestarting(true);
-        let elapsed = 0;
-        const poll = setInterval(async () => {
-          elapsed += 1500;
-          if (elapsed > 30000) {
-            clearInterval(poll); setRestarting(false); setActivating(false);
-            setResult({ type: "error", msg: "Server restart timed out. Refresh the page." });
-            return;
-          }
-          try {
-            const pr = await fetch("/api/stripe-setup", { cache: "no-store" });
-            if (pr.ok) {
-              const pd = await pr.json();
-              if (pd.active_mode === activatedMode) {
-                clearInterval(poll); setRestarting(false); setActivating(false); fetchStatus(); onActivated(activatedMode);
-              }
-            }
-          } catch { /* still restarting */ }
-        }, 1500);
+        setActivating(false);
+        fetchStatus();
+        onActivated(activatedMode);
       } else {
         setLoading(false);
         fetchStatus();
@@ -173,25 +156,9 @@ function StripeSetup({ activeMode: activeModeOverride, onActivated }: { activeMo
     });
     const data = await r.json();
     if (!r.ok) { setResult({ type: "error", msg: data.error }); setActivating(false); return; }
-    setRestarting(true);
-    let elapsed = 0;
-    const poll = setInterval(async () => {
-      elapsed += 1500;
-      if (elapsed > 30000) {
-        clearInterval(poll); setRestarting(false); setActivating(false);
-        setResult({ type: "error", msg: "Server restart timed out. Refresh the page." });
-        return;
-      }
-      try {
-        const pr = await fetch("/api/stripe-setup", { cache: "no-store" });
-        if (pr.ok) {
-          const pd = await pr.json();
-          if (pd.active_mode === mode) {
-            clearInterval(poll); setRestarting(false); setActivating(false); fetchStatus(); onActivated(mode);
-          }
-        }
-      } catch { /* still restarting */ }
-    }, 1500);
+    setActivating(false);
+    fetchStatus();
+    onActivated(mode);
   };
 
   const keyMode = key.startsWith("sk_live_") ? "live" : key.startsWith("sk_test_") ? "test" : null;
@@ -214,8 +181,8 @@ function StripeSetup({ activeMode: activeModeOverride, onActivated }: { activeMo
                 {activeMode === m
                   ? <span className="text-xs text-success-600 font-medium flex items-center gap-1"><Check size={11} />Active</span>
                   : status[m].configured
-                    ? <button onClick={() => switchMode(m)} disabled={activating || restarting} className="text-xs font-medium px-2 py-1 rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50">
-                        {activating || restarting ? <Loader2 size={11} className="animate-spin" /> : `Use ${m}`}
+                    ? <button onClick={() => switchMode(m)} disabled={activating} className="text-xs font-medium px-2 py-1 rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50">
+                        {activating ? <Loader2 size={11} className="animate-spin" /> : `Use ${m}`}
                       </button>
                     : <span className="text-xs text-secondary-400">Not set up</span>}
               </div>
@@ -254,11 +221,6 @@ function StripeSetup({ activeMode: activeModeOverride, onActivated }: { activeMo
             result.type === "success" ? "bg-success-50 border border-success-200 text-success-800" : "bg-error-50 border border-error-100 text-error-700"
           }`}>
             <p className="break-all">{result.msg}</p>
-          </div>
-        )}
-        {restarting && (
-          <div className="flex items-center gap-2 text-xs text-warning-600">
-            <Loader2 size={12} className="animate-spin" />Server restarting…
           </div>
         )}
         <div className="flex gap-2">

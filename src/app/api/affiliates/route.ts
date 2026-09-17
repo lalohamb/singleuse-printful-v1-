@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 import { requireAdmin } from "@/lib/require-admin";
+import { getStripeConfig } from "@/lib/stripe-config";
 import { getErrorMessage } from "@/lib/errors";
 
 export const runtime = "nodejs";
@@ -98,10 +99,10 @@ export async function POST(req: NextRequest) {
     const aff = payout.affiliates as AffiliatePayoutProfile;
     let stripeTransferId: string | null = null;
 
-    const stripeKey = process.env.STRIPE_SECRET_KEY;
-    if (stripeKey && payload.stripe_account_id) {
+    const stripeConfig = await getStripeConfig();
+    if (stripeConfig && payload.stripe_account_id) {
       try {
-        const stripe = new Stripe(stripeKey, { apiVersion: "2026-08-26.dahlia" });
+        const stripe = new Stripe(stripeConfig.secretKey, { apiVersion: "2026-08-26.dahlia" });
         const transfer = await stripe.transfers.create({
           amount: Math.round(payout.total_amount * 100),
           currency: "usd",
