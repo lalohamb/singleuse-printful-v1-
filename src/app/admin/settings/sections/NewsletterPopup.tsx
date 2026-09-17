@@ -92,7 +92,7 @@ export default function NewsletterPopup() {
           <p className="text-white/60 text-[10px] mt-0.5 truncate">{ps.body || "Body text"}</p>
         </div>
       </div>
-      <ImageUpload label="Popup Image" value={ps.imageUrl ?? "/ga.png"} onChange={(url) => setPop({ imageUrl: url })} folder="settings/popup" preview={false} />
+      <ImageUpload label="Popup Image" value={ps.imageUrl ?? "/hero-placeholder.svg"} onChange={(url) => setPop({ imageUrl: url })} folder="settings/popup" preview={false} />
       <button type="button" onClick={() => setShowPicker(true)} className="btn-outline py-2 text-sm">📷 Pick from Product Library</button>
       {showPicker && <ProductImagePicker onSelect={(url) => { setPop({ imageUrl: url }); setShowPicker(false); }} onClose={() => setShowPicker(false)} />}
 
@@ -102,7 +102,7 @@ export default function NewsletterPopup() {
           <span className="text-xs text-secondary-500 w-16">X: {x}px</span>
           <input type="range" min={-1000} max={1000} value={x} onChange={(e) => setPos(Number(e.target.value), y)} className="flex-1 accent-gold-500" />
         </div>
-        {(ps.imageUrl ?? "/ga.png") && (
+        {(ps.imageUrl ?? "/hero-placeholder.svg") && (
           <div className="flex gap-2 items-stretch">
             <div className="flex flex-col items-center gap-1 w-10 flex-shrink-0">
               <span className="text-[10px] text-secondary-400">▲</span>
@@ -111,7 +111,7 @@ export default function NewsletterPopup() {
               <span className="text-[10px] text-secondary-500 mt-1">{ps.popupPreviewH ?? 60}vh</span>
             </div>
             <div className="flex-1 relative rounded-lg bg-secondary-900 overflow-hidden" style={{ height: Math.max(200, (ps.popupPreviewH ?? 60) * 3) }}>
-              <AppImage fill src={ps.imageUrl || "/ga.png"} alt="Popup preview" className={`absolute inset-0 w-full h-full ${ps.popupImageFit === "contain" ? "object-contain" : (ps.popupImageScale ?? 100) === 100 ? "object-cover" : "object-contain"}`} style={{ objectPosition: `${x}px ${y}px`, transform: ps.popupImageFlip ? "scaleX(-1)" : undefined, scale: `${ps.popupImageScale ?? 100}%` }} />
+              <AppImage fill src={ps.imageUrl || "/hero-placeholder.svg"} alt="Popup preview" className={`absolute inset-0 w-full h-full ${ps.popupImageFit === "contain" ? "object-contain" : (ps.popupImageScale ?? 100) === 100 ? "object-cover" : "object-contain"}`} style={{ objectPosition: `${x}px ${y}px`, transform: ps.popupImageFlip ? "scaleX(-1)" : undefined, scale: `${ps.popupImageScale ?? 100}%` }} />
               <span className="absolute bottom-2 right-2 text-xs bg-black/50 text-white px-2 py-1 rounded">Live preview</span>
             </div>
             <div className="flex flex-col items-center gap-1 w-10 flex-shrink-0">

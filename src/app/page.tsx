@@ -5,7 +5,7 @@ import HomeClient from "./HomeClient";
 import type { Category, Product, StoreSettings } from "@/types";
 
 export const metadata: Metadata = {
-  title: "Gender Apparel — Made for Every Body",
+  title: "Your Store — Made for Every Body",
   description: "Wear what feels like you. Shop made-to-order apparel designed for every body, every style, and every day.",
 };
 
@@ -13,7 +13,7 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env
 
 const TEMPLATE_SETTINGS: StoreSettings = {
   id: "template",
-  store_name: "Gender Apparel",
+  store_name: "Your Store",
   tagline: "Made for Every Body.",
   hero_title: "Wear What Feels Like You.",
   hero_subtitle: "Thoughtful apparel designed for every body, every style, and every day. Made to order and shipped to your door.",
@@ -59,7 +59,7 @@ const TEMPLATE_SETTINGS: StoreSettings = {
   our_why_height_vh: 60,
   our_why_label: "Our Why",
   our_why_quote: "We do not just sell clothes. We help you show up as yourself.",
-  our_why_body: "Gender Apparel was created for people who want clothing that feels personal, expressive, and easy to live in. Every design is made with intention and every piece is printed to order.",
+  our_why_body: "Your store was created for people who want clothing that feels personal, expressive, and easy to live in. Every design is made with intention and every piece is printed to order.",
   our_why_image_scale: 100,
   our_why_image_flip: false,
   our_why_image_fit: "cover",
@@ -74,14 +74,14 @@ const TEMPLATE_SETTINGS: StoreSettings = {
   printify_shop_id: null,
   stripe_connected: false,
   social_links: {
-    instagram: { url: "https://instagram.com/genderapparel", enabled: true },
-    tiktok: { url: "https://tiktok.com/@genderapparel", enabled: true },
-    facebook: { url: "https://facebook.com/genderapparel", enabled: true },
-    youtube: { url: "https://youtube.com/@genderapparel", enabled: true },
-    pinterest: { url: "https://pinterest.com/genderapparel", enabled: true },
-    snapchat: { url: "https://snapchat.com/add/genderapparel", enabled: true },
-    threads: { url: "https://threads.net/@genderapparel", enabled: true },
-    email: { url: "mailto:hello@genderapparel.example", enabled: true },
+    instagram: { url: "https://instagram.com/yourstore", enabled: true },
+    tiktok: { url: "https://tiktok.com/@yourstore", enabled: true },
+    facebook: { url: "https://facebook.com/yourstore", enabled: true },
+    youtube: { url: "https://youtube.com/@yourstore", enabled: true },
+    pinterest: { url: "https://pinterest.com/yourstore", enabled: true },
+    snapchat: { url: "https://snapchat.com/add/yourstore", enabled: true },
+    threads: { url: "https://threads.net/@yourstore", enabled: true },
+    email: { url: "mailto:hello@your-store.example", enabled: true },
   },
   site_menu_settings: null,
 };

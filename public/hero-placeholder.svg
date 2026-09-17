@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+  <rect width="1200" height="800" fill="#e5e7eb"/>
+  <rect x="500" y="300" width="200" height="200" rx="16" fill="#d1d5db"/>
+  <circle cx="560" cy="360" r="30" fill="#9ca3af"/>
+  <rect x="520" y="400" width="160" height="12" rx="4" fill="#9ca3af"/>
+  <rect x="540" y="420" width="120" height="10" rx="4" fill="#d1d5db"/>
+  <text x="600" y="540" font-family="sans-serif" font-size="18" fill="#9ca3af" text-anchor="middle">Add your hero image in Admin → Settings</text>
+</svg>

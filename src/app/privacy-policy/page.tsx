@@ -7,12 +7,12 @@ import { DEFAULT_POLICY_CONTENT } from "@/lib/policy-content";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
-  description: "Gender Apparel Privacy Policy.",
+  description: "Privacy Policy.",
 };
 
-const EMAIL = "hello@genderapparel.example";
+const EMAIL = "hello@your-store.example";
 
-const FALLBACK = `Gender Apparel ("we," "us," "our") is committed to protecting your privacy. This policy explains how we collect, use, and protect your information.
+const FALLBACK = `Your Store ("we," "us," "our") is committed to protecting your privacy. This policy explains how we collect, use, and protect your information.
 
 Information We Collect
 - Personal information you provide: name, email address, shipping address, and payment information when placing an order.

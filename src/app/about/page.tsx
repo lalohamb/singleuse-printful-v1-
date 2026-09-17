@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Our Story",
-  description: "Learn about Gender Apparel, a made-to-order clothing brand designed for every body, every style, and every day.",
+  description: "Learn about Your Store, a made-to-order clothing brand designed for every body, every style, and every day.",
 };
 
 export default async function AboutPage() {
@@ -166,8 +166,8 @@ export default async function AboutPage() {
           <h2 className="text-2xl lg:text-3xl font-bold text-secondary-900 mb-4">Connect With Us</h2>
           <p className="text-secondary-500 mb-8">Have a question, a custom design idea, or just want to say hello?</p>
           <div className="flex flex-wrap gap-4 justify-center">
-            <a href="mailto:hello@genderapparel.example" className="btn-outline"><Mail size={20} className="mr-2" />hello@genderapparel.example</a>
-            <a href="https://@gender_apparel" target="_blank" rel="noopener noreferrer" className="btn-outline"><InstagramIcon size={20} /><span className="ml-2">@gender_apparel</span></a>
+            <a href="mailto:hello@your-store.example" className="btn-outline"><Mail size={20} className="mr-2" />hello@your-store.example</a>
+            <a href="https://@yourstore" target="_blank" rel="noopener noreferrer" className="btn-outline"><InstagramIcon size={20} /><span className="ml-2">@yourstore</span></a>
           </div>
           <Link href="/shop" className="btn-gold mt-8 inline-flex">Shop the Collection</Link>
         </section>

@@ -3,7 +3,7 @@ import { AddressesClient } from "@/app/account/components/AddressesClient";
 
 export const metadata: Metadata = {
   title: "Saved Addresses",
-  description: "Manage saved shipping details for your Gender Apparel account.",
+  description: "Manage saved shipping details for your account.",
 };
 
 export default function AccountAddressesPage() {

@@ -151,7 +151,7 @@ async function sendShippingEmail(resendKey: string, order: {
     method: "POST",
     headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      from: "Gender Apparel <orders@genderapparel.example>",
+      from: "Your Store <orders@your-store.example>",
       to: order.email,
       subject: `Your order #${orderRef} has shipped! 📦`,
       html: `
@@ -165,8 +165,8 @@ async function sendShippingEmail(resendKey: string, order: {
             ${trackingHtml}
             <h3 style="margin-top:32px;margin-bottom:8px;font-size:14px;text-transform:uppercase;letter-spacing:1px;color:#888">Items Shipped</h3>
             <table style="width:100%;border-collapse:collapse;font-size:14px">${itemsHtml}</table>
-            <p style="margin-top:32px;color:#888;font-size:13px">Questions? Reply to this email or reach us at hello@genderapparel.example</p>
-            <p style="color:#888;font-size:13px">— The Gender Apparel Team</p>
+            <p style="margin-top:32px;color:#888;font-size:13px">Questions? Reply to this email or reach us at hello@your-store.example</p>
+            <p style="color:#888;font-size:13px">— Your Store Team</p>
           </div>
         </div>
       `,

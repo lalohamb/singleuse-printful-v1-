@@ -17,7 +17,7 @@ export default function AppImage({
   width = 800,
   height = 800,
   fill = false,
-  fallbackSrc = "/genderapparel.png",
+  fallbackSrc = "/product-placeholder.svg",
   sizes = "100vw",
   unoptimized = true,
   ...props

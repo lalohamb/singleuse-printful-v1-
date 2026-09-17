@@ -45,14 +45,14 @@ function SeoStatusBadge({ enabled }: { enabled: boolean }) {
 
 function SeoPanel() {
   const [form, setForm] = useState<SeoSettings>({
-    site_url: "https://genderapparel.example",
+    site_url: "https://your-store.example",
     default_og_image: "",
     sitemap_enabled: true,
     robots_noindex_admin: true,
     jsonld_enabled: true,
     canonical_enabled: true,
-    meta_title_suffix: "| Gender Apparel",
-    twitter_handle: "@gender_apparel",
+    meta_title_suffix: "| Your Store",
+    twitter_handle: "@yourstore",
     google_site_verification: "",
     updated_at: "",
   });
@@ -122,12 +122,12 @@ function SeoPanel() {
           </div>
           <div>
             <label className="label-text">Meta Title Suffix</label>
-            <input value={form.meta_title_suffix} onChange={(e) => set("meta_title_suffix", e.target.value)} className="input-field" placeholder="| Gender Apparel" />
-            <p className="text-xs text-secondary-400 mt-1">Appended to page titles — e.g. &ldquo;Classic Tee | Gender Apparel&rdquo;</p>
+            <input value={form.meta_title_suffix} onChange={(e) => set("meta_title_suffix", e.target.value)} className="input-field" placeholder="| Your Store" />
+            <p className="text-xs text-secondary-400 mt-1">Appended to page titles — e.g. &ldquo;Classic Tee | Your Store&rdquo;</p>
           </div>
           <div>
             <label className="label-text">Twitter / X Handle</label>
-            <input value={form.twitter_handle} onChange={(e) => set("twitter_handle", e.target.value)} className="input-field" placeholder="@gender_apparel" />
+            <input value={form.twitter_handle} onChange={(e) => set("twitter_handle", e.target.value)} className="input-field" placeholder="@yourstore" />
           </div>
           <div>
             <label className="label-text">Google Search Console Verification Code</label>

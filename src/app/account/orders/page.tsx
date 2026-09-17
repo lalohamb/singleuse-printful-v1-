@@ -3,7 +3,7 @@ import { OrdersClient } from "@/app/account/components/OrdersClient";
 
 export const metadata: Metadata = {
   title: "My Orders",
-  description: "Review and track your Gender Apparel orders.",
+  description: "Review and track your orders.",
 };
 
 export default function AccountOrdersPage() {

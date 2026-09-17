@@ -1,5 +1,5 @@
 -- =============================================================================
--- Gender Apparel — Destroy Script
+-- Printify POD Storefront — Destroy Script
 -- Drops all tables, policies, and indexes.
 -- Run in Supabase SQL Editor or via install scripts.
 -- =============================================================================

@@ -1,4 +1,4 @@
-# Supabase Edge Functions — Gender Apparel
+# Supabase Edge Functions — Printify POD Storefront
 
 All functions run on Deno. Secrets are set via `supabase secrets set`.
 
@@ -81,7 +81,7 @@ supabase secrets set \
 | `order:fulfilled` | Updates `orders.fulfillment_status = 'fulfilled'` and `orders.status = 'fulfilled'`. |
 
 ### Shipping email
-Sent via Resend from `orders@genderapparel.example` when `order:shipment:created` fires. Includes a tracking button if `tracking_url` is present.
+Sent via Resend from `orders@your-store.example` when `order:shipment:created` fires. Includes a tracking button if `tracking_url` is present.
 
 ---
 
@@ -148,7 +148,7 @@ Register in Stripe Dashboard → Webhooks. Set `STRIPE_WEBHOOK_SECRET` for signa
 | `payment_intent.payment_failed` | Updates order `status = 'cancelled'`. |
 
 ### Order confirmation email
-Sent via Resend from `orders@genderapparel.example`. Includes itemized list and total.
+Sent via Resend from `orders@your-store.example`. Includes itemized list and total.
 
 ### Printify fulfillment
 - Reads `printify_shop_id` from `settings` (falls back to `PRINTIFY_SHOP_ID` env).

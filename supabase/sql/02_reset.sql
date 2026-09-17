@@ -1,5 +1,5 @@
 -- =============================================================================
--- Gender Apparel — New Store Reset
+-- Printify POD Storefront — New Store Reset
 -- Clears all transactional + content data, restores application defaults.
 -- Admins are NOT deleted — you stay logged in.
 -- Run in Supabase SQL Editor.
@@ -41,8 +41,8 @@ UPDATE policies SET content = '<h2>Terms of Service</h2><p>These Terms of Servic
 
 -- ── 7. SETTINGS — reset to application defaults ───────────────────────────────
 UPDATE settings SET
-  store_name              = 'Gender Apparel',
-  tagline                 = 'Made for Every Body.',
+  store_name              = 'Your Store',
+  tagline                 = 'Your tagline here.',
   hero_title              = 'Empower Yourself. Empower the Culture.',
   hero_subtitle           = 'Apparel celebrating Black culture, faith, and family. Every design made with intention, printed on demand, shipped to your door.',
   hero_image_url          = 'https://images.pexels.com/photos/5693889/pexels-photo-5693889.jpeg?auto=compress&cs=tinysrgb&w=1920',
@@ -97,14 +97,14 @@ UPDATE settings SET
     {"quote":"Finally a brand that celebrates who we are. Every piece feels intentional and powerful.","name":"Aaliyah R.","location":"Chicago, IL","product":"Heritage Collection"}
   ]'::jsonb,
   social_links            = '{
-    "instagram": {"url": "https://instagram.com/gender_apparel", "enabled": true},
-    "tiktok":    {"url": "https://tiktok.com/@genderapparel", "enabled": true},
-    "facebook":  {"url": "https://facebook.com/genderapparel", "enabled": true},
-    "youtube":   {"url": "https://youtube.com/@genderapparel", "enabled": true},
-    "pinterest": {"url": "https://pinterest.com/genderapparel", "enabled": true},
-    "snapchat":  {"url": "https://snapchat.com/add/genderapparel", "enabled": true},
-    "threads":   {"url": "https://threads.net/@genderapparel", "enabled": true},
-    "email":     {"url": "mailto:hello@genderapparel.example", "enabled": true}
+    "instagram": {"url": "https://instagram.com/your_store", "enabled": true},
+    "tiktok":    {"url": "https://tiktok.com/@yourstore", "enabled": true},
+    "facebook":  {"url": "https://facebook.com/yourstore", "enabled": true},
+    "youtube":   {"url": "https://youtube.com/@yourstore", "enabled": true},
+    "pinterest": {"url": "https://pinterest.com/yourstore", "enabled": true},
+    "snapchat":  {"url": "https://snapchat.com/add/yourstore", "enabled": true},
+    "threads":   {"url": "https://threads.net/@yourstore", "enabled": true},
+    "email":     {"url": "mailto:hello@your-store.example", "enabled": true}
   }'::jsonb,
   favicon_url             = null,
   about_settings          = '{
@@ -112,8 +112,8 @@ UPDATE settings SET
     "heroTitle": "Our Story",
     "heroSubtitle": "Empower yourself. Empower the Culture.",
     "heroQuote": "Some things are meant to find you.",
-    "heroCredit": "The Gender Apparel Team",
-    "heroImageUrl": "/dee-and-lalo.png",
+    "heroCredit": "Your Store Team",
+    "heroImageUrl": "/hero-placeholder.svg",
     "heroObjectPosition": "50% 20%",
     "heroImageScale": 100,
     "heroImageFlip": false,
@@ -122,15 +122,15 @@ UPDATE settings SET
     "heroGradientDir": "right",
     "heroBackground": "#171717",
     "heroTextColor": "#ffffff",
-    "storyParagraph1": "Gender Apparel began with a simple idea: clothing should help you feel more like yourself, not less. We create considered pieces that make room for different bodies, different styles, and different ways of showing up.",
+    "storyParagraph1": "Your store began with a simple idea: clothing should help you feel more like yourself.",
     "storyParagraph2": "What drives us is simple. What you wear can speak before you ever open your mouth. A statement piece can reflect who you are, what you stand for, and how you want to move through the world. Clothing is not just fabric. It is voice.",
-    "storyParagraph3": "At Gender Apparel, you will find expressive everyday pieces designed to make you feel something when you put them on. Every design is made with intention and printed to order.",
-    "storyQuote": "Welcome to Gender Apparel. Wear what feels like you.",
-    "storyQuoteCredit": "The Gender Apparel Team",
-    "storyImageUrl": "/dee-and-lalo.png",
-    "storyImageAlt": "Gender Apparel",
+    "storyParagraph3": "At your store, you will find products designed with intention and printed to order.",
+    "storyQuote": "Welcome to your store.",
+    "storyQuoteCredit": "Your Store Team",
+    "storyImageUrl": "/hero-placeholder.svg",
+    "storyImageAlt": "Your Store",
     "storyImageCaption": "Dee & Lalo",
-    "storyImageSubcaption": "Gender Apparel",
+    "storyImageSubcaption": "Your Store",
     "storyObjectPosition": "50% 20%",
     "storyImageScale": 100,
     "storyImageFlip": false,
@@ -149,7 +149,7 @@ UPDATE settings SET
     ],
     "cultureEyebrow": "More Than a Brand",
     "cultureTitle": "The Culture",
-    "cultureBody": "Gender Apparel is for people who want their clothes to feel personal, expressive, and ready for real life.",
+    "cultureBody": "Your store is for people who want quality products that feel personal and ready for real life.",
     "cultureBackground": "#171717",
     "cultureTextColor": "#ffffff",
     "cultureCreed": "Wear what feels like you.",
@@ -164,14 +164,14 @@ WHERE id = (SELECT id FROM settings LIMIT 1);
 
 -- ── 8. SEO SETTINGS — reset to defaults ──────────────────────────────────────
 UPDATE seo_settings SET
-  site_url                 = 'https://genderapparel.example',
+  site_url                 = 'https://your-store.example',
   default_og_image         = null,
   sitemap_enabled          = true,
   robots_noindex_admin     = true,
   jsonld_enabled           = true,
   canonical_enabled        = true,
-  meta_title_suffix        = '| Gender Apparel',
-  twitter_handle           = '@gender_apparel',
+  meta_title_suffix        = '| Your Store',
+  twitter_handle           = '@yourstore',
   google_site_verification = null,
   updated_at               = now()
 WHERE id = '00000000-0000-0000-0000-000000000001';

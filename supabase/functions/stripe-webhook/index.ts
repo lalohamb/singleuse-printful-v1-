@@ -80,13 +80,13 @@ Deno.serve(async (req: Request) => {
 
             // Notify affiliate of new conversion
             const resendKey = Deno.env.get("RESEND_API_KEY");
-            const siteUrl = Deno.env.get("SITE_URL") || "https://genderapparel.example";
+            const siteUrl = Deno.env.get("SITE_URL") || "https://your-store.example";
             if (resendKey && affiliate.email) {
               await fetch("https://api.resend.com/emails", {
                 method: "POST",
                 headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  from: "Body & Sleeves <no-reply@genderapparel.example>",
+                  from: "Your Store <no-reply@your-store.example>",
                   to: affiliate.email,
                   subject: `You earned ${commission.toFixed(2)} — new sale through your link! 🎉`,
                   html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px">
@@ -145,7 +145,7 @@ Deno.serve(async (req: Request) => {
             method: "POST",
             headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
             body: JSON.stringify({
-              from: "Gender Apparel <orders@genderapparel.example>",
+              from: "Your Store <orders@your-store.example>",
               to: customerEmail,
               subject: `Order Confirmed – #${session.id.slice(-8).toUpperCase()}`,
               html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
@@ -157,9 +157,9 @@ Deno.serve(async (req: Request) => {
                 <p>We'll send you another email when your order ships.</p>
                 <p></p>
                 <p>If you have any questions, feel free to reply to this email </p>
-                <p>or contact us at <a href="mailto:hello@genderapparel.example?subject=Regarding%20Order%20%23${session.id.slice(-8).toUpperCase()}">hello@genderapparel.example</a></p>
+                <p>or contact us at <a href="mailto:hello@your-store.example?subject=Regarding%20Order%20%23${session.id.slice(-8).toUpperCase()}">hello@your-store.example</a></p>
                 <p>Thanks for supporting our small business!</p>
-                <p>— Gender Apparel</p>
+                <p>— Your Store</p>
               </div>`,
             }),
           }).catch((e: Error) => console.error("Resend error:", e.message));

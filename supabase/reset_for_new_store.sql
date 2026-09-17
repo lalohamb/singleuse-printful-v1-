@@ -1,5 +1,5 @@
 -- =============================================================================
--- Gender Apparel — New Store Reset
+-- Printify POD Storefront — New Store Reset
 -- Clears all transactional + content data, restores application defaults.
 -- Admins are NOT deleted — you stay logged in.
 -- Run in Supabase SQL Editor.
@@ -30,7 +30,7 @@ UPDATE policies SET content = '', updated_at = now();
 
 -- ── 5. SETTINGS — reset to application defaults ───────────────────────────────
 UPDATE settings SET
-  store_name              = 'Gender Apparel',
+  store_name              = 'Your Store',
   tagline                 = 'Made for Every Body.',
   hero_title              = 'Wear What You Love.',
   hero_subtitle           = 'Inclusive, made-to-order apparel. Every design printed fresh and shipped to your door.',
@@ -60,7 +60,7 @@ UPDATE settings SET
   our_why_height_vh       = 60,
   our_why_label           = 'Our Why',
   our_why_quote           = 'Fashion should feel like freedom.',
-  our_why_body            = 'We started Gender Apparel because we believe clothing should celebrate who you are — not define it. Every piece is made to order, printed with intention, and shipped with love.',
+  our_why_body            = 'We started this store because we believe in quality products made to order. Every piece is printed with intention and shipped with care.',
   our_why_image_scale     = 1,
   our_why_image_flip      = false,
   our_why_image_fit       = 'cover',
@@ -86,14 +86,14 @@ UPDATE settings SET
     {"quote":"Finally a brand that celebrates who we are. Every piece feels intentional and powerful.","name":"Aaliyah R.","location":"Chicago, IL","product":"Heritage Collection"}
   ]'::jsonb,
   social_links            = '{
-    "instagram": {"url": "https://instagram.com/genderapparel", "enabled": true},
-    "tiktok":    {"url": "https://tiktok.com/@genderapparel",    "enabled": true},
-    "facebook":  {"url": "https://facebook.com/genderapparel",   "enabled": true},
-    "youtube":   {"url": "https://youtube.com/@genderapparel",   "enabled": true},
-    "pinterest": {"url": "https://pinterest.com/genderapparel",  "enabled": true},
-    "snapchat":  {"url": "https://snapchat.com/add/genderapparel", "enabled": true},
-    "threads":   {"url": "https://threads.net/@genderapparel",   "enabled": true},
-    "email":     {"url": "mailto:hello@genderapparel.example",   "enabled": true}
+    "instagram": {"url": "https://instagram.com/yourstore", "enabled": true},
+    "tiktok":    {"url": "https://tiktok.com/@yourstore",    "enabled": true},
+    "facebook":  {"url": "https://facebook.com/yourstore",   "enabled": true},
+    "youtube":   {"url": "https://youtube.com/@yourstore",   "enabled": true},
+    "pinterest": {"url": "https://pinterest.com/yourstore",  "enabled": true},
+    "snapchat":  {"url": "https://snapchat.com/add/yourstore", "enabled": true},
+    "threads":   {"url": "https://threads.net/@yourstore",   "enabled": true},
+    "email":     {"url": "mailto:hello@your-store.example",   "enabled": true}
   }'::jsonb,
   favicon_url             = null,
   updated_at              = now()
@@ -101,14 +101,14 @@ WHERE id = (SELECT id FROM settings LIMIT 1);
 
 -- ── 6. SEO SETTINGS — reset to defaults ──────────────────────────────────────
 UPDATE seo_settings SET
-  site_url                 = 'https://genderapparel.example',
+  site_url                 = 'https://your-store.example',
   default_og_image         = null,
   sitemap_enabled          = true,
   robots_noindex_admin     = true,
   jsonld_enabled           = true,
   canonical_enabled        = true,
-  meta_title_suffix        = '| Gender Apparel',
-  twitter_handle           = '@gender_apparel',
+  meta_title_suffix        = '| Your Store',
+  twitter_handle           = '@yourstore',
   google_site_verification = null,
   updated_at               = now()
 WHERE id = '00000000-0000-0000-0000-000000000001';

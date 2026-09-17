@@ -73,20 +73,20 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number }>> = {
 };
 
 const DEFAULT_SOCIAL: StoreSettings["social_links"] = {
-  instagram: { url: "https://instagram.com/genderapparel", enabled: true },
-  tiktok:    { url: "https://tiktok.com/@genderapparel", enabled: true },
-  facebook:  { url: "https://facebook.com/genderapparel", enabled: true },
-  youtube:   { url: "https://youtube.com/@genderapparel", enabled: true },
-  pinterest: { url: "https://pinterest.com/genderapparel", enabled: true },
-  snapchat:  { url: "https://snapchat.com/add/genderapparel", enabled: true },
-  threads:   { url: "https://threads.net/@genderapparel", enabled: true },
-  email:     { url: "mailto:hello@genderapparel.example", enabled: true },
+  instagram: { url: "https://instagram.com/yourstore", enabled: true },
+  tiktok:    { url: "https://tiktok.com/@yourstore", enabled: true },
+  facebook:  { url: "https://facebook.com/yourstore", enabled: true },
+  youtube:   { url: "https://youtube.com/@yourstore", enabled: true },
+  pinterest: { url: "https://pinterest.com/yourstore", enabled: true },
+  snapchat:  { url: "https://snapchat.com/add/yourstore", enabled: true },
+  threads:   { url: "https://threads.net/@yourstore", enabled: true },
+  email:     { url: "mailto:hello@your-store.example", enabled: true },
 };
 
 export default async function Footer() {
   const { data } = await supabase.from("settings").select("social_links, logo_url, logo_size, footer_logo_url, footer_logo_size, footer_text, footer_bottom_message, affiliate_program_enabled").limit(1).maybeSingle();
   const social: StoreSettings["social_links"] = data?.social_links ?? DEFAULT_SOCIAL;
-  const logoUrl = data?.footer_logo_url || data?.logo_url || "/genderapparel.png";
+  const logoUrl = data?.footer_logo_url || data?.logo_url || "/store-logo-placeholder.svg";
   const logoSize = data?.footer_logo_size ?? data?.logo_size ?? 40;
   const footerText = data?.footer_text || "Made-to-order apparel designed for every body, every style, and every day. Wear what feels like you.";
   const footerBottomMessage = data?.footer_bottom_message || "Made to order. Made with love.";
@@ -97,7 +97,7 @@ export default async function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-12">
           <div className="col-span-1 md:col-span-2">
-            <AppImage src={logoUrl} alt="Gender Apparel" width={220} height={80} style={{ height: `${logoSize}px`, width: "auto" }} />
+            <AppImage src={logoUrl} alt="Your Store" width={220} height={80} style={{ height: `${logoSize}px`, width: "auto" }} />
             <p className="mt-4 text-secondary-400 max-w-md">{footerText}</p>
             <div className="flex items-center gap-4 mt-6 flex-wrap">
               {(Object.keys(ICON_MAP) as Array<keyof typeof ICON_MAP>).map((key) => {
@@ -132,7 +132,7 @@ export default async function Footer() {
               <li><Link href="/refund-policy" className="hover:text-white transition-colors">Refund &amp; Returns</Link></li>
               <li><Link href="/terms-of-service" className="hover:text-white transition-colors">Terms of Service</Link></li>
               <li><Link href="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
-              <li><a href="mailto:hello@genderapparel.example" className="hover:text-white transition-colors">Contact Us</a></li>
+              <li><a href="mailto:hello@your-store.example" className="hover:text-white transition-colors">Contact Us</a></li>
             </ul>
           </div>
           <div>
@@ -151,7 +151,7 @@ export default async function Footer() {
           <NewsletterSignup variant="footer" />
         </div>
         <div className="border-t border-secondary-700 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-secondary-500">&copy; {new Date().getFullYear()} Gender Apparel. All rights reserved.</p>
+          <p className="text-sm text-secondary-500">&copy; {new Date().getFullYear()} Your Store. All rights reserved.</p>
           <p className="text-sm text-secondary-500">Powered by <a href="https://Atlascloudhosting.com" target="" rel="noopener noreferrer" className="hover:text-white transition-colors">Atlas Cloud Hosting</a>.</p>
           <p className="text-sm text-secondary-500">{footerBottomMessage}</p>
         </div>

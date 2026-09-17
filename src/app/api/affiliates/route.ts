@@ -27,7 +27,7 @@ async function sendEmail(to: string, subject: string, html: string) {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      from: "Gender Apparel <no-reply@genderapparel.example>",
+      from: "Your Store <no-reply@your-store.example>",
       to,
       subject,
       html,
@@ -55,13 +55,13 @@ export async function POST(req: NextRequest) {
 
     if (error || !aff) return NextResponse.json({ error: error?.message || "Not found" }, { status: 400 });
 
-    const dashUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "https://genderapparel.example"}/affiliates/dashboard`;
+    const dashUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "https://your-store.example"}/affiliates/dashboard`;
     await sendEmail(
       aff.email,
-      "You're approved! Welcome to the Gender Apparel Affiliate Program 🎉",
+      "You're approved! Welcome to the Affiliate Program 🎉",
       `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px">
         <h2 style="color:#111">Welcome to the team, ${aff.name.split(" ")[0]}!</h2>
-        <p>Your affiliate application has been <strong>approved</strong>. You're now part of the Gender Apparel affiliate program.</p>
+        <p>Your affiliate application has been <strong>approved</strong>. You're now part of the affiliate program.</p>
         <h3 style="color:#111;margin-top:24px">Your Details</h3>
         <ul>
           <li>Your referral code: <strong>${aff.code}</strong></li>
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
           </a>
         </p>
         <p style="color:#666;font-size:13px;margin-top:32px">Questions? Reply to this email and we'll get back to you.</p>
-        <p style="color:#666;font-size:13px">— The Gender Apparel Team</p>
+        <p style="color:#666;font-size:13px">— Your Store Team</p>
       </div>`
     );
 
@@ -98,7 +98,6 @@ export async function POST(req: NextRequest) {
     const aff = payout.affiliates as AffiliatePayoutProfile;
     let stripeTransferId: string | null = null;
 
-    // Attempt Stripe transfer if connected account exists
     const stripeKey = process.env.STRIPE_SECRET_KEY;
     if (stripeKey && payload.stripe_account_id) {
       try {
@@ -118,24 +117,20 @@ export async function POST(req: NextRequest) {
         stripeTransferId = transfer.id;
       } catch (e: unknown) {
         console.error("Stripe transfer failed:", getErrorMessage(e).replace(/[\r\n]/g, " "));
-        // Non-fatal — still mark paid and email
       }
     }
 
-    // Update payout record
     await supabase.from("affiliate_payouts").update({
       status: "paid",
       paid_at: new Date().toISOString(),
       stripe_memo: stripeTransferId || payout.stripe_memo || payload.memo || "",
     }).eq("id", payout_id);
 
-    // Mark conversions paid
     await supabase.from("affiliate_conversions")
       .update({ status: "paid", paid_at: new Date().toISOString(), payout_id })
       .eq("payout_id", payout_id);
 
-    // Email affiliate
-    const dashUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "https://genderapparel.example"}/affiliates/dashboard`;
+    const dashUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "https://your-store.example"}/affiliates/dashboard`;
     const affiliateFirstName = (aff.name || aff.email).split(" ")[0];
     await sendEmail(
       aff.email,
@@ -155,7 +150,7 @@ export async function POST(req: NextRequest) {
           </a>
         </p>
         <p style="color:#666;font-size:13px;margin-top:32px">Keep sharing your link — next payout is on the 1st of next month.</p>
-        <p style="color:#666;font-size:13px">— The Gender Apparel Team</p>
+        <p style="color:#666;font-size:13px">— Your Store Team</p>
       </div>`
     );
 

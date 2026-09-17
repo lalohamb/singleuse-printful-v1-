@@ -72,7 +72,7 @@ function EmailPanel() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        from: "Gender Apparel <orders@genderapparel.example>",
+        from: "Your Store <orders@your-store.example>",
         to: form.to.split(",").map((s) => s.trim()),
         subject: form.subject,
         html: form.html,
@@ -98,7 +98,7 @@ function EmailPanel() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            from: "Gender Apparel <orders@genderapparel.example>",
+            from: "Your Store <orders@your-store.example>",
             to: [email],
             subject: broadcast.subject,
             html: broadcast.html,
@@ -194,7 +194,7 @@ function EmailPanel() {
           <div className="flex items-center justify-between p-6 border-b border-secondary-100">
             <div>
               <h2 className="font-semibold text-secondary-900">Delivery Events</h2>
-              <p className="text-xs text-secondary-400 mt-0.5">Webhook URL: <code className="bg-secondary-100 px-1 rounded">{typeof window !== "undefined" ? window.location.origin : "https://genderapparel.example"}/api/resend/webhook</code></p>
+              <p className="text-xs text-secondary-400 mt-0.5">Webhook URL: <code className="bg-secondary-100 px-1 rounded">{typeof window !== "undefined" ? window.location.origin : "https://your-store.example"}/api/resend/webhook</code></p>
             </div>
             <button onClick={fetchEvents} className="text-secondary-400 hover:text-secondary-700"><RefreshCw size={16} className={loadingEvents ? "animate-spin" : ""} /></button>
           </div>

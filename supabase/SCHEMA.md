@@ -1,4 +1,4 @@
-# Gender Apparel — Application Schema & Relationships
+# Printify POD Storefront — Application Schema & Relationships
 
 ## Database Tables
 

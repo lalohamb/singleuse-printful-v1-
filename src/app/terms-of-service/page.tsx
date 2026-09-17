@@ -7,18 +7,18 @@ import { DEFAULT_POLICY_CONTENT } from "@/lib/policy-content";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
-  description: "Gender Apparel Terms of Service.",
+  description: "Terms of Service.",
 };
 
-const EMAIL = "hello@genderapparel.example";
+const EMAIL = "hello@your-store.example";
 
-const FALLBACK = `Welcome to Gender Apparel ("we," "us," "our"). By accessing or purchasing from our site, you agree to the following Terms of Service. Please read them carefully.
+const FALLBACK = `Welcome to Your Store ("we," "us," "our"). By accessing or purchasing from our site, you agree to the following Terms of Service. Please read them carefully.
 
 1. General
 By using this website and placing an order, you confirm that you are at least 18 years of age (or have parental consent), are authorized to use the payment method provided, and that all information you provide is accurate and complete.
 
 2. Products
-All Gender Apparel products are made to order through our print-on-demand partner, Printify. Product images are for illustration purposes — actual colors may vary slightly. We reserve the right to discontinue any product at any time.
+All products are made to order through our print-on-demand partner, Printify. Product images are for illustration purposes — actual colors may vary slightly. We reserve the right to discontinue any product at any time.
 
 3. Pricing
 All prices are listed in US Dollars (USD). We reserve the right to change prices at any time. The price charged will be the price displayed at the time of your order.
@@ -33,10 +33,10 @@ All orders enter production within 2–7 business days. Once in production, orde
 Full details are available in our Refund and Returns Policy. We accept return requests for sizing issues, misprints or defects, and accidental duplicate orders.
 
 7. Intellectual Property
-All designs, graphics, logos, and content on this site are the property of Gender Apparel. You may not copy, reproduce, or distribute any content without express written permission.
+All designs, graphics, logos, and content on this site are the property of Your Store. You may not copy, reproduce, or distribute any content without express written permission.
 
 8. Governing Law
-These Terms are governed by the laws of the State of Illinois, United States.
+These Terms are governed by the laws of your applicable jurisdiction.
 
 9. Changes to These Terms
 We reserve the right to update these Terms at any time. Continued use of the site after changes constitutes your acceptance.`;

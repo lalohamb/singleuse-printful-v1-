@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
       // Reset settings — delete all rows and re-insert one clean row
       await sb.from("settings").delete().gte("updated_at", "1970-01-01");
       const { error: setErr } = await sb.from("settings").insert({
-        store_name: "Gender Apparel",
+        store_name: "Your Store",
         tagline: "Made for Every Body.",
         hero_title: "Wear What You Love.",
         hero_subtitle: "Inclusive, made-to-order apparel. Every design printed fresh and shipped to your door.",
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
         story_image_fit: "cover",
         story_gradient_opacity: 40,
         story_gradient_dir: "full",
-        logo_url: "/logo.png",
+        logo_url: "/store-logo-placeholder.svg",
         logo_size: 40,
         footer_text: "Made-to-order apparel designed for every body, every style, and every day. Wear what feels like you.",
         footer_bottom_message: "Made to order. Made with love.",
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
         our_why_height_vh: 60,
         our_why_label: "Our Why",
         our_why_quote: "Fashion should feel like freedom.",
-        our_why_body: "We started Gender Apparel because we believe clothing should celebrate who you are — not define it. Every piece is made to order, printed with intention, and shipped with love.",
+        our_why_body: "We started Your Store because we believe clothing should celebrate who you are — not define it. Every piece is made to order, printed with intention, and shipped with love.",
         our_why_image_scale: 1,
         our_why_image_flip: false,
         our_why_image_fit: "cover",
@@ -137,14 +137,14 @@ export async function POST(req: NextRequest) {
           { quote: "Finally a brand that celebrates who we are. Every piece feels intentional and powerful.", name: "Aaliyah R.", location: "Chicago, IL", product: "Heritage Collection" },
         ],
         social_links: {
-          instagram: { url: "https://instagram.com/genderapparel", enabled: true },
-          tiktok:    { url: "https://tiktok.com/@genderapparel",    enabled: true },
-          facebook:  { url: "https://facebook.com/genderapparel",   enabled: true },
-          youtube:   { url: "https://youtube.com/@genderapparel",   enabled: true },
-          pinterest: { url: "https://pinterest.com/genderapparel",  enabled: true },
-          snapchat:  { url: "https://snapchat.com/add/genderapparel", enabled: true },
-          threads:   { url: "https://threads.net/@genderapparel",   enabled: true },
-          email:     { url: "mailto:hello@genderapparel.example",   enabled: true },
+          instagram: { url: "https://instagram.com/yourstore", enabled: true },
+          tiktok:    { url: "https://tiktok.com/@yourstore",    enabled: true },
+          facebook:  { url: "https://facebook.com/yourstore",   enabled: true },
+          youtube:   { url: "https://youtube.com/@yourstore",   enabled: true },
+          pinterest: { url: "https://pinterest.com/yourstore",  enabled: true },
+          snapchat:  { url: "https://snapchat.com/add/yourstore", enabled: true },
+          threads:   { url: "https://threads.net/@yourstore",   enabled: true },
+          email:     { url: "mailto:hello@your-store.example",   enabled: true },
         },
         updated_at: new Date().toISOString(),
       });
@@ -152,14 +152,14 @@ export async function POST(req: NextRequest) {
 
       // Reset SEO settings
       const { error: seoErr } = await sb.from("seo_settings").update({
-        site_url: "https://genderapparel.example",
+        site_url: "https://your-store.example",
         default_og_image: null,
         sitemap_enabled: true,
         robots_noindex_admin: true,
         jsonld_enabled: true,
         canonical_enabled: true,
-        meta_title_suffix: "| Gender Apparel",
-        twitter_handle: "@gender_apparel",
+        meta_title_suffix: "| Your Store",
+        twitter_handle: "@yourstore",
         google_site_verification: null,
         updated_at: new Date().toISOString(),
       }).eq("id", "00000000-0000-0000-0000-000000000001");

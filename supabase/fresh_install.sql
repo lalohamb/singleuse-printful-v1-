@@ -1,5 +1,5 @@
 -- =============================================================================
--- Gender Apparel — Full Install Script
+-- Printify POD Storefront — Full Install Script
 -- Run this in Supabase SQL Editor on a fresh project.
 -- =============================================================================
 
@@ -237,8 +237,8 @@ CREATE INDEX IF NOT EXISTS idx_orders_livemode   ON orders(livemode);
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS settings (
   id                      uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  store_name              text        NOT NULL DEFAULT 'Gender Apparel',
-  tagline                 text        DEFAULT 'Made for Every Body.',
+  store_name              text        NOT NULL DEFAULT 'Your Store',
+  tagline                 text        DEFAULT 'Your tagline here.',
   hero_image_url          text,
   hero_object_position    text        DEFAULT '0px 0px',
   hero_title              text,
@@ -293,14 +293,14 @@ CREATE TABLE IF NOT EXISTS settings (
   printify_shop_id        text,
   stripe_connected        boolean     DEFAULT false,
   social_links            jsonb       NOT NULL DEFAULT '{
-    "instagram": {"url": "https://instagram.com/gender_apparel", "enabled": true},
-    "tiktok":    {"url": "https://tiktok.com/@genderapparel", "enabled": true},
-    "facebook":  {"url": "https://facebook.com/genderapparel", "enabled": true},
-    "youtube":   {"url": "https://youtube.com/@genderapparel", "enabled": true},
-    "pinterest": {"url": "https://pinterest.com/genderapparel", "enabled": true},
-    "snapchat":  {"url": "https://snapchat.com/add/genderapparel", "enabled": true},
-    "threads":   {"url": "https://threads.net/@genderapparel", "enabled": true},
-    "email":     {"url": "mailto:hello@genderapparel.example", "enabled": true}
+    "instagram": {"url": "https://instagram.com/your_store", "enabled": true},
+    "tiktok":    {"url": "https://tiktok.com/@yourstore", "enabled": true},
+    "facebook":  {"url": "https://facebook.com/yourstore", "enabled": true},
+    "youtube":   {"url": "https://youtube.com/@yourstore", "enabled": true},
+    "pinterest": {"url": "https://pinterest.com/yourstore", "enabled": true},
+    "snapchat":  {"url": "https://snapchat.com/add/yourstore", "enabled": true},
+    "threads":   {"url": "https://threads.net/@yourstore", "enabled": true},
+    "email":     {"url": "mailto:hello@your-store.example", "enabled": true}
   }'::jsonb,
   favicon_url             text,
   site_menu_settings      jsonb,
@@ -329,14 +329,14 @@ CREATE POLICY "admin_update_settings" ON settings FOR UPDATE
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS seo_settings (
   id                      uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  site_url                text        NOT NULL DEFAULT 'https://genderapparel.example',
+  site_url                text        NOT NULL DEFAULT 'https://your-store.example',
   default_og_image        text,
   sitemap_enabled         boolean     NOT NULL DEFAULT true,
   robots_noindex_admin    boolean     NOT NULL DEFAULT true,
   jsonld_enabled          boolean     NOT NULL DEFAULT true,
   canonical_enabled       boolean     NOT NULL DEFAULT true,
-  meta_title_suffix       text        NOT NULL DEFAULT '| Gender Apparel',
-  twitter_handle          text        DEFAULT '@gender_apparel',
+  meta_title_suffix       text        NOT NULL DEFAULT '| Your Store',
+  twitter_handle          text        DEFAULT '@yourstore',
   google_site_verification text,
   updated_at              timestamptz NOT NULL DEFAULT now()
 );
@@ -372,8 +372,8 @@ INSERT INTO settings (
   story_object_position, story_image_scale, story_image_flip, story_image_fit,
   story_gradient_opacity, story_gradient_dir
 ) VALUES (
-  'Gender Apparel',
-  'Made for Every Body.',
+  'Your Store',
+  'Your tagline here.',
   'Empower Yourself. Empower the Culture.',
   'Apparel celebrating Black culture, faith, and family. Every design made with intention, printed on demand, shipped to your door.',
   'https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',

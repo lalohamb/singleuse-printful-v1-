@@ -58,7 +58,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       if (data?.store_name) setStoreName(data.store_name);
       // Only use logo_url if it's a real uploaded URL, not a default placeholder
       const url = data?.logo_url;
-      if (url && !url.includes("genderapparel.png") && !url.includes("logo.png")) setLogoUrl(url);
+      if (url && !url.includes("store-logo-placeholder") && !url.includes("logo.png")) setLogoUrl(url);
     });
   }, []);
 

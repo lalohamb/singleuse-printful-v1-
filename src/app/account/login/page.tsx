@@ -3,7 +3,7 @@ import { AccountAuthForm } from "@/app/account/components/AccountAuthForm";
 
 export const metadata: Metadata = {
   title: "Sign In",
-  description: "Sign in to your Gender Apparel customer account.",
+  description: "Sign in to your customer account.",
 };
 
 export default function AccountLoginPage() {

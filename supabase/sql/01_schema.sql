@@ -1,5 +1,5 @@
 /*
-# Gender Apparel E-Commerce Schema
+# Printify POD Storefront E-Commerce Schema
 
 ## Overview
 Creates the full database schema for an apparel e-commerce site celebrating Black culture.
@@ -298,7 +298,7 @@ CREATE POLICY "admin_delete_orders" ON orders FOR DELETE
 -- ============ SETTINGS ============
 CREATE TABLE IF NOT EXISTS settings (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  store_name text NOT NULL DEFAULT 'Gender Apparel',
+  store_name text NOT NULL DEFAULT 'Your Store',
   tagline text DEFAULT 'Wear Your Heritage',
   footer_text text DEFAULT 'Made-to-order apparel designed for every body, every style, and every day. Wear what feels like you.',
   footer_bottom_message text DEFAULT 'Made to order. Made with love.',
@@ -346,7 +346,7 @@ ON CONFLICT (slug) DO NOTHING;
 
 INSERT INTO settings (store_name, tagline, hero_title, hero_subtitle, hero_image_url, announcement, announcement_active)
 VALUES (
-  'Gender Apparel',
+  'Your Store',
   'Wear Your Heritage',
   'Culture. Style. Heritage.',
   'Premium apparel celebrating Black culture, designed by us, printed on demand, shipped to your door.',

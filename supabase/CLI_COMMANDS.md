@@ -1,8 +1,8 @@
-# Gender Apparel — Supabase CLI Command Reference
-# Project ref: SUPABASE_PROJECT_REF_REDACTED
-# Run all commands from: /var/www/bodyandsleeves
+# Printify POD Storefront — Supabase CLI Command Reference
+# Project ref: <your-project-ref>
+# Run all commands from: /var/www/your-app
 
-PROJECT=SUPABASE_PROJECT_REF_REDACTED
+PROJECT=<your-project-ref>
 
 # =============================================================================
 # AUTH
@@ -76,14 +76,14 @@ npx supabase secrets set \
 
 # Switch to LIVE Stripe keys
 npx supabase secrets set \
-  STRIPE_SECRET_KEY=STRIPE_LIVE_SECRET_KEY_REDACTED \
-  STRIPE_WEBHOOK_SECRET=whsec_08V5JvZ6KocRdBB2PDoj6xrxaJEKfmXG \
+  STRIPE_SECRET_KEY=sk_live_<your-live-key> \
+  STRIPE_WEBHOOK_SECRET=whsec_<your-live-webhook-secret> \
   --project-ref $PROJECT
 
 # Switch to TEST Stripe keys
 npx supabase secrets set \
-  STRIPE_SECRET_KEY=STRIPE_SECRET_KEY_REDACTED \
-  STRIPE_WEBHOOK_SECRET=whsec_j0pXblTz4FdVBON9vKEkA2ZpTtGrvgud \
+  STRIPE_SECRET_KEY=sk_test_<your-test-key> \
+  STRIPE_WEBHOOK_SECRET=whsec_<your-test-webhook-secret> \
   --project-ref $PROJECT
 
 # Update a single secret
@@ -134,19 +134,19 @@ npx supabase db push --project-ref $PROJECT
 # =============================================================================
 
 # Supabase project dashboard
-# https://supabase.com/dashboard/project/SUPABASE_PROJECT_REF_REDACTED
+# https://supabase.com/dashboard/project/<your-project-ref>
 
 # SQL editor
-# https://supabase.com/dashboard/project/SUPABASE_PROJECT_REF_REDACTED/sql
+# https://supabase.com/dashboard/project/<your-project-ref>/sql
 
 # Edge functions
-# https://supabase.com/dashboard/project/SUPABASE_PROJECT_REF_REDACTED/functions
+# https://supabase.com/dashboard/project/<your-project-ref>/functions
 
 # Auth users
-# https://supabase.com/dashboard/project/SUPABASE_PROJECT_REF_REDACTED/auth/users
+# https://supabase.com/dashboard/project/<your-project-ref>/auth/users
 
 # Database tables
-# https://supabase.com/dashboard/project/SUPABASE_PROJECT_REF_REDACTED/editor
+# https://supabase.com/dashboard/project/<your-project-ref>/editor
 
 # Stripe live dashboard
 # https://dashboard.stripe.com

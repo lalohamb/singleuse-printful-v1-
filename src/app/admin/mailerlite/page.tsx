@@ -97,7 +97,7 @@ function EditSubscriberModal({ subscriber, groups, onClose, onDone }: { subscrib
 }
 
 function CreateCampaignModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () => void; onDone: () => void }) {
-  const [form, setForm] = useState({ name: "", subject: "", from_name: "Gender Apparel", from_email: "orders@genderapparel.example", html: "", group: "", send_now: false });
+  const [form, setForm] = useState({ name: "", subject: "", from_name: "Your Store", from_email: "orders@your-store.example", html: "", group: "", send_now: false });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);

@@ -1,7 +1,7 @@
 /*
 # Update store settings with real brand voice
 
-Updates the settings table with Gender Apparel's template tagline, hero text,
+Updates the settings table with storefront template tagline, hero text,
 and announcement bar content.
 */
 

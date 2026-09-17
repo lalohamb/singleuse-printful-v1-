@@ -35,7 +35,7 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
         <div className="absolute inset-0 bg-secondary-900">
           {/* LINE BELOW TO SET HERO IMAGE BACKGROUND TO FULL PIC>> :style={{ objectPosition: "100% " }} <<;END 09-04-2026*/}
           {/* https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/object-position*/ } 
-          <AppImage fill src={settings?.hero_image_url || "https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"} alt="Gender Apparel clothing" className={`absolute inset-0 w-full h-full ${settings?.hero_image_fit === "contain" ? "object-contain" : (settings?.hero_image_scale ?? 100) === 100 ? "object-cover" : "object-contain"}`} style={{ objectPosition: settings?.hero_object_position || "center", transform: settings?.hero_image_flip ? "scaleX(-1)" : undefined, scale: `${settings?.hero_image_scale ?? 100}%` }} />
+          <AppImage fill src={settings?.hero_image_url || "/hero-placeholder.svg"} alt="Store hero image" className={`absolute inset-0 w-full h-full ${settings?.hero_image_fit === "contain" ? "object-contain" : (settings?.hero_image_scale ?? 100) === 100 ? "object-cover" : "object-contain"}`} style={{ objectPosition: settings?.hero_object_position || "center", transform: settings?.hero_image_flip ? "scaleX(-1)" : undefined, scale: `${settings?.hero_image_scale ?? 100}%` }} />
           {(() => {
             const op = (settings?.hero_gradient_opacity ?? 70) / 100;
             const dir = settings?.hero_gradient_dir ?? "left";
@@ -230,7 +230,7 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
               <div className="kente-bar h-1 w-24 mb-8 rounded-full" />
               <p className="text-gold-400 text-sm font-medium tracking-widest uppercase mb-4">{settings?.our_why_label || "Our Why"}</p>
               <h2 className="text-3xl lg:text-5xl font-bold text-white leading-tight mb-6">&ldquo;{settings?.our_why_quote || "We don\u2019t just sell clothes. We tell stories."}&rdquo;</h2>
-              <p className="text-white/60 text-lg leading-relaxed mb-8">{settings?.our_why_body || "Gender Apparel was created for people who want clothing that feels personal, expressive, and easy to live in. Every design is made with intention and every piece is printed to order."}</p>
+              <p className="text-white/60 text-lg leading-relaxed mb-8">{settings?.our_why_body || "Your store was created for people who want clothing that feels personal, expressive, and easy to live in. Every design is made with intention and every piece is printed to order."}</p>
               <Link href="/about" className="btn-gold self-start">Read Our Story <ArrowRight size={18} className="ml-2" /></Link>
             </div>
             <div className="relative min-h-[400px] bg-secondary-800" style={{ minHeight: settings?.our_why_height_vh ? `${settings.our_why_height_vh}px` : 400 }}>

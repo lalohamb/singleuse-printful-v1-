@@ -3,7 +3,7 @@ import { AccountDashboardClient } from "@/app/account/components/AccountDashboar
 
 export const metadata: Metadata = {
   title: "My Account",
-  description: "Track orders and manage your Gender Apparel account.",
+  description: "Track orders and manage your account.",
 };
 
 export default function AccountPage() {

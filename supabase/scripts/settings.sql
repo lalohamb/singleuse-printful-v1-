@@ -2,7 +2,7 @@
 SELECT * FROM settings LIMIT 1;
 
 -- Update store name / tagline
-UPDATE settings SET store_name = 'Gender Apparel', tagline = 'Made for Every Body.' WHERE id = (SELECT id FROM settings LIMIT 1);
+UPDATE settings SET store_name = 'Your Store', tagline = 'Made for Every Body.' WHERE id = (SELECT id FROM settings LIMIT 1);
 
 -- Toggle announcement bar
 UPDATE settings SET announcement_active = true  WHERE id = (SELECT id FROM settings LIMIT 1);

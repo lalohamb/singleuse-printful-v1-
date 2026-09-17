@@ -45,7 +45,7 @@ function sanitizeImageUrl(url: string): string {
     const { protocol } = new URL(url);
     if (protocol === "https:" || protocol === "http:") return url;
   } catch { /* invalid URL */ }
-  return "/ga.png";
+  return "/hero-placeholder.svg";
 }
 
 function getLayout(position: string) {
@@ -125,7 +125,7 @@ export default function NewsletterPopup() {
         body: data.popup_settings.body || "New drops, exclusive offers, and culture — straight to your inbox.",
         ctaLabel: data.popup_settings.ctaLabel || "Subscribe",
         bgColor: data.popup_settings.bgColor || "#111111",
-        imageUrl: sanitizeImageUrl(data.popup_settings.imageUrl || "/ga.png"),
+        imageUrl: sanitizeImageUrl(data.popup_settings.imageUrl || "/hero-placeholder.svg"),
         groupId: data.popup_settings.groupId || "",
         position: data.popup_settings.position || "right",
         imgX: data.popup_settings.imgX ?? 0,

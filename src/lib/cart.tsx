@@ -43,7 +43,7 @@ interface CartContextValue extends CartState {
 }
 
 const CartContext = createContext<CartContextValue | undefined>(undefined);
-const STORAGE_KEY = "genderapparel_cart";
+const STORAGE_KEY = "pod_storefront_cart";
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, { items: [], isOpen: false });

@@ -52,9 +52,9 @@ export default function Header() {
               </button>
               <Link href="/" className="flex items-center gap-2">
                 {settings?.logo_url ? (
-                  <AppImage src={settings.logo_url} alt={settings.store_name || "Gender Apparel"} width={240} height={80} style={{ height: `${settings.logo_size ?? 40}px`, width: "auto" }} />
+                  <AppImage src={settings.logo_url} alt={settings.store_name || "Your Store"} width={240} height={80} style={{ height: `${settings.logo_size ?? 40}px`, width: "auto" }} />
                 ) : (
-                  <AppImage src="/genderapparel.png" alt="Gender Apparel" width={240} height={80} style={{ height: `${settings?.logo_size ?? 40}px`, width: "auto" }} />
+                  <AppImage src="/store-logo-placeholder.svg" alt="Your Store" width={240} height={80} style={{ height: `${settings?.logo_size ?? 40}px`, width: "auto" }} />
                 )}
               </Link>
             </div>

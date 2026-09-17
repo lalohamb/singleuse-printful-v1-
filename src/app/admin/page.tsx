@@ -26,7 +26,7 @@ export default function AdminLoginPage() {
         <div className="text-center mb-8">
           <div className="w-16 h-16 rounded-2xl bg-gold-500 flex items-center justify-center mx-auto mb-4"><ShieldCheck size={32} className="text-secondary-900" /></div>
           <h1 className="text-2xl font-bold text-white">Admin Portal</h1>
-          <p className="text-secondary-400 mt-2">Gender Apparel Management</p>
+          <p className="text-secondary-400 mt-2">Store Management</p>
         </div>
         <div className="bg-white rounded-2xl p-8 shadow-xl">
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -34,7 +34,7 @@ export default function AdminLoginPage() {
               <label className="label-text">Email</label>
               <div className="relative">
                 <Mail size={18} className="absolute left-3 top-3 text-secondary-400" />
-                <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="input-field pl-10" placeholder="admin@genderapparel.example" />
+                <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="input-field pl-10" placeholder="admin@your-store.example" />
               </div>
             </div>
             <div>

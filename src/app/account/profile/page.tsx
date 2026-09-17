@@ -3,7 +3,7 @@ import { ProfileClient } from "@/app/account/components/ProfileClient";
 
 export const metadata: Metadata = {
   title: "Account Profile",
-  description: "Manage your Gender Apparel customer profile.",
+  description: "Manage your customer profile.",
 };
 
 export default function AccountProfilePage() {

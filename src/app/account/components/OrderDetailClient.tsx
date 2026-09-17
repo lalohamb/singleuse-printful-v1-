@@ -80,7 +80,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
             <div className="divide-y divide-secondary-100">
               {order.items.map((item) => (
                 <div key={`${item.product_id}-${item.variant_id}`} className="flex gap-4 p-5">
-                  <AppImage src={item.image_url || "/genderapparel.png"} alt={item.title} width={72} height={72} className="w-20 h-20 rounded-lg object-cover bg-secondary-100 flex-shrink-0" />
+                  <AppImage src={item.image_url || "/product-placeholder.svg"} alt={item.title} width={72} height={72} className="w-20 h-20 rounded-lg object-cover bg-secondary-100 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-secondary-900">{item.title}</p>
                     <p className="text-sm text-secondary-500">{item.variant_label} · Qty {item.quantity}</p>

@@ -7,10 +7,10 @@ import { DEFAULT_POLICY_CONTENT } from "@/lib/policy-content";
 
 export const metadata: Metadata = {
   title: "Refund and Returns Policy",
-  description: "Gender Apparel refund and returns policy.",
+  description: "Refund and returns policy.",
 };
 
-const EMAIL = "hello@genderapparel.example";
+const EMAIL = "hello@your-store.example";
 
 const FALLBACK = `Our refund and returns policy lasts 30 days from purchase. If 30 days have passed, we can't offer a full refund or exchange.
 

@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   ]);
   if (!productRes.data) return { title: "Product Not Found" };
   const { title, description, image_url } = productRes.data;
-  const base = (seo?.site_url || "https://genderapparel.example").replace(/\/$/, "");
+  const base = (seo?.site_url || "https://your-store.example").replace(/\/$/, "");
   const ogImage = image_url || seo?.default_og_image || null;
   return {
     title,
@@ -49,7 +49,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
   if (!productRes.data) notFound();
   const product = productRes.data as Product;
-  const base = (seo?.site_url || "https://genderapparel.example").replace(/\/$/, "");
+  const base = (seo?.site_url || "https://your-store.example").replace(/\/$/, "");
 
   const jsonLd = seo?.jsonld_enabled ? {
     "@context": "https://schema.org",
@@ -65,7 +65,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       availability: "https://schema.org/InStock",
       url: `${base}/product/${product.id}`,
     },
-    brand: { "@type": "Brand", name: "Gender Apparel" },
+    brand: { "@type": "Brand", name: product.title ? undefined : "Your Store" },
   } : null;
 
   return (

@@ -133,24 +133,24 @@ Set the webhook to listen for `checkout.session.completed` and `payment_intent.p
 ## Deploy All Functions
 
 ```bash
-supabase functions deploy --project-ref SUPABASE_PROJECT_REF_REDACTED
+supabase functions deploy --project-ref <your-project-ref>
 ```
 
 Or individually:
 
 ```bash
-supabase functions deploy printify-proxy --project-ref SUPABASE_PROJECT_REF_REDACTED
-supabase functions deploy printify-webhook --project-ref SUPABASE_PROJECT_REF_REDACTED
-supabase functions deploy stripe-checkout --project-ref SUPABASE_PROJECT_REF_REDACTED
-supabase functions deploy stripe-webhook --project-ref SUPABASE_PROJECT_REF_REDACTED
+supabase functions deploy printify-proxy --project-ref <your-project-ref>
+supabase functions deploy printify-webhook --project-ref <your-project-ref>
+supabase functions deploy stripe-checkout --project-ref <your-project-ref>
+supabase functions deploy stripe-webhook --project-ref <your-project-ref>
 ```
 
 ## Set Secrets
 
 ```bash
-supabase secrets set PRINTIFY_API_TOKEN=your_token --project-ref SUPABASE_PROJECT_REF_REDACTED
-supabase secrets set STRIPE_SECRET_KEY=sk_live_... --project-ref SUPABASE_PROJECT_REF_REDACTED
-supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_... --project-ref SUPABASE_PROJECT_REF_REDACTED
-supabase secrets set RESEND_API_KEY=re_... --project-ref SUPABASE_PROJECT_REF_REDACTED
-supabase secrets set MAILER_LITE_API_KEY=your_key --project-ref SUPABASE_PROJECT_REF_REDACTED
+supabase secrets set PRINTIFY_API_TOKEN=your_token --project-ref <your-project-ref>
+supabase secrets set STRIPE_SECRET_KEY=sk_live_... --project-ref <your-project-ref>
+supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_... --project-ref <your-project-ref>
+supabase secrets set RESEND_API_KEY=re_... --project-ref <your-project-ref>
+supabase secrets set MAILER_LITE_API_KEY=your_key --project-ref <your-project-ref>
 ```
