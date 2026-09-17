@@ -262,15 +262,20 @@ function StripeDashboard() {
     if (showSpinner) { setLoading(true); setError(null); }
     setRefreshError(null);
     try {
-      const [setupRes, balRes, chargesRes, payoutsRes] = await Promise.all([
-        fetch("/api/stripe-setup", { cache: "no-store" }),
+      // Check setup first — skip balance calls if keys not configured
+      const setupRes = await fetch("/api/stripe-setup", { cache: "no-store" });
+      const setupData = await setupRes.json();
+      const hasKeys = setupData?.live?.configured || setupData?.test?.configured;
+      if (!hasKeys) { if (showSpinner) setLoading(false); return; }
+
+      const [balRes, chargesRes, payoutsRes] = await Promise.all([
         fetch("/api/stripe-admin?action=balance"),
         fetch("/api/stripe-admin?action=charges&limit=20"),
         fetch("/api/stripe-admin?action=payouts"),
       ]);
-      const [setupData, balData, chargesData, payoutsData] = await Promise.all([setupRes.json(), balRes.json(), chargesRes.json(), payoutsRes.json()]);
+      const [balData, chargesData, payoutsData] = await Promise.all([balRes.json(), chargesRes.json(), payoutsRes.json()]);
       if (!balRes.ok) throw new Error(balData.error);
-      setActiveMode(knownMode ?? setupData?.active_mode ?? (balData.livemode ? "live" : "test"));
+      setActiveMode(knownMode ?? setupData.active_mode ?? (balData.livemode ? "live" : "test"));
       setBalance(balData);
       const currency = balData.available?.[0]?.currency ?? "usd";
       setBalanceCurrency(currency);
@@ -325,12 +330,17 @@ function StripeDashboard() {
 
   if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-2 border-secondary-300 border-t-secondary-900" /></div>;
 
+  if (!balance) return (
+    <div className="space-y-4">
+      <p className="text-sm text-secondary-500">No Stripe keys configured yet. Add your keys below to get started.</p>
+      <StripeSetup onActivated={onModeSwitch} />
+    </div>
+  );
+
   if (error) return (
-    <div className="bg-error-50 border border-error-100 rounded-xl p-6 text-center">
-      <AlertCircle size={32} className="mx-auto mb-3 text-error-500" />
-      <p className="font-semibold text-error-700 mb-1">Could not connect to Stripe</p>
-      <p className="text-sm text-error-600 mb-4">{error}</p>
-      <p className="text-xs text-secondary-500">Make sure <code>STRIPE_SECRET_KEY</code> is set in <code>.env.local</code></p>
+    <div className="space-y-6">
+      <StripeSetup onActivated={(mode) => { setError(null); onModeSwitch(mode); }} />
+      <div className="bg-error-50 border border-error-100 rounded-xl p-4 text-sm text-error-700">{error}</div>
     </div>
   );
 
