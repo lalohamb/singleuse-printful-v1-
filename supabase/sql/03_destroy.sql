@@ -6,6 +6,7 @@
 
 DROP TABLE IF EXISTS affiliate_conversions CASCADE;
 DROP TABLE IF EXISTS affiliate_payouts     CASCADE;
+DROP TABLE IF EXISTS affiliate_clicks      CASCADE;
 DROP TABLE IF EXISTS affiliates            CASCADE;
 DROP TABLE IF EXISTS email_events          CASCADE;
 DROP TABLE IF EXISTS customer_profiles     CASCADE;
