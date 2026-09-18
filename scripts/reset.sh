@@ -37,7 +37,7 @@ DB_PASSWORD=$(env_get "DB_PASSWORD" "$ENV_LOCAL")
 
 DB_URL=""
 if command -v psql &>/dev/null && [[ -n "$DB_PASSWORD" ]]; then
-  DB_URL="postgresql://postgres.${SUPABASE_PROJECT_REF}:${DB_PASSWORD}@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
+  DB_URL="postgresql://postgres.${SUPABASE_PROJECT_REF}:${DB_PASSWORD}@aws-0-us-west-2.pooler.supabase.com:6543/postgres"
 fi
 
 echo ""

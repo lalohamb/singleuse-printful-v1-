@@ -9,8 +9,6 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 LIB_DIR="$SCRIPT_DIR/lib"
 SQL_DIR="$ROOT_DIR/supabase/sql"
 ENV_LOCAL="$ROOT_DIR/.env.local"
-ENV_LIVE="$ROOT_DIR/.env.live"
-ENV_TEST="$ROOT_DIR/.env.test"
 DEFAULTS="$SCRIPT_DIR/defaults.env"
 
 source "$LIB_DIR/env.sh"
@@ -26,7 +24,7 @@ fail()  { echo -e "  ${RED}✗${NC} $1"; }
 hr()    { echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"; }
 
 hr
-echo -e "${CYAN}  Gender Apparel — Fresh Install${NC}"
+echo -e "${CYAN}  Storefront — Fresh Install${NC}"
 hr
 
 # =============================================================================
@@ -96,40 +94,12 @@ ok "All credentials collected"
 # =============================================================================
 step 3 "Writing env files"
 
-# .env.live — Stripe live keys only (other vars stay in .env.local)
-if [[ ! -f "$ENV_LIVE" ]] || [[ -z "$(env_get STRIPE_SECRET_KEY "$ENV_LIVE")" ]]; then
-  cat > "$ENV_LIVE" <<EOF
-STRIPE_SECRET_KEY=${STRIPE_LIVE_SECRET}
-STRIPE_WEBHOOK_SECRET=whsec_replace_after_registration
-EOF
-  ok ".env.live created"
-else
-  ok ".env.live already exists — skipped"
-fi
-
-# .env.test — Stripe test keys only
-if [[ ! -f "$ENV_TEST" ]] || [[ -z "$(env_get STRIPE_SECRET_KEY "$ENV_TEST")" ]]; then
-  cat > "$ENV_TEST" <<EOF
-STRIPE_SECRET_KEY=${STRIPE_TEST_SECRET}
-STRIPE_WEBHOOK_SECRET=whsec_replace_after_registration
-EOF
-  ok ".env.test created"
-else
-  ok ".env.test already exists — skipped"
-fi
-
-# Set active mode to test in .env.local
-env_set "STRIPE_SECRET_KEY"     "$STRIPE_TEST_SECRET"   "$ENV_LOCAL"
-env_set "STRIPE_WEBHOOK_SECRET" "whsec_pending"         "$ENV_LOCAL"
-
-# .gitignore — ensure .env.live and .env.test are ignored
+# Stripe keys are stored in DB — not in env files
 GITIGNORE="$ROOT_DIR/.gitignore"
-for entry in ".env.live" ".env.test" "scripts/defaults.env"; do
-  if ! grep -qF "$entry" "$GITIGNORE" 2>/dev/null; then
-    echo "$entry" >> "$GITIGNORE"
-    ok "Added $entry to .gitignore"
-  fi
-done
+if ! grep -qF "scripts/defaults.env" "$GITIGNORE" 2>/dev/null; then
+  echo "scripts/defaults.env" >> "$GITIGNORE"
+  ok "Added scripts/defaults.env to .gitignore"
+fi
 
 ok "Env files ready"
 
@@ -146,16 +116,23 @@ if [[ "$USE_PSQL" == "true" ]]; then
     read -rp "  Supabase DB Password (from dashboard → Settings → Database): " DB_PASSWORD
     env_set "DB_PASSWORD" "$DB_PASSWORD" "$ENV_LOCAL"
   fi
-  DB_URL="postgresql://postgres.${SUPABASE_PROJECT_REF}:${DB_PASSWORD}@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
+  DB_URL="postgresql://postgres.${SUPABASE_PROJECT_REF}:${DB_PASSWORD}@aws-0-us-west-2.pooler.supabase.com:6543/postgres"
 fi
 
 echo "  Running 01_schema.sql..."
 if run_sql_file "$SQL_DIR/01_schema.sql" "$SUPABASE_PROJECT_REF" "$SERVICE_ROLE_KEY" "$DB_URL" "$SUPABASE_ACCESS_TOKEN"; then
-  ok "Schema created, including customer account profiles"
+  ok "Base schema created"
 else
   fail "Schema SQL failed — check your DB credentials"
   exit 1
 fi
+
+echo "  Running migrations..."
+for f in $(ls "$ROOT_DIR/supabase/migrations"/*.sql | sort); do
+  echo "    → $(basename $f)"
+  run_sql_file "$f" "$SUPABASE_PROJECT_REF" "$SERVICE_ROLE_KEY" "$DB_URL" "$SUPABASE_ACCESS_TOKEN" || warn "Migration $(basename $f) failed — continuing"
+done
+ok "Migrations complete"
 
 # =============================================================================
 # [5/8] Create admin user + seed data
@@ -228,8 +205,6 @@ step 6 "Pushing Supabase secrets and deploying edge functions"
 
 echo "  Pushing secrets..."
 if push_secrets "$SUPABASE_PROJECT_REF" "$SUPABASE_ACCESS_TOKEN" \
-  "STRIPE_SECRET_KEY"          "$STRIPE_TEST_SECRET" \
-  "STRIPE_WEBHOOK_SECRET"      "whsec_pending" \
   "SUPABASE_URL"               "$SUPABASE_URL" \
   "SUPABASE_SERVICE_ROLE_KEY"  "$SERVICE_ROLE_KEY" \
   "PRINTIFY_API_TOKEN"         "$PRINTIFY_TOKEN" \
@@ -248,37 +223,37 @@ deploy_functions "$SUPABASE_PROJECT_REF" \
 ok "Edge functions deployed"
 
 # =============================================================================
-# [7/8] Register Stripe webhooks
+# [7/8] Register Stripe webhooks + save keys to DB
 # =============================================================================
-step 7 "Registering Stripe webhooks"
+step 7 "Registering Stripe webhooks and saving keys to database"
 
 WEBHOOK_URL="https://${SUPABASE_PROJECT_REF}.supabase.co/functions/v1/stripe-webhook"
+TEST_WHSEC=""
+LIVE_WHSEC=""
 
 echo "  Registering test webhook..."
-delete_existing_webhooks "$STRIPE_TEST_SECRET" "$WEBHOOK_URL"
-TEST_WHSEC=$(register_webhook "$STRIPE_TEST_SECRET" "$WEBHOOK_URL")
-if [[ -n "$TEST_WHSEC" ]]; then
-  env_set "STRIPE_WEBHOOK_SECRET" "$TEST_WHSEC" "$ENV_TEST"
-  env_set "STRIPE_WEBHOOK_SECRET" "$TEST_WHSEC" "$ENV_LOCAL"
-  ok "Test webhook registered — whsec written to .env.test"
-else
-  warn "Test webhook registration failed — add whsec manually to .env.test"
-fi
+delete_existing_webhooks "$STRIPE_TEST_SECRET" "$WEBHOOK_URL" 2>/dev/null || true
+TEST_WHSEC=$(register_webhook "$STRIPE_TEST_SECRET" "$WEBHOOK_URL" 2>/dev/null || echo "")
+[[ -n "$TEST_WHSEC" ]] && ok "Test webhook registered" || warn "Test webhook failed — add whsec via /admin/stripe"
 
 echo "  Registering live webhook..."
-delete_existing_webhooks "$STRIPE_LIVE_SECRET" "$WEBHOOK_URL"
-LIVE_WHSEC=$(register_webhook "$STRIPE_LIVE_SECRET" "$WEBHOOK_URL")
-if [[ -n "$LIVE_WHSEC" ]]; then
-  env_set "STRIPE_WEBHOOK_SECRET" "$LIVE_WHSEC" "$ENV_LIVE"
-  ok "Live webhook registered — whsec written to .env.live"
-else
-  warn "Live webhook registration failed — add whsec manually to .env.live"
-fi
+delete_existing_webhooks "$STRIPE_LIVE_SECRET" "$WEBHOOK_URL" 2>/dev/null || true
+LIVE_WHSEC=$(register_webhook "$STRIPE_LIVE_SECRET" "$WEBHOOK_URL" 2>/dev/null || echo "")
+[[ -n "$LIVE_WHSEC" ]] && ok "Live webhook registered" || warn "Live webhook failed — add whsec via /admin/stripe"
 
-# Update Supabase secret with real test whsec
-if [[ -n "$TEST_WHSEC" ]]; then
-  push_secrets "$SUPABASE_PROJECT_REF" "$SUPABASE_ACCESS_TOKEN" \
-    "STRIPE_WEBHOOK_SECRET" "$TEST_WHSEC" > /dev/null
+# Save all Stripe keys to settings table
+STRIPE_SQL="UPDATE settings SET
+  stripe_test_secret_key     = '${STRIPE_TEST_SECRET}',
+  stripe_test_webhook_secret = '${TEST_WHSEC}',
+  stripe_live_secret_key     = '${STRIPE_LIVE_SECRET}',
+  stripe_live_webhook_secret = '${LIVE_WHSEC}',
+  stripe_mode                = 'test'
+WHERE id = (SELECT id FROM settings LIMIT 1);"
+
+if run_sql "$STRIPE_SQL" "$SUPABASE_PROJECT_REF" "$SERVICE_ROLE_KEY" "$DB_URL" "$SUPABASE_ACCESS_TOKEN"; then
+  ok "Stripe keys saved to database"
+else
+  warn "Could not save Stripe keys to DB — add them via /admin/stripe"
 fi
 
 # =============================================================================
