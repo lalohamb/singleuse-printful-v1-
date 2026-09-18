@@ -317,6 +317,11 @@ CREATE TABLE IF NOT EXISTS settings (
   default_shipping_cost numeric DEFAULT 6.99,
   printify_connected boolean DEFAULT false,
   stripe_connected boolean DEFAULT false,
+  stripe_mode text NOT NULL DEFAULT 'test',
+  stripe_live_secret_key text,
+  stripe_live_webhook_secret text,
+  stripe_test_secret_key text,
+  stripe_test_webhook_secret text,
   updated_at timestamptz DEFAULT now()
 );
 
