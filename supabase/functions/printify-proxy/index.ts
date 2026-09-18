@@ -456,7 +456,16 @@ Deno.serve(async (req: Request) => {
               .select("id");
 
             if (error) errors.push({ id: String(p.id), error: error.message });
-            else if (data && data[0]) synced.push(String(detail.id));
+            else if (data && data[0]) {
+              synced.push(String(detail.id));
+              // Confirm publish to Printify so products don't get stuck in "Publishing" state.
+              // Fire-and-forget — failure is non-fatal.
+              printifyFetch(
+                `/shops/${shopId}/products/${detail.id}/publishing_succeeded.json`,
+                token,
+                { method: "POST", body: JSON.stringify({ title: true, description: true, images: true, variants: true, tags: true }) }
+              ).catch(() => {});
+            }
           } catch (e) {
             errors.push({
               id: String(p.id),

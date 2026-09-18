@@ -27,8 +27,8 @@ export async function getStripeConfig(): Promise<StripeConfig | null> {
   const secretKey = mode === "live" ? data.stripe_live_secret_key : data.stripe_test_secret_key;
   const webhookSecret = mode === "live" ? data.stripe_live_webhook_secret : data.stripe_test_webhook_secret;
 
-  if (!secretKey || !webhookSecret) return null;
-  return { secretKey, webhookSecret, mode };
+  if (!secretKey) return null;
+  return { secretKey, webhookSecret: webhookSecret ?? "", mode };
 }
 
 export async function getStripeSettings() {

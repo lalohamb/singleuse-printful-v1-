@@ -91,10 +91,12 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     live: {
       configured: !!(data?.stripe_live_secret_key && data?.stripe_live_webhook_secret),
+      key_configured: !!(data?.stripe_live_secret_key),
       key_hint: mask(data?.stripe_live_secret_key ?? ""),
     },
     test: {
       configured: !!(data?.stripe_test_secret_key && data?.stripe_test_webhook_secret),
+      key_configured: !!(data?.stripe_test_secret_key),
       key_hint: mask(data?.stripe_test_secret_key ?? ""),
     },
     active_mode: data?.stripe_mode === "live" ? "live" : "test",

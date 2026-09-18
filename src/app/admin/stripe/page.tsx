@@ -102,7 +102,7 @@ function RefundModal({ charge, onClose, onRefunded }: { charge: Charge; onClose:
   );
 }
 
-interface KeyStatus { configured: boolean; key_hint: string; }
+interface KeyStatus { configured: boolean; key_configured: boolean; key_hint: string; }
 
 function StripeSetup({ activeMode: activeModeOverride, onActivated }: { activeMode?: string; onActivated: (mode: "live" | "test") => void }) {
   const [status, setStatus] = useState<{ live: KeyStatus; test: KeyStatus; active_mode: string } | null>(null);
@@ -180,13 +180,13 @@ function StripeSetup({ activeMode: activeModeOverride, onActivated }: { activeMo
                 }`}>{m.toUpperCase()}</span>
                 {activeMode === m
                   ? <span className="text-xs text-success-600 font-medium flex items-center gap-1"><Check size={11} />Active</span>
-                  : status[m].configured
+                  : status[m].key_configured
                     ? <button onClick={() => switchMode(m)} disabled={activating} className="text-xs font-medium px-2 py-1 rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50">
                         {activating ? <Loader2 size={11} className="animate-spin" /> : `Use ${m}`}
                       </button>
                     : <span className="text-xs text-secondary-400">Not set up</span>}
               </div>
-              {status[m].configured
+              {status[m].key_configured
                 ? <p className="text-xs font-mono text-secondary-500 truncate">{status[m].key_hint}</p>
                 : <p className="text-xs text-secondary-400">Paste a sk_{m}_ key below</p>}
             </div>
@@ -257,6 +257,7 @@ function StripeDashboard() {
 
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [balanceCurrency, setBalanceCurrency] = useState("usd");
+  const [webhookStatus, setWebhookStatus] = useState<{ live: boolean; test: boolean }>({ live: false, test: false });
 
   const loadStripeData = async (knownMode?: "live" | "test", showSpinner = true) => {
     if (showSpinner) { setLoading(true); setError(null); }
@@ -267,6 +268,7 @@ function StripeDashboard() {
       const setupData = await setupRes.json();
       const hasKeys = setupData?.live?.configured || setupData?.test?.configured;
       if (!hasKeys) { if (showSpinner) setLoading(false); return; }
+      setWebhookStatus({ live: !!setupData?.live?.configured, test: !!setupData?.test?.configured });
 
       const [balRes, chargesRes, payoutsRes] = await Promise.all([
         fetch("/api/stripe-admin?action=balance"),
@@ -378,6 +380,12 @@ function StripeDashboard() {
             {refreshError && (
               <div className="flex items-center gap-2 text-xs text-error-700 bg-error-50 border border-error-100 rounded-lg px-4 py-2">
                 <AlertCircle size={14} className="flex-shrink-0" />{refreshError}
+              </div>
+            )}
+            {!webhookStatus[activeMode] && (
+              <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
+                <AlertCircle size={14} className="flex-shrink-0" />
+                <span><strong>{activeMode.toUpperCase()} webhook not configured.</strong> Stripe cannot confirm payments until a webhook signing secret is saved. Re-save your {activeMode} key via the Connect Stripe panel to register it.</span>
               </div>
             )}
             {activeMode !== "live" && (
