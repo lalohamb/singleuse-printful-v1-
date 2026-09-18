@@ -8,7 +8,7 @@ import Reveal from "@/components/Reveal";
 import NewsletterSignup from "@/components/NewsletterSignup";
 import PromoBanner from "@/components/PromoBanner";
 import AppImage from "@/components/AppImage";
-import { formatPrice } from "@/lib/supabase";
+import { formatPrice, resolveStorageUrl } from "@/lib/supabase";
 import { DEFAULT_AFFIRMATIONS_SETTINGS, type AffirmationsSettings } from "@/lib/affirmations-settings";
 import { DEFAULT_NEW_ARRIVALS_SETTINGS, type NewArrivalsSettings } from "@/lib/new-arrivals-settings";
 import { DEFAULT_BRAND_VALUES_SETTINGS, type BrandValuesSettings } from "@/lib/brand-values-settings";
@@ -35,7 +35,7 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
         <div className="absolute inset-0 bg-secondary-900">
           {/* LINE BELOW TO SET HERO IMAGE BACKGROUND TO FULL PIC>> :style={{ objectPosition: "100% " }} <<;END 09-04-2026*/}
           {/* https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/object-position*/ } 
-          <AppImage fill src={settings?.hero_image_url || "/hero-placeholder.svg"} alt="Store hero image" className={`absolute inset-0 w-full h-full ${settings?.hero_image_fit === "contain" ? "object-contain" : (settings?.hero_image_scale ?? 100) === 100 ? "object-cover" : "object-contain"}`} style={{ objectPosition: settings?.hero_object_position || "center", transform: settings?.hero_image_flip ? "scaleX(-1)" : undefined, scale: `${settings?.hero_image_scale ?? 100}%` }} />
+          <AppImage fill src={resolveStorageUrl(settings?.hero_image_url) || "/hero-placeholder.svg"} alt="Store hero image" className={`absolute inset-0 w-full h-full ${settings?.hero_image_fit === "contain" ? "object-contain" : (settings?.hero_image_scale ?? 100) === 100 ? "object-cover" : "object-contain"}`} style={{ objectPosition: settings?.hero_object_position || "center", transform: settings?.hero_image_flip ? "scaleX(-1)" : undefined, scale: `${settings?.hero_image_scale ?? 100}%` }} />
           {(() => {
             const op = (settings?.hero_gradient_opacity ?? 70) / 100;
             const dir = settings?.hero_gradient_dir ?? "left";
@@ -236,7 +236,7 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
             <div className="relative min-h-[400px] bg-secondary-800" style={{ minHeight: settings?.our_why_height_vh ? `${settings.our_why_height_vh}px` : 400 }}>
               {(() => {
                 const hasOwn = !!settings?.our_why_image_url;
-                const src = hasOwn ? settings!.our_why_image_url! : (settings?.hero_image_url || "https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940");
+                const src = resolveStorageUrl(hasOwn ? settings!.our_why_image_url! : settings?.hero_image_url) || "https://images.pexels.com/photos/858117/pexels-photo-858117.jpeg?auto=compress&cs=tinysrgb&h=650&w=940";
                 const scale = hasOwn ? (settings?.our_why_image_scale ?? 100) : 100;
                 const pos = hasOwn ? (settings?.our_why_object_position || "center") : "center";
                 const flip = hasOwn ? !!settings?.our_why_image_flip : false;
@@ -283,7 +283,7 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
         <div className="relative rounded-2xl overflow-hidden bg-secondary-900 px-8 py-16 text-center">
           <div className="absolute inset-0">
             {(() => {
-              const src = settings?.story_image_url || "https://images.pexels.com/photos/29646005/pexels-photo-29646005.jpeg?auto=compress&cs=tinysrgb&h=650&w=940";
+              const src = resolveStorageUrl(settings?.story_image_url) || "https://images.pexels.com/photos/29646005/pexels-photo-29646005.jpeg?auto=compress&cs=tinysrgb&h=650&w=940";
               const op = (settings?.story_gradient_opacity ?? 40) / 100;
               const dir = settings?.story_gradient_dir ?? "full";
               const gradMap: Record<string, string> = {
