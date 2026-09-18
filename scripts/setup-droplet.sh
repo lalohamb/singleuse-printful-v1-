@@ -80,6 +80,17 @@ server {
     listen 80;
     server_name $DOMAIN www.$DOMAIN;
 
+    location /_next/static/ {
+        alias ${APP_DIR}/.next/standalone/.next/static/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location /public/ {
+        alias ${APP_DIR}/.next/standalone/public/;
+        expires 1y;
+    }
+
     location / {
         proxy_pass http://localhost:3000;
         proxy_http_version 1.1;
