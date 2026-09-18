@@ -30,8 +30,8 @@ export default function ImageUpload({ value, onChange, folder = "uploads", label
   const [loadingMedia, setLoadingMedia] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const fetchMedia = async () => {
-    setLoadingMedia(true);
+  const fetchMedia = async (silent = false) => {
+    if (!silent) setLoadingMedia(true);
     const all: MediaFile[] = [];
     for (const f of FOLDERS) {
       const { data } = await supabase.storage.from(BUCKET).list(f, { sortBy: { column: "created_at", order: "desc" } });
@@ -63,8 +63,11 @@ export default function ImageUpload({ value, onChange, folder = "uploads", label
     const json = await res.json();
     if (!res.ok) { setError(json.error || "Upload failed"); setUploading(false); return; }
     onChange(json.url);
+    // Optimistically prepend the new file so it appears instantly in the open picker
+    const fileName = json.url.split("/").pop() || "uploaded";
+    setMedia((prev) => [{ name: fileName, publicUrl: json.url, folder }, ...prev]);
     setUploading(false);
-    if (media.length > 0) fetchMedia();
+    fetchMedia(true); // silent background reconcile
   };
 
   return (
