@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { Mail } from "lucide-react";
+import Image from "next/image";
 import { createClient } from "@supabase/supabase-js";
 import type { StoreSettings } from "@/types";
-import AppImage from "@/components/AppImage";
 
 function getSupabase() {
   return createClient(
@@ -86,20 +86,20 @@ const DEFAULT_SOCIAL: StoreSettings["social_links"] = {
 
 export default async function Footer() {
   const supabase = getSupabase();
-  const { data } = await supabase.from("settings").select("social_links, logo_url, logo_size, footer_logo_url, footer_logo_size, footer_text, footer_bottom_message, affiliate_program_enabled").limit(1).maybeSingle();
+  const { data } = await supabase.from("settings").select("social_links, logo_url, logo_size, footer_logo_url, footer_logo_size, footer_text, footer_bottom_message").limit(1).maybeSingle();
   const social: StoreSettings["social_links"] = data?.social_links ?? DEFAULT_SOCIAL;
   const logoUrl = data?.footer_logo_url || data?.logo_url || "/store-logo-placeholder.svg";
   const logoSize = data?.footer_logo_size ?? data?.logo_size ?? 40;
   const footerText = data?.footer_text || "Made-to-order apparel designed for every body, every style, and every day. Wear what feels like you.";
   const footerBottomMessage = data?.footer_bottom_message || "Made to order. Made with love.";
-  const affiliateEnabled = !!data?.affiliate_program_enabled;
+  const affiliateEnabled = false;
 
   return (
     <footer className="bg-secondary-900 text-secondary-300 mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-12">
           <div className="col-span-1 md:col-span-2">
-            <AppImage src={logoUrl} alt="Your Store" width={220} height={80} style={{ height: `${logoSize}px`, width: "auto" }} />
+            <Image src={logoUrl} alt="Your Store" width={220} height={80} style={{ height: `${logoSize}px`, width: "auto" }} unoptimized />
             <p className="mt-4 text-secondary-400 max-w-md">{footerText}</p>
             <div className="flex items-center gap-4 mt-6 flex-wrap">
               {(Object.keys(ICON_MAP) as Array<keyof typeof ICON_MAP>).map((key) => {
@@ -143,9 +143,7 @@ export default async function Footer() {
               <li><Link href="/about" className="hover:text-white transition-colors">About Us</Link></li>
               <li><Link href="/about#mission" className="hover:text-white transition-colors">Our Mission</Link></li>
               <li><Link href="/about#culture" className="hover:text-white transition-colors">The Culture</Link></li>
-              {affiliateEnabled && (
-                <li><Link href="/affiliates" className="hover:text-white transition-colors">Affiliate Program</Link></li>
-              )}
+
             </ul>
           </div>
         </div>

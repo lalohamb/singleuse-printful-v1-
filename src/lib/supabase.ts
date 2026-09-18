@@ -103,16 +103,6 @@ export async function getShippingQuote({
 
   return Math.round(total * 100) / 100;
 }
-export function getAffiliateCode(): string | null {
-  try {
-    const raw = localStorage.getItem("affiliate_ref");
-    if (!raw) return null;
-    const { code, expires } = JSON.parse(raw);
-    if (Date.now() > expires) { localStorage.removeItem("affiliate_ref"); return null; }
-    return code;
-  } catch { return null; }
-}
-
 export async function createStripeCheckout(payload: {
   items: Array<{
     product_id: string;

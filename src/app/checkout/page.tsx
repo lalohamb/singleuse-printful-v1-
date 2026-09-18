@@ -5,7 +5,7 @@ import { ChevronLeft, Lock, Check, Loader2, Truck } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { getCustomerProfile } from "@/lib/account-data";
 import { useCustomerAuth } from "@/lib/customer-auth";
-import { formatPrice, createStripeCheckout, getShippingQuote, getAffiliateCode } from "@/lib/supabase";
+import { formatPrice, createStripeCheckout, getShippingQuote } from "@/lib/supabase";
 import type { CartItem } from "@/types";
 import AppImage from "@/components/AppImage";
 
@@ -85,7 +85,6 @@ export default function CheckoutPage() {
         shipping_name: `${form.firstName} ${form.lastName}`,
         email: form.email,
         shipping_cost: resolvedShipping,
-        affiliate_code: getAffiliateCode() || undefined,
       });
       clearCart();
       window.location.href = result.url;
