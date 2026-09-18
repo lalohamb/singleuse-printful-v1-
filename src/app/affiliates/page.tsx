@@ -5,11 +5,6 @@ import { DollarSign, Users, Link2, TrendingUp, CheckCircle, Clock, CreditCard } 
 import StorefrontLayout from "@/components/StorefrontLayout";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
 export const metadata: Metadata = {
   title: "Affiliate Program",
   description: "Partner with us. Earn 10% on every sale you drive. Apply to join the affiliate program.",
@@ -40,6 +35,10 @@ const rules = [
 ];
 
 export default async function AffiliatesPage() {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
   const { data } = await supabase.from("settings").select("affiliate_program_enabled").limit(1).maybeSingle();
   if (data?.affiliate_program_enabled === false) notFound();
   return (
