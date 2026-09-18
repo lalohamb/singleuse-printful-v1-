@@ -1,65 +1,80 @@
 #!/bin/bash
-# Run ONCE on a fresh Ubuntu 22.04 droplet as root
+# Run ONCE on a fresh Ubuntu 22.04 droplet as root.
 #
 # Usage:
-#   DOMAIN=bodyandsleeves.com \
-#   REPO=git@github.com:lalohamb/bodyandsleeves-next.git \
+#   DOMAIN=yourdomain.com \
+#   REPO=git@github.com:youruser/yourrepo.git \
 #   bash setup-droplet.sh
 #
-# Secrets (Supabase, Printify, etc.) are NOT stored in this script.
-# Provide them one of two ways before running:
-#   1. Place a ready-made .env.local next to this script (scp it up), OR
-#   2. Export the vars in your shell and they'll be written to .env.local:
-#        NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
+# Before running, upload your .env.local next to this script:
+#   scp -i ~/.ssh/id_rsa .env.local root@YOUR_IP:/root/
 #
-# REPO should use an SSH deploy key (git@github.com:...) so no token is
-# ever written to disk. Generate one on the droplet with:
-#   ssh-keygen -t ed25519 -f /root/.ssh/github_deploy -N ""
-# then add the .pub as a read-only deploy key on the GitHub repo.
+# .env.local must contain at minimum:
+#   NEXT_PUBLIC_SUPABASE_URL
+#   NEXT_PUBLIC_SUPABASE_ANON_KEY
+#   SUPABASE_SERVICE_ROLE_KEY
+#   SUPABASE_PROJECT_REF
+#   SUPABASE_ACCESS_TOKEN   ← needed to deploy edge functions
 
 set -euo pipefail
 
 APP_DIR="${APP_DIR:-/var/www/bodyandsleeves}"
-DOMAIN="${DOMAIN:?Set DOMAIN, e.g. DOMAIN=bodyandsleeves.com}"
-REPO="${REPO:?Set REPO, e.g. REPO=git@github.com:lalohamb/bodyandsleeves-next.git}"
+PM2_NAME="bodyandsleeves"
+DOMAIN="${DOMAIN:?Set DOMAIN, e.g. DOMAIN=yourdomain.com}"
+REPO="${REPO:?Set REPO, e.g. REPO=git@github.com:user/repo.git}"
 
-# --- Node.js 22 ---
+# ── Node.js 22 + Nginx ────────────────────────────────────────────────────────
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 apt-get install -y nodejs git nginx
-
-# --- PM2 ---
 npm install -g pm2
 
-# --- Clone repo ---
+# ── Clone repo ────────────────────────────────────────────────────────────────
 mkdir -p "$APP_DIR"
-git clone "$REPO" "$APP_DIR"
+GIT_SSH_COMMAND='ssh -i /root/.ssh/github_deploy' git clone "$REPO" "$APP_DIR"
 cd "$APP_DIR"
 
-# --- Environment variables ---
-# Prefer an .env.local uploaded alongside this script; otherwise build one
-# from the environment. Never commit .env.local — it holds secrets.
-if [ -f "$(dirname "$0")/.env.local" ]; then
-  cp "$(dirname "$0")/.env.local" "$APP_DIR/.env.local"
-else
-  : "${NEXT_PUBLIC_SUPABASE_URL:?Set NEXT_PUBLIC_SUPABASE_URL or provide .env.local}"
-  : "${NEXT_PUBLIC_SUPABASE_ANON_KEY:?Set NEXT_PUBLIC_SUPABASE_ANON_KEY or provide .env.local}"
-  cat > "$APP_DIR/.env.local" << EOF
-NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
-NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
-EOF
+# ── Copy .env.local ───────────────────────────────────────────────────────────
+ENV_SRC="$(dirname "$0")/.env.local"
+if [ ! -f "$ENV_SRC" ]; then
+  ENV_SRC="/root/.env.local"
 fi
+if [ ! -f "$ENV_SRC" ]; then
+  echo "❌ .env.local not found. Upload it to /root/.env.local before running."
+  exit 1
+fi
+cp "$ENV_SRC" "$APP_DIR/.env.local"
 chmod 600 "$APP_DIR/.env.local"
 
-# --- Build ---
+# ── Build ─────────────────────────────────────────────────────────────────────
 npm install
 npm run build
+cp -r .next/static .next/standalone/.next/static
+cp -r public .next/standalone/public
+cp .env.local .next/standalone/.env.local
 
-# --- PM2 ---
-pm2 start npm --name "bodyandsleeves" -- start
+# ── ecosystem.config.js ───────────────────────────────────────────────────────
+node - << 'JSEOF'
+const fs = require('fs');
+const raw = fs.readFileSync('/var/www/bodyandsleeves/.env.local', 'utf8');
+const env = {};
+raw.split('\n').forEach(l => {
+  const m = l.match(/^([^#=]+)=(.*)/);
+  if (m) env[m[1].trim()] = m[2].trim();
+});
+env.APP_ROOT = '/var/www/bodyandsleeves';
+env.PM2_APP_NAME = 'bodyandsleeves';
+env.PORT = '3000';
+const config = 'module.exports = { apps: [{ name: "bodyandsleeves", script: ".next/standalone/server.js", interpreter: "node", cwd: "/var/www/bodyandsleeves", env: ' + JSON.stringify(env) + ' }] };';
+fs.writeFileSync('/var/www/bodyandsleeves/ecosystem.config.js', config);
+console.log('ecosystem.config.js written');
+JSEOF
+
+# ── PM2 ───────────────────────────────────────────────────────────────────────
+pm2 start ecosystem.config.js
 pm2 startup systemd -u root --hp /root
 pm2 save
 
-# --- Nginx config ---
+# ── Nginx ─────────────────────────────────────────────────────────────────────
 cat > /etc/nginx/sites-available/bodyandsleeves << EOF
 server {
     listen 80;
@@ -83,13 +98,58 @@ ln -sf /etc/nginx/sites-available/bodyandsleeves /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
 
-# --- HTTPS (Let's Encrypt) ---
-# Requires DNS for $DOMAIN + www.$DOMAIN to already point at this droplet.
-# Uncomment and set an email to enable:
+# ── Supabase Edge Functions ───────────────────────────────────────────────────
+# Read vars from .env.local
+source_env() {
+  local key=$1
+  grep "^${key}=" "$APP_DIR/.env.local" | cut -d'=' -f2- | tr -d '\r'
+}
+
+SUPABASE_ACCESS_TOKEN=$(source_env SUPABASE_ACCESS_TOKEN)
+SUPABASE_PROJECT_REF=$(source_env SUPABASE_PROJECT_REF)
+PRINTIFY_API_TOKEN=$(source_env PRINTIFY_API_TOKEN)
+PRINTIFY_SHOP_ID=$(source_env PRINTIFY_SHOP_ID)
+SITE_URL="https://$DOMAIN"
+
+if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$SUPABASE_PROJECT_REF" ]; then
+  echo "⚠️  SUPABASE_ACCESS_TOKEN or SUPABASE_PROJECT_REF not set — skipping edge function deployment."
+else
+  echo "Deploying Supabase edge functions..."
+
+  # Install Supabase CLI if not present
+  if ! command -v supabase &> /dev/null; then
+    npm install -g supabase
+  fi
+
+  cd "$APP_DIR"
+  export SUPABASE_ACCESS_TOKEN
+
+  supabase functions deploy printify-proxy printify-webhook stripe-checkout stripe-webhook \
+    --project-ref "$SUPABASE_PROJECT_REF"
+
+  # Set edge function secrets
+  supabase secrets set \
+    SITE_URL="$SITE_URL" \
+    PRINTIFY_SHOP_ID="$PRINTIFY_SHOP_ID" \
+    --project-ref "$SUPABASE_PROJECT_REF"
+
+  # Set Printify token separately to avoid shell interpolation issues
+  if [ -n "$PRINTIFY_API_TOKEN" ]; then
+    printf 'PRINTIFY_API_TOKEN=%s' "$PRINTIFY_API_TOKEN" > /tmp/printify_secret.env
+    supabase secrets set --env-file /tmp/printify_secret.env --project-ref "$SUPABASE_PROJECT_REF"
+    rm -f /tmp/printify_secret.env
+  fi
+
+  echo "✅ Edge functions deployed."
+fi
+
+# ── HTTPS (Let's Encrypt) ─────────────────────────────────────────────────────
+# Requires DNS for $DOMAIN to already point at this droplet.
+# Uncomment to enable:
 #   apt-get install -y certbot python3-certbot-nginx
 #   certbot --nginx -d "$DOMAIN" -d "www.$DOMAIN" \
 #     --non-interactive --agree-tos -m you@example.com --redirect
 
 echo ""
-echo "✅ Done. App running at http://$DOMAIN"
+echo "✅ Setup complete. App running at http://$DOMAIN"
 echo "   Run certbot (see commented block above) to enable HTTPS."

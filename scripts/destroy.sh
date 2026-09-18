@@ -20,7 +20,7 @@ fail() { echo -e "  ${RED}✗${NC} $1"; }
 hr()   { echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"; }
 
 hr
-echo -e "${RED}  Gender Apparel — DESTROY${NC}"
+echo -e "${RED}  Storefront — DESTROY${NC}"
 echo -e "  This will drop ALL app tables, including customer_profiles, and delete .env.live and .env.test."
 echo -e "  This cannot be undone."
 hr
@@ -30,16 +30,17 @@ read -rp "  Type DESTROY to confirm: " confirm
 
 SUPABASE_PROJECT_REF=$(env_get "SUPABASE_PROJECT_REF" "$ENV_LOCAL")
 SERVICE_ROLE_KEY=$(env_get "SUPABASE_SERVICE_ROLE_KEY" "$ENV_LOCAL")
-DB_PASSWORD=$(env_get "DB_PASSWORD" "$ENV_LOCAL")
+ACCESS_TOKEN=$(env_get "SUPABASE_ACCESS_TOKEN" "$ENV_LOCAL")
+DB_PASSWORD=$(env_get "SUPABASE_DATABASE_PASSWORD" "$ENV_LOCAL")
 
 DB_URL=""
 if command -v psql &>/dev/null && [[ -n "$DB_PASSWORD" ]]; then
-  DB_URL="postgresql://postgres.${SUPABASE_PROJECT_REF}:${DB_PASSWORD}@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
+  DB_URL="postgresql://postgres.${SUPABASE_PROJECT_REF}:${DB_PASSWORD}@aws-0-us-west-2.pooler.supabase.com:6543/postgres"
 fi
 
 echo ""
 echo "  Dropping all tables..."
-if run_sql_file "$SQL_DIR/03_destroy.sql" "$SUPABASE_PROJECT_REF" "$SERVICE_ROLE_KEY" "$DB_URL"; then
+if run_sql_file "$SQL_DIR/03_destroy.sql" "$SUPABASE_PROJECT_REF" "$SERVICE_ROLE_KEY" "$DB_URL" "$ACCESS_TOKEN"; then
   ok "All tables dropped"
 else
   fail "Destroy SQL failed"
@@ -47,8 +48,8 @@ else
 fi
 
 echo "  Removing .env.live and .env.test..."
-[[ -f "$ROOT_DIR/.env.live" ]] && rm "$ROOT_DIR/.env.live" && ok ".env.live deleted"
-[[ -f "$ROOT_DIR/.env.test" ]] && rm "$ROOT_DIR/.env.test" && ok ".env.test deleted"
+[[ -f "$ROOT_DIR/.env.live" ]] && rm "$ROOT_DIR/.env.live" && ok ".env.live deleted" || true
+[[ -f "$ROOT_DIR/.env.test" ]] && rm "$ROOT_DIR/.env.test" && ok ".env.test deleted" || true
 
 hr
 echo -e "${GREEN}  ✅ Destroy complete.${NC}"
