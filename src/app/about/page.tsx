@@ -26,7 +26,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AboutPage() {
-  const { data } = await supabase.from("settings").select("about_hero_settings, about_story_settings, about_mission_settings, about_culture_settings").limit(1).maybeSingle();
+  const { data } = await supabase.from("settings").select("about_hero_settings, about_story_settings, about_mission_settings, about_culture_settings, social_links").limit(1).maybeSingle();
   const about: AboutSettings = {
     ...DEFAULT_ABOUT_SETTINGS,
     ...((data?.about_hero_settings ?? {}) as Partial<AboutSettings>),
@@ -34,6 +34,12 @@ export default async function AboutPage() {
     ...((data?.about_mission_settings ?? {}) as Partial<AboutSettings>),
     ...((data?.about_culture_settings ?? {}) as Partial<AboutSettings>),
   };
+
+  type SocialEntry = { url: string; enabled: boolean };
+  const social = (data?.social_links ?? {}) as Record<string, SocialEntry>;
+  const emailHref = social.email?.enabled && social.email.url ? social.email.url : null;
+  const instagramUrl = social.instagram?.enabled && social.instagram.url ? social.instagram.url : null;
+  const instagramHandle = instagramUrl ? instagramUrl.replace(/.*instagram\.com\//, "@").replace(/\/$/, "") : null;
 
   return (
     <StorefrontLayout>
@@ -170,8 +176,12 @@ export default async function AboutPage() {
           <h2 className="text-2xl lg:text-3xl font-bold text-secondary-900 mb-4">Connect With Us</h2>
           <p className="text-secondary-500 mb-8">Have a question, a custom design idea, or just want to say hello?</p>
           <div className="flex flex-wrap gap-4 justify-center">
-            <a href="mailto:hello@your-store.example" className="btn-outline"><Mail size={20} className="mr-2" />hello@your-store.example</a>
-            <a href="https://@yourstore" target="_blank" rel="noopener noreferrer" className="btn-outline"><InstagramIcon size={20} /><span className="ml-2">@yourstore</span></a>
+            {emailHref && (
+              <a href={emailHref} className="btn-outline"><Mail size={20} className="mr-2" />{emailHref.replace("mailto:", "")}</a>
+            )}
+            {instagramUrl && (
+              <a href={instagramUrl} target="_blank" rel="noopener noreferrer" className="btn-outline"><InstagramIcon size={20} /><span className="ml-2">{instagramHandle}</span></a>
+            )}
           </div>
           <Link href="/shop" className="btn-gold mt-8 inline-flex">Shop the Collection</Link>
         </section>
