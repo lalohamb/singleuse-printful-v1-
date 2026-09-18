@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   const ALLOWED_EXTS = new Set(["jpg", "jpeg", "png", "gif", "webp", "avif", "svg"]);
   const rawExt = file.name.split(".").pop()?.toLowerCase() ?? "";
   if (!ALLOWED_EXTS.has(rawExt)) return NextResponse.json({ error: "Unsupported file type" }, { status: 400 });
-  const safeFolder = folder.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64) || "uploads";
+  const safeFolder = folder.replace(/[^a-zA-Z0-9_\-/]/g, "").replace(/\/+/g, "/").replace(/(^\/|\/+$)/g, "").slice(0, 128) || "uploads";
   const path = `${safeFolder}/${Date.now()}.${rawExt}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 

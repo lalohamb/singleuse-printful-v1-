@@ -7,7 +7,7 @@ import type { Category } from "@/types";
 import AppImage from "@/components/AppImage";
 
 const BUCKET = "store-images";
-const FOLDERS = ["uploads", "settings/hero", "settings/our-why", "settings/story"];
+const FOLDERS = ["uploads", "settings/hero", "settings/our-why", "settings/story", "settingshero", "settingsour-why", "settingsstory"];
 
 const DIR_OPTIONS = [
   { value: "bottom", label: "Bottom → Top" },

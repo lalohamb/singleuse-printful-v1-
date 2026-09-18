@@ -6,7 +6,7 @@ import ProtectedAdmin from "@/components/ProtectedAdmin";
 import AppImage from "@/components/AppImage";
 
 const BUCKET = "store-images";
-const FOLDERS = ["uploads", "settings/hero", "settings/our-why", "settings/story", "settings/logo"];
+const FOLDERS = ["uploads", "settings/hero", "settings/our-why", "settings/story", "settings/logo", "settingshero", "settingsour-why", "settingsstory", "settingslogo"];
 
 interface MediaFile {
   name: string;

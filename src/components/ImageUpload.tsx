@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import AppImage from "@/components/AppImage";
 
 const BUCKET = "store-images";
-const FOLDERS = ["uploads", "settings/hero", "settings/our-why", "settings/story", "settings/logo", "settings/about", "settings/popup"];
+const FOLDERS = ["uploads", "settings/hero", "settings/our-why", "settings/story", "settings/logo", "settings/about", "settings/popup", "settingshero", "settingsour-why", "settingsstory", "settingslogo"];
 
 
 interface MediaFile {
