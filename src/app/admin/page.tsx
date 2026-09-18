@@ -1,23 +1,28 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Lock, Mail, Loader2, ShieldCheck } from "lucide-react";
 import { useAdminAuth } from "@/lib/admin-auth";
 
 export default function AdminLoginPage() {
-  const { signIn } = useAdminAuth();
+  const { signIn, admin, loading } = useAdminAuth();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Redirect once admin is confirmed — avoids race with checkAdmin()
+  useEffect(() => {
+    if (!loading && admin) router.replace("/admin/dashboard");
+  }, [admin, loading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true); setError(null);
+    setSubmitting(true); setError(null);
     const { error } = await signIn(email, password);
-    if (error) { setError(error); setLoading(false); }
-    else router.push("/admin/dashboard");
+    if (error) { setError(error); setSubmitting(false); }
+    // on success: do nothing — useEffect above handles redirect once admin row is confirmed
   };
 
   return (
@@ -45,8 +50,8 @@ export default function AdminLoginPage() {
               </div>
             </div>
             {error && <div className="bg-error-50 border border-error-100 text-error-700 rounded-lg p-3 text-sm">{error}</div>}
-            <button type="submit" disabled={loading} className="btn-primary w-full">
-              {loading ? <><Loader2 size={20} className="mr-2 animate-spin" />Processing...</> : "Sign In"}
+            <button type="submit" disabled={submitting} className="btn-primary w-full">
+              {submitting ? <><Loader2 size={20} className="mr-2 animate-spin" />Verifying...</> : "Sign In"}
             </button>
           </form>
         </div>
