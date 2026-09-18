@@ -5,10 +5,12 @@ import { createClient } from "@supabase/supabase-js";
 import type { StoreSettings } from "@/types";
 import AppImage from "@/components/AppImage";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+}
 
 function InstagramIcon({ size = 22 }: { size?: number }) {
   return (
@@ -84,6 +86,7 @@ const DEFAULT_SOCIAL: StoreSettings["social_links"] = {
 };
 
 export default async function Footer() {
+  const supabase = getSupabase();
   const { data } = await supabase.from("settings").select("social_links, logo_url, logo_size, footer_logo_url, footer_logo_size, footer_text, footer_bottom_message, affiliate_program_enabled").limit(1).maybeSingle();
   const social: StoreSettings["social_links"] = data?.social_links ?? DEFAULT_SOCIAL;
   const logoUrl = data?.footer_logo_url || data?.logo_url || "/store-logo-placeholder.svg";
