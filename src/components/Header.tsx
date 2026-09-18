@@ -31,11 +31,23 @@ export default function Header() {
   } as const;
 
   useEffect(() => {
-    supabase.from("settings").select("*").limit(1).maybeSingle().then(({ data }) => { if (data) setSettings(data as StoreSettings); });
+    const fetchSettings = () =>
+      supabase.from("settings").select("*").limit(1).maybeSingle().then(({ data }) => { if (data) setSettings(data as StoreSettings); });
+
+    fetchSettings();
     supabase.from("categories").select("*").order("name").then(({ data }) => { if (data) setCategories(data as Category[]); });
+
+    const channel = supabase
+      .channel("header-settings")
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "settings" }, () => fetchSettings())
+      .subscribe();
+
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener("scroll", onScroll);
+    };
   }, []);
 
   return (

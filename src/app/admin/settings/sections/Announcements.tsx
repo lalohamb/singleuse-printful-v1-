@@ -41,7 +41,11 @@ export default function Announcements() {
       newsletter_group_id: form.newsletter_group_id,
       updated_at: new Date().toISOString(),
     }).eq("id", form.id);
-    if (!err) { setSaved(true); setTimeout(() => setSaved(false), 2000); }
+    if (!err) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      fetch("/api/revalidate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths: ["/"] }) });
+    }
   };
 
   const insertEmoji = (emoji: string) => {
