@@ -10,8 +10,6 @@ export const metadata: Metadata = {
   description: "Refund and returns policy.",
 };
 
-const EMAIL = "hello@your-store.example";
-
 const FALLBACK = `Our refund and returns policy lasts 30 days from purchase. If 30 days have passed, we can't offer a full refund or exchange.
 
 Eligibility
@@ -41,8 +39,13 @@ export default async function RefundPolicyPage() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
-  const { data } = await supabase.from("policies").select("content").eq("id", "refund").maybeSingle();
-  const content = data?.content || DEFAULT_POLICY_CONTENT.refund || FALLBACK;
+  const [{ data: policyData }, { data: settingsData }] = await Promise.all([
+    supabase.from("policies").select("content").eq("id", "refund").maybeSingle(),
+    supabase.from("settings").select("social_links").maybeSingle(),
+  ]);
+  const content = policyData?.content || DEFAULT_POLICY_CONTENT.refund || FALLBACK;
+  const emailEntry = (settingsData?.social_links as Record<string, { url: string; enabled: boolean }> | null)?.email;
+  const email = emailEntry?.enabled ? emailEntry.url : null;
 
   return (
     <StorefrontLayout>
@@ -52,11 +55,13 @@ export default async function RefundPolicyPage() {
         </p>
         <h1 className="text-3xl lg:text-4xl font-bold text-secondary-900 mb-10">Refund and Returns Policy</h1>
         <div className="prose prose-sm max-w-none text-secondary-600 leading-relaxed [&_p]:mb-4 [&_h2]:mt-8 [&_h2]:mb-3" dangerouslySetInnerHTML={{ __html: content }} />
-        <div className="mt-12 bg-secondary-50 rounded-xl p-6">
-          <h2 className="text-xl font-semibold text-secondary-900 mb-3">Need Help?</h2>
-          <p className="mb-4">Contact us for questions related to refunds and returns.</p>
-          <a href={`mailto:${EMAIL}`} className="inline-flex items-center gap-2 btn-outline"><Mail size={18} />{EMAIL}</a>
-        </div>
+        {email && (
+          <div className="mt-12 bg-secondary-50 rounded-xl p-6">
+            <h2 className="text-xl font-semibold text-secondary-900 mb-3">Need Help?</h2>
+            <p className="mb-4">Contact us for questions related to refunds and returns.</p>
+            <a href={`mailto:${email}`} className="inline-flex items-center gap-2 btn-outline"><Mail size={18} />{email}</a>
+          </div>
+        )}
       </div>
     </StorefrontLayout>
   );

@@ -10,8 +10,6 @@ export const metadata: Metadata = {
   description: "Privacy Policy.",
 };
 
-const EMAIL = "hello@your-store.example";
-
 const FALLBACK = `Your Store ("we," "us," "our") is committed to protecting your privacy. This policy explains how we collect, use, and protect your information.
 
 Information We Collect
@@ -50,8 +48,13 @@ export default async function PrivacyPolicyPage() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
-  const { data } = await supabase.from("policies").select("content").eq("id", "privacy").maybeSingle();
-  const content = data?.content || DEFAULT_POLICY_CONTENT.privacy || FALLBACK;
+  const [{ data: policyData }, { data: settingsData }] = await Promise.all([
+    supabase.from("policies").select("content").eq("id", "privacy").maybeSingle(),
+    supabase.from("settings").select("social_links").maybeSingle(),
+  ]);
+  const content = policyData?.content || DEFAULT_POLICY_CONTENT.privacy || FALLBACK;
+  const emailEntry = (settingsData?.social_links as Record<string, { url: string; enabled: boolean }> | null)?.email;
+  const email = emailEntry?.enabled ? emailEntry.url : null;
 
   return (
     <StorefrontLayout>
@@ -61,11 +64,13 @@ export default async function PrivacyPolicyPage() {
         </p>
         <h1 className="text-3xl lg:text-4xl font-bold text-secondary-900 mb-10">Privacy Policy</h1>
         <div className="prose prose-sm max-w-none text-secondary-600 leading-relaxed [&_p]:mb-4 [&_h2]:mt-8 [&_h2]:mb-3" dangerouslySetInnerHTML={{ __html: content }} />
-        <div className="mt-12 bg-secondary-50 rounded-xl p-6">
-          <h2 className="text-xl font-semibold text-secondary-900 mb-3">Contact Us</h2>
-          <p className="mb-4">Questions about this Privacy Policy? Reach out to us.</p>
-          <a href={`mailto:${EMAIL}`} className="inline-flex items-center gap-2 btn-outline"><Mail size={18} />{EMAIL}</a>
-        </div>
+        {email && (
+          <div className="mt-12 bg-secondary-50 rounded-xl p-6">
+            <h2 className="text-xl font-semibold text-secondary-900 mb-3">Contact Us</h2>
+            <p className="mb-4">Questions about this Privacy Policy? Reach out to us.</p>
+            <a href={`mailto:${email}`} className="inline-flex items-center gap-2 btn-outline"><Mail size={18} />{email}</a>
+          </div>
+        )}
       </div>
     </StorefrontLayout>
   );

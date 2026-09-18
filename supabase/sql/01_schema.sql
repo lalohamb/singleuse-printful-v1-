@@ -496,6 +496,35 @@ INSERT INTO products (title, description, category_id, price, cost, image_url, i
   )
 ON CONFLICT (printify_id) DO NOTHING;
 
+-- ============ POLICIES ============
+CREATE TABLE IF NOT EXISTS policies (
+  id text PRIMARY KEY,
+  title text NOT NULL,
+  content text,
+  locked boolean NOT NULL DEFAULT false,
+  updated_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE policies ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "public_read_policies" ON policies;
+CREATE POLICY "public_read_policies" ON policies FOR SELECT
+  TO anon, authenticated USING (true);
+
+DROP POLICY IF EXISTS "admin_upsert_policies" ON policies;
+CREATE POLICY "admin_upsert_policies" ON policies FOR INSERT
+  TO authenticated WITH CHECK (
+    EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "admin_update_policies" ON policies;
+CREATE POLICY "admin_update_policies" ON policies FOR UPDATE
+  TO authenticated USING (
+    EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid())
+  ) WITH CHECK (
+    EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid())
+  );
+
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
 CREATE INDEX IF NOT EXISTS idx_products_status ON products(status);
 CREATE INDEX IF NOT EXISTS idx_products_featured ON products(featured);
