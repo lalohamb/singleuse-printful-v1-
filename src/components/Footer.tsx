@@ -92,8 +92,6 @@ export default async function Footer() {
   const logoSize = data?.footer_logo_size ?? data?.logo_size ?? 40;
   const footerText = data?.footer_text || "Made-to-order apparel designed for every body, every style, and every day. Wear what feels like you.";
   const footerBottomMessage = data?.footer_bottom_message || "Made to order. Made with love.";
-  const affiliateEnabled = false;
-
   return (
     <footer className="bg-secondary-900 text-secondary-300 mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
