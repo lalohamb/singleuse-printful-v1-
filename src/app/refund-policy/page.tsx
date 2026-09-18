@@ -5,6 +5,8 @@ import StorefrontLayout from "@/components/StorefrontLayout";
 import { createClient } from "@supabase/supabase-js";
 import { DEFAULT_POLICY_CONTENT } from "@/lib/policy-content";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Refund and Returns Policy",
   description: "Refund and returns policy.",
