@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Mail } from "lucide-react";
-import NewsletterSignup from "@/components/NewsletterSignup";
 import { createClient } from "@supabase/supabase-js";
 import type { StoreSettings } from "@/types";
 import AppImage from "@/components/AppImage";
@@ -149,9 +148,6 @@ export default async function Footer() {
               )}
             </ul>
           </div>
-        </div>
-        <div className="border-t border-secondary-700 mt-12 pt-10">
-          <NewsletterSignup variant="footer" />
         </div>
         <div className="border-t border-secondary-700 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-sm text-secondary-500">&copy; {new Date().getFullYear()} Your Store. All rights reserved.</p>
