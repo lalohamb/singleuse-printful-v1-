@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSettings } from "./useSettings";
 import { SaveBar } from "./SaveBar";
 import { DEFAULT_NEW_ARRIVALS_SETTINGS, type NewArrivalsSettings } from "@/lib/new-arrivals-settings";
@@ -8,6 +8,10 @@ export default function NewArrivals() {
   const { form, save, saved, error } = useSettings();
   const [s, setS] = useState<NewArrivalsSettings>(DEFAULT_NEW_ARRIVALS_SETTINGS);
   const upd = <K extends keyof NewArrivalsSettings>(k: K, v: NewArrivalsSettings[K]) => setS((prev) => ({ ...prev, [k]: v }));
+
+  useEffect(() => {
+    if (form?.new_arrivals_settings) setS({ ...DEFAULT_NEW_ARRIVALS_SETTINGS, ...(form.new_arrivals_settings as Partial<NewArrivalsSettings>) });
+  }, [form?.new_arrivals_settings]);
 
   return (
     <div className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6 space-y-4">

@@ -27,6 +27,10 @@ export default function About() {
   const [about, setAboutState] = useState<AboutSettings>({ ...DEFAULT_ABOUT_SETTINGS });
   const [savedSection, setSavedSection] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (form?.about_settings) setAboutState({ ...DEFAULT_ABOUT_SETTINGS, ...(form.about_settings as Partial<AboutSettings>) });
+  }, [form?.about_settings]);
+
   const setAbout = <K extends keyof AboutSettings>(key: K, value: AboutSettings[K]) =>
     setAboutState((prev) => ({ ...prev, [key]: value }));
 

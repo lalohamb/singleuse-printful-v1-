@@ -45,7 +45,11 @@ export default function NewsletterPopup() {
 
   const handleSave = async () => {
     const { error: err } = await supabase.from("settings").update({ popup_settings: form.popup_settings, updated_at: new Date().toISOString() }).eq("id", form.id);
-    if (!err) { setSaved(true); setTimeout(() => setSaved(false), 2000); }
+    if (!err) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      fetch("/api/revalidate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths: ["/"] }) });
+    }
   };
 
   const x = ps.imgX ?? 0;

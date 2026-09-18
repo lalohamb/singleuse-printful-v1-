@@ -30,6 +30,10 @@ export default function HomepageHero() {
   const [emojiOpen, setEmojiOpen] = useState(false);
   const affirmationRef = useRef<HTMLTextAreaElement>(null);
 
+  useEffect(() => {
+    if (form?.affirmations_settings) setAffirmations({ ...DEFAULT_AFFIRMATIONS_SETTINGS, ...(form.affirmations_settings as Partial<AffirmationsSettings>) });
+  }, [form?.affirmations_settings]);
+
   const pos = (form.hero_object_position || "0px 0px").replace(/px/g, "").split(" ");
   const x = parseInt(pos[0]) || 0;
   const y = parseInt(pos[1]) || 0;

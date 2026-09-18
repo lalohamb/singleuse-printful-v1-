@@ -7,10 +7,14 @@ import { supabase } from "@/lib/supabase";
 import type { Category } from "@/types";
 
 export default function AdminMenu() {
-  const { save, saved, error } = useSettings();
+  const { save, saved, error, form } = useSettings();
   const [s, setS] = useState<SiteMenuSettings>(DEFAULT_SITE_MENU_SETTINGS);
   const [categories, setCategories] = useState<Category[]>([]);
   const upd = <K extends keyof SiteMenuSettings>(k: K, v: SiteMenuSettings[K]) => setS((prev) => ({ ...prev, [k]: v }));
+
+  useEffect(() => {
+    if (form?.site_menu_settings) setS({ ...DEFAULT_SITE_MENU_SETTINGS, ...(form.site_menu_settings as Partial<SiteMenuSettings>) });
+  }, [form?.site_menu_settings]);
 
   useEffect(() => {
     supabase.from("categories").select("id, name, slug").order("name").then(({ data }) => {
