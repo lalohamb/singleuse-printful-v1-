@@ -322,6 +322,7 @@ CREATE TABLE IF NOT EXISTS settings (
   stripe_live_webhook_secret text,
   stripe_test_secret_key text,
   stripe_test_webhook_secret text,
+  newsletter_group_id text,
   updated_at timestamptz DEFAULT now()
 );
 
