@@ -14,7 +14,10 @@ import Social from "./sections/Social";
 import Integrations from "./sections/Integrations";
 import Announcements from "./sections/Announcements";
 import NewsletterPopup from "./sections/NewsletterPopup";
-import About from "./sections/About";
+import AboutHero from "./sections/AboutHero";
+import AboutStory from "./sections/AboutStory";
+import AboutMission from "./sections/AboutMission";
+import AboutCulture from "./sections/AboutCulture";
 
 const TITLES: Record<string, string> = {
   "store-information": "Store Information",
@@ -28,7 +31,10 @@ const TITLES: Record<string, string> = {
   "customer-love":     "Customer Love",
   announcements:       "Announcements",
   "newsletter-popup":  "Newsletter Popup",
-  about:               "About, Mission & Culture",
+  "about-hero":        "About — Hero",
+  "about-story":       "About — Story",
+  "about-mission":     "About — Mission",
+  "about-culture":     "About — Culture",
   footer:              "Footer",
   integrations:        "Integrations",
   social:              "Social Links",
@@ -46,7 +52,10 @@ const SECTIONS: Record<string, React.ComponentType> = {
   "customer-love":     CustomerLove,
   announcements:       Announcements,
   "newsletter-popup":  NewsletterPopup,
-  about:               About,
+  "about-hero":        AboutHero,
+  "about-story":       AboutStory,
+  "about-mission":     AboutMission,
+  "about-culture":     AboutCulture,
   footer:              Footer,
   integrations:        Integrations,
   social:              Social,

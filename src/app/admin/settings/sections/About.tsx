@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Check, Save } from "lucide-react";
 import ImageUpload from "@/components/ImageUpload";
 import { supabase } from "@/lib/supabase";
@@ -35,8 +35,11 @@ export default function About() {
     setAboutState((prev) => ({ ...prev, [key]: value }));
 
   const saveSection = async (sectionKey: string, keys: (keyof AboutSettings)[]) => {
+    // Read-modify-write: fetch current DB value so saving one section never clobbers another
+    const { data } = await supabase.from("settings").select("about_settings").eq("id", form.id).single();
+    const current = { ...DEFAULT_ABOUT_SETTINGS, ...((data?.about_settings ?? {}) as Partial<AboutSettings>) };
     const partial = keys.reduce((acc, k) => ({ ...acc, [k]: about[k] }), {} as Partial<AboutSettings>);
-    const merged = { ...about, ...partial };
+    const merged = { ...current, ...partial };
     await supabase.from("settings").update({ about_settings: merged, updated_at: new Date().toISOString() }).eq("id", form.id);
     setSavedSection(sectionKey);
     fetch("/api/revalidate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths: ["/about"] }) });
@@ -110,6 +113,24 @@ export default function About() {
         <div><label className="label-text">Closing Quote</label><input value={about.storyQuote} onChange={(e) => setAbout("storyQuote", e.target.value)} className="input-field" /></div>
         <div><label className="label-text">Quote Credit</label><input value={about.storyQuoteCredit} onChange={(e) => setAbout("storyQuoteCredit", e.target.value)} className="input-field" /></div>
         <ImageUpload label="Story Image" value={about.storyImageUrl} onChange={(url) => setAbout("storyImageUrl", url)} folder="settings/about" preview={false} />
+        {about.storyImageUrl && (() => {
+          const pos = (about.storyObjectPosition || "50% 20%").replace(/%/g, "").split(" ");
+          const x = parseInt(pos[0]) || 50;
+          const y = parseInt(pos[1]) || 20;
+          const setPos = (nx: number, ny: number) => setAbout("storyObjectPosition", `${nx}% ${ny}%`);
+          return (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3"><span className="text-xs text-secondary-500 w-16">X: {x}%</span><input type="range" min={0} max={100} value={x} onChange={(e) => setPos(Number(e.target.value), y)} className="flex-1 accent-gold-500" /></div>
+              <div className="flex items-center gap-3"><span className="text-xs text-secondary-500 w-16">Y: {y}%</span><input type="range" min={0} max={100} value={y} onChange={(e) => setPos(x, Number(e.target.value))} className="flex-1 accent-gold-500" /></div>
+              <div className="flex items-center gap-3"><span className="text-xs text-secondary-500 w-24">Zoom: {about.storyImageScale ?? 100}%</span><input type="range" min={10} max={200} value={about.storyImageScale ?? 100} onChange={(e) => setAbout("storyImageScale", Number(e.target.value))} className="flex-1 accent-gold-500" /></div>
+              <div className="flex items-center gap-2">
+                {["cover", "contain"].map((v) => <button key={v} type="button" onClick={() => setAbout("storyImageFit", v)} className={`text-xs px-3 py-1 rounded border capitalize ${(about.storyImageFit || "cover") === v ? "bg-gold-500 text-white border-gold-500" : "border-secondary-300"}`}>{v}</button>)}
+                <button type="button" onClick={() => setAbout("storyImageFlip", !about.storyImageFlip)} className={`text-xs px-3 py-1 rounded border ${about.storyImageFlip ? "bg-gold-500 text-white border-gold-500" : "border-secondary-300"}`}>Flip</button>
+                <button type="button" onClick={() => { setAbout("storyObjectPosition", "50% 20%"); setAbout("storyImageScale", 100); setAbout("storyImageFlip", false); setAbout("storyImageFit", "cover"); }} className="btn-outline py-1 text-xs">Reset</button>
+              </div>
+            </div>
+          );
+        })()}
         <div className="grid grid-cols-2 gap-3">
           <div><label className="label-text">Caption</label><input value={about.storyImageCaption} onChange={(e) => setAbout("storyImageCaption", e.target.value)} className="input-field" /></div>
           <div><label className="label-text">Subcaption</label><input value={about.storyImageSubcaption} onChange={(e) => setAbout("storyImageSubcaption", e.target.value)} className="input-field" /></div>

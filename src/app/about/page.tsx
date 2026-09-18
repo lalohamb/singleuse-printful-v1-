@@ -26,10 +26,14 @@ export const metadata: Metadata = {
 };
 
 export default async function AboutPage() {
-  const { data } = await supabase.from("settings").select("about_settings").limit(1).maybeSingle();
-  const about = { ...DEFAULT_ABOUT_SETTINGS, ...Object.fromEntries(
-    Object.entries((data?.about_settings || {}) as Partial<AboutSettings>).filter(([, v]) => v !== "" && v !== null && v !== undefined)
-  ) };
+  const { data } = await supabase.from("settings").select("about_hero_settings, about_story_settings, about_mission_settings, about_culture_settings").limit(1).maybeSingle();
+  const about: AboutSettings = {
+    ...DEFAULT_ABOUT_SETTINGS,
+    ...((data?.about_hero_settings ?? {}) as Partial<AboutSettings>),
+    ...((data?.about_story_settings ?? {}) as Partial<AboutSettings>),
+    ...((data?.about_mission_settings ?? {}) as Partial<AboutSettings>),
+    ...((data?.about_culture_settings ?? {}) as Partial<AboutSettings>),
+  };
 
   return (
     <StorefrontLayout>
