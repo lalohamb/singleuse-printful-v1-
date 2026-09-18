@@ -38,7 +38,7 @@ raw.split('\n').forEach(l => {
 env.APP_ROOT = '/var/www/bodyandsleeves';
 env.PM2_APP_NAME = 'bodyandsleeves';
 env.PORT = '3000';
-const config = 'module.exports = { apps: [{ name: "bodyandsleeves", script: ".next/standalone/server.js", interpreter: "node", cwd: "/var/www/bodyandsleeves", env: ' + JSON.stringify(env) + ' }] };';
+const config = 'module.exports = { apps: [{ name: "bodyandsleeves", script: "server.js", interpreter: "node", cwd: "/var/www/bodyandsleeves/.next/standalone", env: ' + JSON.stringify(env) + ' }] };';
 fs.writeFileSync('/var/www/bodyandsleeves/ecosystem.config.js', config);
 console.log('ecosystem.config.js written');
 JSEOF
