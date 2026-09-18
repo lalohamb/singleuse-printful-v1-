@@ -287,8 +287,7 @@ function StripeDashboard() {
       // Always reset orderMap so stale IDs from previous mode don't persist
       const piIds = chargeList.map((c) => c.payment_intent).filter(Boolean) as string[];
       if (piIds.length) {
-        const { createClient } = await import("@supabase/supabase-js");
-        const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+        const { supabase: sb } = await import("@/lib/supabase");
         const { data: orders } = await sb.from("orders").select("id, stripe_payment_intent_id").in("stripe_payment_intent_id", piIds);
         const map: Record<string, string> = {};
         for (const o of orders || []) map[o.stripe_payment_intent_id] = o.id;
