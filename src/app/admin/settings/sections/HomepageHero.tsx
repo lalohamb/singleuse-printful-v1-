@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import ImageUpload from "@/components/ImageUpload";
 import ProductImagePicker from "../ProductImagePicker";
 import { useSettings } from "./useSettings";
@@ -9,7 +9,6 @@ import {
   DEFAULT_AFFIRMATIONS_SETTINGS,
   type AffirmationsSettings,
 } from "@/lib/affirmations-settings";
-import { useRef } from "react";
 
 const AFFIRMATION_EMOJIS = [
   { label: "Business", icons: ["✨","💎","⭐","🏆","✅","💯","🛍️","🛒","🎁","🏷️","💸","🔥","⚡","📦","🚚","🧵","♻️","🛡️","💬","📩"] },

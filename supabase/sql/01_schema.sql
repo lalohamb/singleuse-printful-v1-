@@ -498,3 +498,33 @@ CREATE INDEX IF NOT EXISTS idx_products_featured ON products(featured);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_email ON orders(email);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
+
+-- ============ STORAGE ============
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'store-images',
+  'store-images',
+  true,
+  5242880,
+  ARRAY['image/jpeg','image/png','image/webp','image/gif','image/avif','image/svg+xml']
+) ON CONFLICT (id) DO NOTHING;
+
+DROP POLICY IF EXISTS "public_read_store_images" ON storage.objects;
+CREATE POLICY "public_read_store_images" ON storage.objects
+  FOR SELECT TO anon, authenticated
+  USING (bucket_id = 'store-images');
+
+DROP POLICY IF EXISTS "admin_upload_store_images" ON storage.objects;
+CREATE POLICY "admin_upload_store_images" ON storage.objects
+  FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'store-images' AND EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()));
+
+DROP POLICY IF EXISTS "admin_update_store_images" ON storage.objects;
+CREATE POLICY "admin_update_store_images" ON storage.objects
+  FOR UPDATE TO authenticated
+  USING (bucket_id = 'store-images' AND EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()));
+
+DROP POLICY IF EXISTS "admin_delete_store_images" ON storage.objects;
+CREATE POLICY "admin_delete_store_images" ON storage.objects
+  FOR DELETE TO authenticated
+  USING (bucket_id = 'store-images' AND EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()));

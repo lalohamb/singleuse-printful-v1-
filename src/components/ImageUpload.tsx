@@ -47,7 +47,7 @@ export default function ImageUpload({ value, onChange, folder = "uploads", label
 
   const openPicker = () => {
     setPickerOpen(true);
-    if (media.length === 0) fetchMedia();
+    fetchMedia();
   };
 
   const handleFile = async (file: File) => {
