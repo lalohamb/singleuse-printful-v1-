@@ -15,5 +15,6 @@ export async function POST(req: Request) {
     .slice(0, 20);
   if (paths.length === 0) return NextResponse.json({ error: "No valid paths" }, { status: 400 });
   for (const p of paths) revalidatePath(p);
+  revalidatePath("/", "layout");
   return NextResponse.json({ revalidated: true, paths });
 }
