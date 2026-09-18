@@ -323,6 +323,8 @@ CREATE TABLE IF NOT EXISTS settings (
   stripe_test_secret_key text,
   stripe_test_webhook_secret text,
   newsletter_group_id text,
+  popup_settings jsonb,
+  orders_paused boolean DEFAULT false,
   updated_at timestamptz DEFAULT now()
 );
 
