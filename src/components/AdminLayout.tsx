@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { LayoutDashboard, Package, ShoppingBag, LogOut, Menu, FolderTree, ExternalLink, Mail, CreditCard, Send, Search, Truck, Image, FileText, AlertTriangle, Palette, Home, Users, PanelBottom, Plug, Share2, Megaphone, Store, Sparkles, BarChart3, Heart, BookOpen, MessageCircle, Link2, DollarSign } from "lucide-react";
 import { useAdminAuth } from "@/lib/admin-auth";
-import { supabase } from "@/lib/supabase";
+import { supabase, resolveStorageUrl } from "@/lib/supabase";
 import AppImage from "@/components/AppImage";
 
 const navItems = [
@@ -59,7 +59,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       if (data?.store_name) setStoreName(data.store_name);
       // Only use logo_url if it's a real uploaded URL, not a default placeholder
       const url = data?.logo_url;
-      if (url && !url.includes("store-logo-placeholder") && !url.includes("logo.png")) setLogoUrl(url);
+      if (url && !url.includes("store-logo-placeholder") && !url.includes("logo.png")) setLogoUrl(resolveStorageUrl(url));
     });
   }, []);
 

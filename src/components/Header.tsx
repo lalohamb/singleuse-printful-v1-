@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ShoppingBag, Menu, X, Search, UserCircle } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { useCustomerAuth } from "@/lib/customer-auth";
-import { supabase } from "@/lib/supabase";
+import { supabase, resolveStorageUrl } from "@/lib/supabase";
 import type { StoreSettings, Category } from "@/types";
 import { DEFAULT_SITE_MENU_SETTINGS, type SiteMenuSettings } from "@/lib/site-menu-settings";
 import AppImage from "@/components/AppImage";
@@ -64,7 +64,7 @@ export default function Header() {
               </button>
               <Link href="/" className="flex items-center gap-2">
                 {settings?.logo_url ? (
-                  <AppImage src={settings.logo_url} alt={settings.store_name || "Your Store"} width={240} height={80} style={{ height: `${settings.logo_size ?? 40}px`, width: "auto" }} />
+                  <AppImage src={resolveStorageUrl(settings.logo_url)} alt={settings.store_name || "Your Store"} width={240} height={80} style={{ height: `${settings.logo_size ?? 40}px`, width: "auto" }} />
                 ) : (
                   <AppImage src="/store-logo-placeholder.svg" alt="Your Store" width={240} height={80} style={{ height: `${settings?.logo_size ?? 40}px`, width: "auto" }} />
                 )}

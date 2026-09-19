@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { X, ArrowRight, Check, Loader2 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase, resolveStorageUrl } from "@/lib/supabase";
 import AppImage from "@/components/AppImage";
 
 interface PopupSettings {
@@ -125,7 +125,7 @@ export default function NewsletterPopup() {
         body: data.popup_settings.body || "New drops, exclusive offers, and culture — straight to your inbox.",
         ctaLabel: data.popup_settings.ctaLabel || "Subscribe",
         bgColor: data.popup_settings.bgColor || "#111111",
-        imageUrl: sanitizeImageUrl(data.popup_settings.imageUrl || "/hero-placeholder.svg"),
+        imageUrl: sanitizeImageUrl(resolveStorageUrl(data.popup_settings.imageUrl) || "/hero-placeholder.svg"),
         groupId: data.popup_settings.groupId || "",
         position: data.popup_settings.position || "right",
         imgX: data.popup_settings.imgX ?? 0,
