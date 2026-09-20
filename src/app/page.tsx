@@ -79,6 +79,7 @@ const TEMPLATE_SETTINGS: StoreSettings = {
     email: { url: "mailto:hello@your-store.example", enabled: true },
   },
   site_menu_settings: null,
+  feature_strip_settings: null,
 };
 
 const TEMPLATE_CATEGORIES: Category[] = [
