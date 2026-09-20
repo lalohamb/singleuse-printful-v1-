@@ -89,7 +89,7 @@ const DEFAULT_SOCIAL: StoreSettings["social_links"] = {
 export default async function Footer() {
   noStore();
   const supabase = getSupabase();
-  const { data } = await supabase.from("settings").select("social_links, logo_url, logo_size, footer_logo_url, footer_logo_size, footer_text, footer_bottom_message").limit(1).maybeSingle();
+  const { data } = await supabase.from("settings").select("store_name, social_links, logo_url, logo_size, footer_logo_url, footer_logo_size, footer_text, footer_bottom_message").limit(1).maybeSingle();
   const social: StoreSettings["social_links"] = data?.social_links ?? DEFAULT_SOCIAL;
   const logoUrl = resolveStorageUrl(data?.footer_logo_url || data?.logo_url) || "/store-logo-placeholder.svg";
   const logoSize = data?.footer_logo_size ?? data?.logo_size ?? 40;
@@ -149,7 +149,7 @@ export default async function Footer() {
           </div>
         </div>
         <div className="border-t border-secondary-700 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-secondary-500">&copy; {new Date().getFullYear()} Your Store. All rights reserved.</p>
+          <p className="text-sm text-secondary-500">&copy; {new Date().getFullYear()} {data?.store_name || "Your Store"}. All rights reserved.</p>
           <p className="text-sm text-secondary-500">Powered by <a href="https://Atlascloudhosting.com" target="" rel="noopener noreferrer" className="hover:text-white transition-colors">Atlas Cloud Hosting</a>.</p>
           <p className="text-sm text-secondary-500">{footerBottomMessage}</p>
         </div>
