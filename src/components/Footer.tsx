@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Mail } from "lucide-react";
 import Image from "next/image";
 import { createClient } from "@supabase/supabase-js";
-import { resolveStorageUrl } from "@/lib/supabase";
+import { resolveStorageUrl } from "@/lib/storage";
 import type { StoreSettings } from "@/types";
 
 function getSupabase() {

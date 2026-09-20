@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { LayoutDashboard, Package, ShoppingBag, LogOut, Menu, FolderTree, ExternalLink, Mail, CreditCard, Send, Search, Truck, Image, FileText, AlertTriangle, Palette, Home, Users, PanelBottom, Plug, Share2, Megaphone, Store, Sparkles, BarChart3, Heart, BookOpen, MessageCircle, Link2, DollarSign } from "lucide-react";
 import { useAdminAuth } from "@/lib/admin-auth";
-import { supabase, resolveStorageUrl } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
+import { resolveStorageUrl } from "@/lib/storage";
 import AppImage from "@/components/AppImage";
 
 const navItems = [

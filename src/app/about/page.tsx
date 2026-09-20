@@ -4,7 +4,7 @@ import { Heart, Sparkles, Users, Globe, Mail, Quote } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
 import { DEFAULT_ABOUT_SETTINGS, DEFAULT_MISSION_CARDS, DEFAULT_CULTURE_CARDS, type AboutSettings } from "@/lib/about-settings";
 import AppImage from "@/components/AppImage";
-import { resolveStorageUrl } from "@/lib/supabase";
+import { resolveStorageUrl } from "@/lib/storage";
 
 function InstagramIcon({ size = 20 }: { size?: number }) {
   return (

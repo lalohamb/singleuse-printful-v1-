@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { X, ArrowRight, Check, Loader2 } from "lucide-react";
-import { supabase, resolveStorageUrl } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
+import { resolveStorageUrl } from "@/lib/storage";
 import AppImage from "@/components/AppImage";
 
 interface PopupSettings {
