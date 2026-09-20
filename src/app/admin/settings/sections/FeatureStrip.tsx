@@ -1,8 +1,74 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSettings } from "./useSettings";
 import { SaveBar } from "./SaveBar";
 import { DEFAULT_FEATURE_STRIP_SETTINGS, type FeatureStripItem, type FeatureStripSettings } from "@/lib/feature-strip-settings";
+
+const EMOJI_CATEGORIES: { label: string; emojis: string[] }[] = [
+  { label: "Popular", emojis: ["✨","🔥","💫","⭐","🌟","💥","🎉","🎊","💎","🏆","🥇","🎯","💡","🚀","⚡","🌈","❤️","💜","💚","💙"] },
+  { label: "Shopping", emojis: ["🛍️","🛒","👜","👛","💳","🏷️","📦","🎁","🚚","🔄","↩️","✅","🔒","🛡️","💯","🤝","📋","📝","🔖","📌"] },
+  { label: "Fashion", emojis: ["👕","👗","👔","🧥","🧣","🧤","🧢","👒","👟","👠","👡","👢","💍","💄","🪞","🧵","🪡","✂️","🎀","👑"] },
+  { label: "Nature", emojis: ["🌿","🌱","🍃","🌸","🌺","🌻","🌼","🍀","🌲","🌳","🌊","☀️","🌙","⭐","🌍","♻️","🌿","🍂","🍁","🌾"] },
+  { label: "Symbols", emojis: ["✔️","❌","⚠️","ℹ️","➕","➖","🔑","🔓","📣","📢","💬","📞","📧","🔔","⏰","📍","🗺️","🏠","🏪","🏬"] },
+];
+
+function EmojiPicker({ value, onChange }: { value: string; onChange: (e: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState(0);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="text-2xl w-12 h-10 flex items-center justify-center border border-secondary-200 rounded-lg hover:bg-secondary-50 transition-colors"
+        title="Pick emoji"
+      >
+        {value || "😀"}
+      </button>
+      {open && (
+        <div className="absolute z-50 top-12 left-0 w-72 bg-white border border-secondary-200 rounded-xl shadow-xl p-3 space-y-2">
+          <div className="flex gap-1 flex-wrap">
+            {EMOJI_CATEGORIES.map((cat, idx) => (
+              <button
+                key={cat.label}
+                type="button"
+                onClick={() => setTab(idx)}
+                className={`px-2 py-0.5 text-xs rounded-full border transition-colors ${
+                  tab === idx ? "bg-secondary-900 text-white border-secondary-900" : "border-secondary-200 text-secondary-600 hover:bg-secondary-50"
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-8 gap-1 max-h-40 overflow-y-auto">
+            {EMOJI_CATEGORIES[tab].emojis.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => { onChange(emoji); setOpen(false); }}
+                className={`text-xl w-8 h-8 flex items-center justify-center rounded hover:bg-secondary-100 transition-colors ${
+                  value === emoji ? "bg-secondary-200" : ""
+                }`}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function FeatureStrip() {
   const { form, save, saved, error } = useSettings();
@@ -76,7 +142,10 @@ export default function FeatureStrip() {
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="label-text">Icon / Emoji</label>
-                <input value={item.icon} onChange={(e) => updItem(i, "icon", e.target.value)} className="input-field" />
+                <div className="flex gap-2 items-center">
+                  <EmojiPicker value={item.icon} onChange={(e) => updItem(i, "icon", e)} />
+                  <input value={item.icon} onChange={(e) => updItem(i, "icon", e.target.value)} className="input-field flex-1" placeholder="or type" />
+                </div>
               </div>
               <div>
                 <label className="label-text">Title</label>
