@@ -1,5 +1,6 @@
 "use client";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
+import FeatureStrip from "./sections/FeatureStrip";
 import StoreInformation from "./sections/StoreInformation";
 import Branding from "./sections/Branding";
 import Footer from "./sections/Footer";
@@ -23,6 +24,7 @@ const TITLES: Record<string, string> = {
   "store-information": "Store Information",
   branding:            "Branding",
   "homepage-hero":     "Homepage Hero",
+  "feature-strip":     "Feature Strip",
   "new-arrivals":      "New Arrivals",
   "brand-values":      "Brand Values",
   "admin-menu":        "Menu Bar",
@@ -44,6 +46,7 @@ const SECTIONS: Record<string, React.ComponentType> = {
   "store-information": StoreInformation,
   branding:            Branding,
   "homepage-hero":     HomepageHero,
+  "feature-strip":     FeatureStrip,
   "new-arrivals":      NewArrivals,
   "brand-values":      BrandValues,
   "admin-menu":        AdminMenu,

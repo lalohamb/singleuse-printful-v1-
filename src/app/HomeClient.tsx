@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowRight, Truck, Shield, Sparkles, Heart, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Product, StoreSettings, Category } from "@/types";
 import ProductCard from "@/components/ProductCard";
 import Reveal from "@/components/Reveal";
@@ -11,6 +11,7 @@ import AppImage from "@/components/AppImage";
 import { formatPrice } from "@/lib/supabase";
 import { resolveStorageUrl } from "@/lib/storage";
 import { DEFAULT_AFFIRMATIONS_SETTINGS, type AffirmationsSettings } from "@/lib/affirmations-settings";
+import { DEFAULT_FEATURE_STRIP_SETTINGS, type FeatureStripSettings } from "@/lib/feature-strip-settings";
 import { DEFAULT_NEW_ARRIVALS_SETTINGS, type NewArrivalsSettings } from "@/lib/new-arrivals-settings";
 import { DEFAULT_BRAND_VALUES_SETTINGS, type BrandValuesSettings } from "@/lib/brand-values-settings";
 
@@ -24,6 +25,7 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
 }) {
   const [slide, setSlide] = useState(0);
   const affirmations = { ...DEFAULT_AFFIRMATIONS_SETTINGS, ...((settings?.affirmations_settings || {}) as Partial<AffirmationsSettings>) };
+  const featureStrip: FeatureStripSettings = { ...DEFAULT_FEATURE_STRIP_SETTINGS, ...((settings?.feature_strip_settings || {}) as Partial<FeatureStripSettings>) };
   const newArrivalsSettings = { ...DEFAULT_NEW_ARRIVALS_SETTINGS, ...((settings?.new_arrivals_settings || {}) as Partial<NewArrivalsSettings>) };
   const brandValues = { ...DEFAULT_BRAND_VALUES_SETTINGS, ...((settings?.brand_values_settings || {}) as Partial<BrandValuesSettings>) };
   const slideCount = newArrivals.length;
@@ -65,21 +67,18 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
         </div>
       </section>
 
-      <section className="bg-secondary-900 text-white py-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-2 lg:grid-cols-4 gap-6">
-          {[
-            { icon: Truck, title: "Made to Order", desc: "Printed fresh for you" },
-            { icon: Heart, title: "Made With Intention", desc: "Built for real life" },
-            { icon: Shield, title: "Size Inclusive", desc: "Empowerment has no size limit" },
-            { icon: Sparkles, title: "Style Without Limits", desc: "Designed for self-expression" },
-          ].map((f) => (
-            <div key={f.title} className="flex items-center gap-3">
-              <f.icon size={28} className="text-gold-400 flex-shrink-0" />
-              <div><p className="font-semibold text-sm">{f.title}</p><p className="text-xs text-secondary-400">{f.desc}</p></div>
-            </div>
-          ))}
-        </div>
-      </section>
+      {featureStrip.active && (
+        <section className="py-6" style={{ backgroundColor: featureStrip.backgroundColor, color: featureStrip.textColor }}>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-2 lg:grid-cols-4 gap-6">
+            {featureStrip.items.filter((f) => f.enabled).map((f) => (
+              <div key={f.title} className="flex items-center gap-3">
+                <span className="text-2xl flex-shrink-0" style={{ color: featureStrip.accentColor }}>{f.icon}</span>
+                <div><p className="font-semibold text-sm">{f.title}</p><p className="text-xs opacity-60">{f.desc}</p></div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {affirmations.active && affirmations.phrases.length > 0 && <section aria-hidden className="bg-weave text-white py-4 overflow-hidden border-y border-white/10" style={{ backgroundColor: affirmations.backgroundColor, color: affirmations.textColor }}>
         <div className="flex w-max animate-marquee">
