@@ -30,6 +30,7 @@ const settingsItems = [
   { path: "/admin/settings/branding", label: "Branding", icon: Palette },
   { path: "/admin/settings/admin-menu", label: "Menu Bar", icon: Menu },
   { path: "/admin/settings/homepage-hero", label: "Homepage Hero", icon: Home },
+  { path: "/admin/settings/feature-strip", label: "Feature Strip", icon: Sparkles },
   { path: "/admin/settings/new-arrivals", label: "New Arrivals", icon: Sparkles },
   { path: "/admin/settings/brand-values", label: "Brand Values", icon: BarChart3 },
   { path: "/admin/settings/our-why", label: "Our Why", icon: Heart },
