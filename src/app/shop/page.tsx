@@ -4,16 +4,18 @@ import { createClient } from "@supabase/supabase-js";
 import StorefrontLayout from "@/components/StorefrontLayout";
 import ShopClient from "./ShopClient";
 
-export const metadata: Metadata = {
-  title: "Shop",
-  description: "Browse made-to-order clothing — T-shirts, hoodies, hats, and more.",
-};
-
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
-// ISR: regenerate this page at most once per 60s so product/category edits
-// and Printify re-syncs show up on the storefront without a manual rebuild.
 export const revalidate = 60;
+
+export async function generateMetadata(): Promise<Metadata> {
+  const { data: seo } = await supabase.from("seo_settings").select("default_og_image, site_url").limit(1).maybeSingle();
+  return {
+    title: "Shop",
+    description: "Browse made-to-order clothing — T-shirts, hoodies, hats, and more.",
+    ...(seo?.default_og_image && { openGraph: { images: [{ url: seo.default_og_image }] } }),
+  };
+}
 
 export default async function ShopPage() {
   const [productsRes, categoriesRes] = await Promise.all([

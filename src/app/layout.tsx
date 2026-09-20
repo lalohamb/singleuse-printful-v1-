@@ -22,13 +22,15 @@ const supabase = createClient(
 
 export async function generateMetadata(): Promise<Metadata> {
   const [{ data: seo }, { data: settings }] = await Promise.all([
-    supabase.from("seo_settings").select("google_site_verification, twitter_handle").limit(1).maybeSingle(),
-    supabase.from("settings").select("favicon_url").limit(1).maybeSingle(),
+    supabase.from("seo_settings").select("google_site_verification, twitter_handle, meta_title_suffix").limit(1).maybeSingle(),
+    supabase.from("settings").select("store_name, favicon_url").limit(1).maybeSingle(),
   ]);
+  const storeName = settings?.store_name || "Your Store";
+  const suffix = seo?.meta_title_suffix || `| ${storeName}`;
   return {
-    title: { default: "Your Store", template: "%s | Your Store" },
+    title: { default: storeName, template: `%s ${suffix}` },
     description: "Made-to-order apparel designed for every body, every style, and every day.",
-    openGraph: { siteName: "Your Store", type: "website" },
+    openGraph: { siteName: storeName, type: "website" },
     ...(seo?.twitter_handle && { twitter: { card: "summary_large_image", site: seo.twitter_handle } }),
     ...(seo?.google_site_verification && { verification: { google: seo.google_site_verification } }),
     ...(settings?.favicon_url && { icons: { icon: "/api/favicon", shortcut: "/api/favicon" } }),

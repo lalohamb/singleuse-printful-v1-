@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Mail } from "lucide-react";
 import Image from "next/image";
 import { createClient } from "@supabase/supabase-js";
+import { unstable_noStore as noStore } from "next/cache";
 import { resolveStorageUrl } from "@/lib/storage";
 import type { StoreSettings } from "@/types";
 
@@ -86,6 +87,7 @@ const DEFAULT_SOCIAL: StoreSettings["social_links"] = {
 };
 
 export default async function Footer() {
+  noStore();
   const supabase = getSupabase();
   const { data } = await supabase.from("settings").select("social_links, logo_url, logo_size, footer_logo_url, footer_logo_size, footer_text, footer_bottom_message").limit(1).maybeSingle();
   const social: StoreSettings["social_links"] = data?.social_links ?? DEFAULT_SOCIAL;
@@ -133,7 +135,7 @@ export default async function Footer() {
               <li><Link href="/refund-policy" className="hover:text-white transition-colors">Refund &amp; Returns</Link></li>
               <li><Link href="/terms-of-service" className="hover:text-white transition-colors">Terms of Service</Link></li>
               <li><Link href="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
-              <li><a href="mailto:hello@your-store.example" className="hover:text-white transition-colors">Contact Us</a></li>
+              <li><a href={social.email?.url || "mailto:hello@your-store.example"} className="hover:text-white transition-colors">Contact Us</a></li>
             </ul>
           </div>
           <div>

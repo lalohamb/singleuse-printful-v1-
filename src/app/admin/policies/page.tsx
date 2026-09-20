@@ -120,7 +120,7 @@ export default function PoliciesPage() {
                     <button type="button" disabled={isLocked} onMouseDown={(e) => e.preventDefault()} onClick={() => { const url = window.prompt("Link URL"); if (url) format(id, "createLink", url); }} className="p-2 text-secondary-600 hover:bg-white hover:text-secondary-900 rounded" title="Insert link" aria-label="Insert link"><LinkIcon size={16} /></button>
                   </div>
                   <div
-                    key={drafts[id] ? `${id}-${drafts[id].slice(0, 20)}` : id}
+                    key={id}
                     data-policy-editor={id}
                     contentEditable={!isLocked}
                     suppressContentEditableWarning

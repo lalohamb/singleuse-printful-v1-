@@ -4,11 +4,6 @@ import StorefrontLayout from "@/components/StorefrontLayout";
 import HomeClient from "./HomeClient";
 import type { Category, Product, StoreSettings } from "@/types";
 
-export const metadata: Metadata = {
-  title: "Your Store — Made for Every Body",
-  description: "Wear what feels like you. Shop made-to-order apparel designed for every body, every style, and every day.",
-};
-
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
 const TEMPLATE_SETTINGS: StoreSettings = {
@@ -107,6 +102,20 @@ const TEMPLATE_PRODUCTS: Product[] = [
 
 // Always fetch fresh data from Supabase on every request.
 export const revalidate = 0;
+
+export async function generateMetadata(): Promise<Metadata> {
+  const [{ data: seo }, { data: settings }] = await Promise.all([
+    supabase.from("seo_settings").select("default_og_image, site_url").limit(1).maybeSingle(),
+    supabase.from("settings").select("store_name, tagline").limit(1).maybeSingle(),
+  ]);
+  const storeName = settings?.store_name || "Your Store";
+  const tagline = settings?.tagline || "Made for Every Body";
+  return {
+    title: `${storeName} — ${tagline}`,
+    description: "Wear what feels like you. Shop made-to-order apparel designed for every body, every style, and every day.",
+    ...(seo?.default_og_image && { openGraph: { images: [{ url: seo.default_og_image }] } }),
+  };
+}
 
 export default async function HomePage() {
   const [settingsRes, featuredRes, newArrivalsRes, trendingRes, categoriesRes, catImgRes] = await Promise.all([

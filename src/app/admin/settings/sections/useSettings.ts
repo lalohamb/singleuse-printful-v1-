@@ -30,7 +30,7 @@ export function useSettings() {
     if (err) { setError(err.message); return false; }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-    fetch("/api/revalidate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths: ["/", "/about", "/shop"] }) });
+    fetch("/api/revalidate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths: ["/", "/about", "/shop", "/shop/[slug]", "/terms-of-service", "/privacy-policy", "/refund-policy"] }) });
     return true;
   };
 
