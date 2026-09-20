@@ -84,9 +84,12 @@ CREATE INDEX IF NOT EXISTS idx_customer_profiles_newsletter ON customer_profiles
 CREATE TABLE IF NOT EXISTS categories (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name        text UNIQUE NOT NULL,
-  slug        text UNIQUE NOT NULL,
-  description text,
-  created_at  timestamptz DEFAULT now()
+  slug             text UNIQUE NOT NULL,
+  description      text,
+  gradient_opacity integer     DEFAULT 60,
+  gradient_dir     text        DEFAULT 'bottom',
+  category_image_url text      DEFAULT null,
+  created_at       timestamptz DEFAULT now()
 );
 
 ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
@@ -134,6 +137,8 @@ CREATE TABLE IF NOT EXISTS products (
   is_bestseller     boolean     NOT NULL DEFAULT false,
   is_on_sale        boolean     NOT NULL DEFAULT false,
   content_locked    boolean     NOT NULL DEFAULT false,
+  is_personalizable boolean     NOT NULL DEFAULT false,
+  personalization_label text,
   print_provider_id text,
   blueprint_id      text,
   variants          jsonb       DEFAULT '[]'::jsonb,
@@ -309,10 +314,18 @@ CREATE TABLE IF NOT EXISTS settings (
   newsletter_group_id     text,
   popup_settings          jsonb       DEFAULT '{"active": false, "title": "Join the Culture", "body": "New drops, exclusive offers, and culture — straight to your inbox.", "ctaLabel": "Subscribe", "delay": 3, "dismissDays": 7, "position": "right", "imageUrl": "/ga.png", "imgX": 0, "imgY": 0, "popupImageScale": 100, "popupImageFlip": false, "popupImageFit": "cover", "popupPreviewH": 60, "bgColor": "#111111"}'::jsonb,
   affiliate_program_enabled boolean    DEFAULT true,
+  singleton               boolean     NOT NULL DEFAULT true,
+  stripe_live_secret_key      text,
+  stripe_live_webhook_secret  text,
+  stripe_test_secret_key      text,
+  stripe_test_webhook_secret  text,
+  stripe_mode                 text        NOT NULL DEFAULT 'test',
   updated_at              timestamptz DEFAULT now()
 );
 
 ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+
+CREATE UNIQUE INDEX IF NOT EXISTS settings_singleton ON settings (singleton);
 
 DROP POLICY IF EXISTS "public_read_settings" ON settings;
 CREATE POLICY "public_read_settings" ON settings FOR SELECT
