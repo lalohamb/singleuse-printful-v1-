@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
+import { unstable_noStore as noStore } from "next/cache";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import StorefrontClientShell from "@/components/StorefrontClientShell";
 import { CustomerAuthProvider } from "@/lib/customer-auth";
 
 export default function StorefrontLayout({ children }: { children: ReactNode }) {
+  noStore();
   return (
     <div className="min-h-screen flex flex-col bg-white">
       <CustomerAuthProvider>
