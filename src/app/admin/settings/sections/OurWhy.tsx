@@ -74,7 +74,7 @@ export default function OurWhy() {
               <span className="text-[10px]">▼</span>
               <span className="text-[10px] text-secondary-500">{ourWhyPreviewH}px</span>
             </div>
-            <div className="flex-1 relative rounded-lg bg-secondary-900 overflow-hidden" style={{ height: ourWhyPreviewH / 2 }}>
+            <div className="flex-1 relative rounded-lg bg-secondary-900 overflow-hidden" style={{ height: Math.max(480, ourWhyPreviewH) }}>
               <AppImage fill src={form.our_why_image_url} alt="Our Why preview" className={`absolute inset-0 w-full h-full ${form.our_why_image_fit === "contain" ? "object-contain" : (form.our_why_image_scale ?? 100) === 100 ? "object-cover" : "object-contain"}`} style={{ objectPosition: form.our_why_object_position || "center", transform: form.our_why_image_flip ? "scaleX(-1)" : undefined, scale: `${form.our_why_image_scale ?? 100}%` }} />
               <div className="absolute inset-0" style={{ background: gradMap[dir] }} />
               <span className="absolute bottom-2 right-2 text-xs bg-black/50 text-white px-2 py-1 rounded">Live preview</span>

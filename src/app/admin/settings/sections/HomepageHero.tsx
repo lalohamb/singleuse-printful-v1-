@@ -102,7 +102,7 @@ export default function HomepageHero() {
               <span className="text-[10px] text-secondary-400">▼</span>
               <span className="text-[10px] text-secondary-500 mt-1">{heroPreviewH}vh</span>
             </div>
-            <div className="flex-1 relative rounded-lg bg-secondary-900 overflow-hidden" style={{ height: Math.max(240, heroPreviewH * 4) }}>
+            <div className="flex-1 relative rounded-lg bg-secondary-900 overflow-hidden" style={{ height: Math.max(480, heroPreviewH * 7) }}>
               <AppImage fill src={form.hero_image_url} alt="Hero preview" className={`absolute inset-0 w-full h-full ${form.hero_image_fit === "contain" ? "object-contain" : (form.hero_image_scale ?? 100) === 100 ? "object-cover" : "object-contain"}`} style={{ objectPosition: form.hero_object_position || "center", transform: form.hero_image_flip ? "scaleX(-1)" : undefined, scale: `${form.hero_image_scale ?? 100}%` }} />
               <div className="absolute inset-0" style={{ background: gradMap[dir] }} />
               <span className="absolute bottom-2 right-2 text-xs bg-black/50 text-white px-2 py-1 rounded">Live preview</span>
