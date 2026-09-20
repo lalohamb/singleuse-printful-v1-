@@ -105,6 +105,7 @@ export async function POST(req: NextRequest) {
         affirmations_settings: null,
         new_arrivals_settings: null,
         brand_values_settings: null,
+        feature_strip_settings: null,
         favicon_url: null,
         our_why_image_url: null,
         our_why_object_position: "0px 0px",

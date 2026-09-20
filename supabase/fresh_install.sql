@@ -266,6 +266,7 @@ CREATE TABLE IF NOT EXISTS settings (
   affirmations_settings   jsonb,
   new_arrivals_settings   jsonb,
   brand_values_settings   jsonb,
+  feature_strip_settings  jsonb,
   testimonials            jsonb       DEFAULT '[{"quote":"I wore my shirt to a family reunion and got so many compliments. This brand truly gets us.","name":"Jasmine T.","location":"Atlanta, GA","product":"Culture First Tee"},{"quote":"The quality is unmatched. Soft, true to size, and the design is everything. Will be ordering again.","name":"Marcus W.","location":"Houston, TX","product":"Faith Over Fear Hoodie"},{"quote":"Finally a brand that celebrates who we are. Every piece feels intentional and powerful.","name":"Aaliyah R.","location":"Chicago, IL","product":"Heritage Collection"}]'::jsonb,
   promo_banner_active     boolean     DEFAULT false,
   promo_banner_title      text,
