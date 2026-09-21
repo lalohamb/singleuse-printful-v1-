@@ -43,6 +43,7 @@ function normGroup(g: Record<string, unknown>) {
 // Normalize v3 campaign
 function normCampaign(c: Record<string, unknown>) {
   const stats = c.stats as Record<string, unknown> | null;
+  const emails = c.emails as Array<Record<string, unknown>> | null;
   return {
     id: String(c.id),
     name: c.name,
@@ -54,6 +55,7 @@ function normCampaign(c: Record<string, unknown>) {
     unsubscribed: stats?.unsubscribed ?? 0,
     open_rate: stats?.open_rate ? Number((stats.open_rate as Record<string,unknown>).float ?? stats.open_rate) : 0,
     click_rate: stats?.click_rate ? Number((stats.click_rate as Record<string,unknown>).float ?? stats.click_rate) : 0,
+    preview_url: emails?.[0]?.preview_url ?? null,
   };
 }
 

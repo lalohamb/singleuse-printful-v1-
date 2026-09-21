@@ -7,7 +7,7 @@ import { getErrorMessage } from "@/lib/errors";
 interface SubscriberField { key: string; value: string }
 interface Subscriber { id: string; email: string; status: string; type: string; date_created: string; source?: string | null; sent?: number; opens_count?: number; clicks_count?: number; open_rate?: number; fields?: SubscriberField[] }
 interface Group { id: string; name: string; total: number; active: number }
-interface Campaign { id: string; name: string; status: string; date_created: string; opened: number; clicked: number; sent: number; unsubscribed: number; open_rate: number; click_rate: number }
+interface Campaign { id: string; name: string; status: string; date_created: string; opened: number; clicked: number; sent: number; unsubscribed: number; open_rate: number; click_rate: number; preview_url?: string | null }
 interface Automation { id: string; name: string; enabled: boolean; steps_count: number; trigger_type: string | null; trigger_group: string | null; sent: number; open_rate: number; completed: number; in_queue: number; screenshot_url: string | null }
 interface Form { id: string; name: string; type: string; conversions_count: number; url?: string | null }
 interface Account { account: { name: string; email: string }; statistics?: { total_subscribers: number; open_rate: { float: number }; click_rate: { float: number } } }
@@ -528,9 +528,11 @@ function MailerLiteDashboard() {
                         <td className="px-4 py-3 text-sm text-secondary-500">{c.date_created ? new Date(c.date_created).toLocaleDateString() : "—"}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1">
-                            <button onClick={async () => { await post({ action: "duplicate_campaign", id: c.id }); fetchAll(); }} className="p-1.5 text-secondary-400 hover:text-primary-600 transition-colors" title="Duplicate"><Copy size={15} /></button>
+                            {c.preview_url && (
+                              <a href={c.preview_url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-secondary-400 hover:text-primary-600 transition-colors" title="Preview email"><ExternalLink size={15} /></a>
+                            )}
                             {c.status === "draft" && (
-                              <button onClick={async () => { setDeleting(c.id); await post({ action: "delete_campaign", id: c.id }); setCampaigns((p) => p.filter((x) => x.id !== c.id)); setDeleting(null); }} disabled={deleting === c.id} className="p-1.5 text-secondary-400 hover:text-error-600 transition-colors">
+                              <button onClick={async () => { setDeleting(c.id); await post({ action: "delete_campaign", id: c.id }); setCampaigns((p) => p.filter((x) => x.id !== c.id)); setDeleting(null); }} disabled={deleting === c.id} className="p-1.5 text-secondary-400 hover:text-error-600 transition-colors" title="Delete draft">
                                 {deleting === c.id ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
                               </button>
                             )}
