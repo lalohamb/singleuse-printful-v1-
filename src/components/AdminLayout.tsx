@@ -140,6 +140,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             })}
           </div>
           <a href="/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-secondary-400 hover:bg-secondary-800 hover:text-white transition-colors"><ExternalLink size={18} />View Store</a>
+          <a href="https://bulk-pod-product-creator.com/?blog_post=how_to_create_POD_products_via_the_printify_API" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-secondary-400 hover:bg-secondary-800 hover:text-white transition-colors"><ExternalLink size={18} />Bulk Product</a>
         </nav>
         <div className="p-4 border-t border-secondary-700 flex-shrink-0">
           <div className="flex items-center gap-3 mb-3">

@@ -37,10 +37,10 @@ export default function ShopClient({ products, categories }: { products: Product
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-      <div className="mb-8">
+      {/* <div className="mb-8">
         <h1 className="text-3xl lg:text-4xl font-bold text-secondary-900">{activeCatName}</h1>
         <p className="text-secondary-500 mt-2">{filtered.length} {filtered.length === 1 ? "product" : "products"}</p>
-      </div>
+      </div> */}
       <div className="flex flex-col lg:flex-row gap-8">
         <aside className="lg:w-64 flex-shrink-0">
           <button onClick={() => setShowFilters(!showFilters)} className="lg:hidden flex items-center gap-2 mb-4 px-4 py-2 border border-secondary-200 rounded-lg w-full justify-center">
