@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
       const [accountRes, groupsRes, campaignsRes, automationsRes, formsRes] = await Promise.all([
         ml("/me"),
         ml("/groups?limit=25"),
-        ml("/campaigns?limit=25&filter[status]=sent"),
+        ml("/campaigns?limit=25"),
         ml("/automations?limit=25"),
         ml("/forms/popup?limit=25"),
       ]);

@@ -96,8 +96,8 @@ function EditSubscriberModal({ subscriber, groups, onClose, onDone }: { subscrib
   );
 }
 
-function CreateCampaignModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () => void; onDone: () => void }) {
-  const [form, setForm] = useState({ name: "", subject: "", from_name: "Your Store", from_email: "orders@your-store.example", html: "", group: "", send_now: false });
+function CreateCampaignModal({ groups, defaultFromName, defaultFromEmail, onClose, onDone }: { groups: Group[]; defaultFromName: string; defaultFromEmail: string; onClose: () => void; onDone: () => void }) {
+  const [form, setForm] = useState({ name: "", subject: "", from_name: defaultFromName, from_email: defaultFromEmail, html: "", group: "", send_now: false });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -520,7 +520,7 @@ function MailerLiteDashboard() {
       {modal === "edit_sub" && selectedSub && <EditSubscriberModal subscriber={selectedSub} groups={groups} onClose={() => setModal(null)} onDone={(patch) => { if (patch) setSubscribers((p) => p.map((s) => s.id === selectedSub.id ? { ...s, ...patch } : s)); else fetchAll(); }} />}
       {modal === "add_group" && <GroupModal onClose={() => setModal(null)} onDone={fetchAll} />}
       {modal === "edit_group" && selectedGroup && <GroupModal group={selectedGroup} onClose={() => setModal(null)} onDone={fetchAll} />}
-      {modal === "create_campaign" && <CreateCampaignModal groups={groups} onClose={() => setModal(null)} onDone={fetchAll} />}
+      {modal === "create_campaign" && <CreateCampaignModal groups={groups} defaultFromName={account?.account?.name || ""} defaultFromEmail={account?.account?.email || ""} onClose={() => setModal(null)} onDone={fetchAll} />}
     </div>
   );
 }
