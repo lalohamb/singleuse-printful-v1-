@@ -245,8 +245,8 @@ function MailerLiteDashboard() {
       setAccount(statsData.account);
       setGroups(statsData.groups || []);
       setCampaigns(statsData.campaigns || []);
-      setAutomations([]);
-      setForms([]);
+      setAutomations(statsData.automations || []);
+      setForms(statsData.forms || []);
       setSubscribers(Array.isArray(subsData) ? subsData : (subsData.data || []));
       setSubMeta(subsData.meta || null);
     } catch (e: unknown) { setError(getErrorMessage(e)); }
