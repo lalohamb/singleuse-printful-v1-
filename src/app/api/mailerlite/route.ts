@@ -24,9 +24,14 @@ function normSub(s: Record<string, unknown>) {
     id: String(s.id),
     email: s.email,
     status: s.status,
-    type: s.status, // page uses both .type and .status
-    date_created: s.created_at,
-    fields: fields ? Object.entries(fields).map(([key, f]) => ({ key, value: f.value })) : [],
+    type: s.status,
+    date_created: s.subscribed_at ?? s.created_at,
+    source: s.source ?? null,
+    sent: s.sent ?? 0,
+    opens_count: s.opens_count ?? 0,
+    clicks_count: s.clicks_count ?? 0,
+    open_rate: s.open_rate ?? 0,
+    fields: fields ? Object.entries(fields).map(([key, f]) => ({ key, value: f?.value ?? "" })) : [],
   };
 }
 
@@ -94,9 +99,30 @@ export async function GET(req: NextRequest) {
           };
         }),
         forms: (formsRes.json.data ?? []).map((f: Record<string, unknown>) => ({
-          id: String(f.id), name: f.name, type: f.type ?? "popup", conversions_count: f.conversions_count ?? 0,
+          id: String(f.id), name: f.name, type: "popup", conversions_count: f.conversions_count ?? 0, url: f.url ?? null,
         })),
       });
+    }
+
+    if (action === "all_forms") {
+      const [popupRes, embeddedRes] = await Promise.all([
+        ml("/forms/popup?limit=25"),
+        ml("/forms/embedded?limit=25"),
+      ]);
+      const norm = (type: string) => (f: Record<string, unknown>) => ({
+        id: String(f.id), name: f.name, type, conversions_count: f.conversions_count ?? 0, url: f.url ?? null,
+      });
+      return NextResponse.json([
+        ...(popupRes.json.data ?? []).map(norm("popup")),
+        ...(embeddedRes.json.data ?? []).map(norm("embedded")),
+      ]);
+    }
+
+    if (action === "subscriber_groups") {
+      const id = searchParams.get("id");
+      if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+      const { json } = await ml(`/subscribers/${id}/groups`);
+      return NextResponse.json((json.data ?? []).map(normGroup));
     }
 
     if (action === "subscribers") {
@@ -261,6 +287,12 @@ export async function POST(req: NextRequest) {
       if (!body.id || !/^[\w-]{1,64}$/.test(String(body.id))) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
       const { ok, status } = await ml(`/campaigns/${body.id}`, { method: "DELETE" });
       return NextResponse.json({ success: ok || status === 204 });
+    }
+
+    if (action === "update_subscriber_fields") {
+      if (!body.id || !/^[\w-]{1,64}$/.test(String(body.id))) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+      const { json, status } = await ml(`/subscribers/${body.id}`, { method: "PUT", body: JSON.stringify({ fields: body.fields }) });
+      return NextResponse.json(json, { status });
     }
 
     if (action === "assign_group") {

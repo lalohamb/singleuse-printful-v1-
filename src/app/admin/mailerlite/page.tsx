@@ -1,15 +1,15 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Users, Mail, BarChart2, RefreshCw, Plus, Trash2, X, Loader2, Check, AlertCircle, ExternalLink, FolderOpen, Search, Edit2, UserMinus, Zap, FileText, ChevronLeft, ChevronRight } from "lucide-react";
+import { Users, Mail, BarChart2, RefreshCw, Plus, Trash2, X, Loader2, Check, AlertCircle, ExternalLink, FolderOpen, Search, Edit2, UserMinus, Zap, FileText, ChevronLeft, ChevronRight, Copy, TrendingUp, MousePointer } from "lucide-react";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
 import { getErrorMessage } from "@/lib/errors";
 
 interface SubscriberField { key: string; value: string }
-interface Subscriber { id: string; email: string; status: string; type: string; date_created: string; fields?: SubscriberField[] }
+interface Subscriber { id: string; email: string; status: string; type: string; date_created: string; source?: string | null; sent?: number; opens_count?: number; clicks_count?: number; open_rate?: number; fields?: SubscriberField[] }
 interface Group { id: string; name: string; total: number; active: number }
 interface Campaign { id: string; name: string; status: string; date_created: string; opened: number; clicked: number; sent: number; unsubscribed: number; open_rate: number; click_rate: number }
 interface Automation { id: string; name: string; enabled: boolean; steps_count: number; trigger_type: string | null; trigger_group: string | null; sent: number; open_rate: number; completed: number; in_queue: number; screenshot_url: string | null }
-interface Form { id: string; name: string; type: string; conversions_count: number }
+interface Form { id: string; name: string; type: string; conversions_count: number; url?: string | null }
 interface Account { account: { name: string; email: string }; statistics?: { total_subscribers: number; open_rate: { float: number }; click_rate: { float: number } } }
 
 const statusBadge: Record<string, string> = {
@@ -67,26 +67,72 @@ function AddSubscriberModal({ groups, onClose, onDone }: { groups: Group[]; onCl
 function EditSubscriberModal({ subscriber, groups, onClose, onDone }: { subscriber: Subscriber; groups: Group[]; onClose: () => void; onDone: (patch?: Partial<Subscriber>) => void }) {
   const [status, setStatus] = useState(subscriber.type || subscriber.status);
   const [name, setName] = useState(subscriber.fields?.find((f) => f.key === "name")?.value || "");
+  const [lastName, setLastName] = useState(subscriber.fields?.find((f) => f.key === "last_name")?.value || "");
+  const [subGroups, setSubGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    api("subscriber_groups", `&id=${subscriber.id}`).then((data) => setSubGroups(Array.isArray(data) ? data : []));
+  }, [subscriber.id]);
+
   const handleSave = async () => {
     setLoading(true); setError(null);
-    const res = await post({ action: "update_subscriber", id: subscriber.id, status, fields: { name } });
-    if (res.error) setError(res.error);
-    else { setDone(true); setTimeout(() => { onDone({ type: status, status, fields: subscriber.fields?.map(f => f.key === "name" ? { ...f, value: name } : f) }); onClose(); }, 800); }
+    const res = await post({ action: "update_subscriber", id: subscriber.id, status, fields: subscriber.fields?.map(f => f.key === "name" ? { ...f, value: name } : f.key === "last_name" ? { ...f, value: lastName } : f) || [{ key: "name", value: name }, { key: "last_name", value: lastName }] });
+    if (res.error) setError(typeof res.error === "string" ? res.error : JSON.stringify(res.error));
+    else { setDone(true); setTimeout(() => { onDone(); onClose(); }, 800); }
     setLoading(false);
+  };
+
+  const removeFromGroup = async (groupId: string) => {
+    await post({ action: "remove_from_group", group_id: groupId, subscriber_id: subscriber.id });
+    setSubGroups((p) => p.filter((g) => g.id !== groupId));
+  };
+
+  const addToGroup = async (groupId: string) => {
+    await post({ action: "assign_group", group_id: groupId, email: subscriber.email });
+    const g = groups.find((g) => g.id === groupId);
+    if (g && !subGroups.find((sg) => sg.id === groupId)) setSubGroups((p) => [...p, g]);
   };
 
   return (
     <Modal title="Edit Subscriber" onClose={onClose}>
       <div className="space-y-4">
         <div><label className="label-text">Email</label><p className="text-sm text-secondary-700 font-medium mt-1">{subscriber.email}</p></div>
-        <div><label className="label-text">Name</label><input value={name} onChange={(e) => setName(e.target.value)} className="input-field" /></div>
+        <div className="grid grid-cols-2 gap-3">
+          <div><label className="label-text">First Name</label><input value={name} onChange={(e) => setName(e.target.value)} className="input-field" /></div>
+          <div><label className="label-text">Last Name</label><input value={lastName} onChange={(e) => setLastName(e.target.value)} className="input-field" /></div>
+        </div>
         <div><label className="label-text">Status</label>
           <select value={status} onChange={(e) => setStatus(e.target.value)} className="input-field">
             {["active", "unsubscribed", "bounced", "junk"].map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+        {(subscriber.sent !== undefined) && (
+          <div className="grid grid-cols-3 gap-2">
+            {[{label:"Sent",value:subscriber.sent},{label:"Opens",value:subscriber.opens_count},{label:"Clicks",value:subscriber.clicks_count}].map(({label,value}) => (
+              <div key={label} className="bg-secondary-50 rounded-lg p-3 text-center">
+                <p className="text-lg font-bold text-secondary-900">{value ?? 0}</p>
+                <p className="text-xs text-secondary-500">{label}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        <div>
+          <label className="label-text mb-2 block">Groups</label>
+          <div className="flex flex-wrap gap-2 mb-2">
+            {subGroups.map((g) => (
+              <span key={g.id} className="flex items-center gap-1 text-xs bg-primary-50 text-primary-700 px-2 py-1 rounded-full">
+                {g.name}
+                <button onClick={() => removeFromGroup(g.id)} className="hover:text-error-600"><X size={11} /></button>
+              </span>
+            ))}
+            {subGroups.length === 0 && <span className="text-xs text-secondary-400">No groups</span>}
+          </div>
+          <select onChange={(e) => { if (e.target.value) addToGroup(e.target.value); e.target.value = ""; }} className="input-field text-sm" defaultValue="">
+            <option value="">+ Add to group...</option>
+            {groups.filter((g) => !subGroups.find((sg) => sg.id === g.id)).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
           </select>
         </div>
         {error && <ErrorMsg msg={error} />}
@@ -237,16 +283,17 @@ function MailerLiteDashboard() {
   const fetchAll = async () => {
     setLoading(true); setError(null);
     try {
-      const [statsData, subsData] = await Promise.all([
+      const [statsData, subsData, formsData] = await Promise.all([
         api("stats"),
         api("subscribers", "&limit=25"),
+        api("all_forms"),
       ]);
       if (statsData.error) throw new Error(statsData.error);
       setAccount(statsData.account);
       setGroups(statsData.groups || []);
       setCampaigns(statsData.campaigns || []);
       setAutomations(statsData.automations || []);
-      setForms(statsData.forms || []);
+      setForms(Array.isArray(formsData) ? formsData : (statsData.forms || []));
       setSubscribers(Array.isArray(subsData) ? subsData : (subsData.data || []));
       setSubMeta(subsData.meta || null);
     } catch (e: unknown) { setError(getErrorMessage(e)); }
@@ -342,13 +389,14 @@ function MailerLiteDashboard() {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
         {[
           { label: "Total Subscribers", value: totalSubs, icon: Users, color: "bg-primary-50 text-primary-600" },
           { label: "Active (this page)", value: activeSubs, icon: Check, color: "bg-success-50 text-success-600" },
           { label: "Groups", value: groups.length, icon: FolderOpen, color: "bg-accent-50 text-accent-600" },
           { label: "Campaigns", value: campaigns.length, icon: BarChart2, color: "bg-warning-50 text-warning-600" },
           { label: "Automations", value: automations.length, icon: Zap, color: "bg-primary-50 text-primary-600" },
+          { label: "Forms", value: forms.length, icon: FileText, color: "bg-secondary-100 text-secondary-600" },
         ].map((card) => (
           <div key={card.label} className="bg-white rounded-xl p-5 border border-secondary-100 shadow-sm">
             <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${card.color}`}><card.icon size={20} /></div>
@@ -395,14 +443,17 @@ function MailerLiteDashboard() {
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-secondary-50 border-b border-secondary-100">
-                    <tr>{["Email", "Name", "Status", "Joined", ""].map((h) => <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-secondary-600 uppercase tracking-wide">{h}</th>)}</tr>
+                    <tr>{["Email", "Name", "Status", "Source", "Sent", "Opens", "Joined", ""].map((h) => <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-secondary-600 uppercase tracking-wide">{h}</th>)}</tr>
                   </thead>
                   <tbody className="divide-y divide-secondary-50">
                     {subscribers.map((sub) => (
                       <tr key={sub.id} className="hover:bg-secondary-50 transition-colors">
                         <td className="px-4 py-3 text-sm font-medium text-secondary-900">{sub.email}</td>
-                        <td className="px-4 py-3 text-sm text-secondary-500">{sub.fields?.find((f) => f.key === "name")?.value || "—"}</td>
+                        <td className="px-4 py-3 text-sm text-secondary-500">{sub.fields?.find((f) => f.key === "name")?.value || "—"} {sub.fields?.find((f) => f.key === "last_name")?.value || ""}</td>
                         <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded-full ${statusBadge[sub.type] || statusBadge[sub.status] || "bg-secondary-100 text-secondary-500"}`}>{sub.type || sub.status}</span></td>
+                        <td className="px-4 py-3 text-xs text-secondary-400 capitalize">{sub.source || "—"}</td>
+                        <td className="px-4 py-3 text-sm text-secondary-500">{sub.sent ?? "—"}</td>
+                        <td className="px-4 py-3 text-sm text-secondary-500">{sub.opens_count ?? "—"}</td>
                         <td className="px-4 py-3 text-sm text-secondary-500">{sub.date_created ? new Date(sub.date_created).toLocaleDateString() : "—"}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1">
@@ -464,7 +515,7 @@ function MailerLiteDashboard() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-secondary-50 border-b border-secondary-100">
-                  <tr>{["Campaign", "Status", "Sent", "Open Rate", "Click Rate", "Unsubs", "Created"].map((h) => <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-secondary-600 uppercase tracking-wide">{h}</th>)}</tr>
+                  <tr>{["Campaign", "Status", "Sent", "Open Rate", "Click Rate", "Unsubs", "Created", ""].map((h) => <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-secondary-600 uppercase tracking-wide">{h}</th>)}</tr>
                 </thead>
                 <tbody className="divide-y divide-secondary-50">
                   {campaigns.map((c) => (
@@ -476,6 +527,13 @@ function MailerLiteDashboard() {
                         <td className="px-4 py-3 text-sm text-secondary-600">{c.click_rate ? `${c.click_rate}%` : "—"}</td>
                         <td className="px-4 py-3 text-sm text-secondary-600">{c.unsubscribed ?? "—"}</td>
                         <td className="px-4 py-3 text-sm text-secondary-500">{c.date_created ? new Date(c.date_created).toLocaleDateString() : "—"}</td>
+                        <td className="px-4 py-3">
+                          {c.status === "draft" && (
+                            <button onClick={async () => { setDeleting(c.id); await post({ action: "delete_campaign", id: c.id }); setCampaigns((p) => p.filter((x) => x.id !== c.id)); setDeleting(null); }} disabled={deleting === c.id} className="p-1.5 text-secondary-400 hover:text-error-600 transition-colors">
+                              {deleting === c.id ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                            </button>
+                          )}
+                        </td>
                       </tr>
                   ))}
                 </tbody>
@@ -539,9 +597,24 @@ function MailerLiteDashboard() {
                 <div key={f.id} className="flex items-center justify-between px-5 py-4 hover:bg-secondary-50 transition-colors">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-lg bg-primary-50 flex items-center justify-center"><FileText size={18} className="text-primary-500" /></div>
-                    <div><p className="font-medium text-secondary-900">{f.name}</p><p className="text-xs text-secondary-500 capitalize">{f.type}</p></div>
+                    <div>
+                      <p className="font-medium text-secondary-900">{f.name}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xs bg-secondary-100 text-secondary-500 px-2 py-0.5 rounded-full capitalize">{f.type}</span>
+                        <span className="text-xs text-secondary-400">{f.conversions_count} conversions</span>
+                      </div>
+                    </div>
                   </div>
-                  <span className="text-sm text-secondary-500">{f.conversions_count} conversions</span>
+                  <div className="flex items-center gap-2">
+                    {f.url && (
+                      <button onClick={() => { navigator.clipboard.writeText(f.url!); }} className="flex items-center gap-1 text-xs px-2 py-1.5 rounded border border-secondary-200 text-secondary-600 hover:border-secondary-400 transition-colors" title="Copy URL">
+                        <Copy size={13} />Copy URL
+                      </button>
+                    )}
+                    {f.url && (
+                      <a href={f.url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-secondary-400 hover:text-primary-600 transition-colors"><ExternalLink size={15} /></a>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
