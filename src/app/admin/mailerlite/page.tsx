@@ -326,7 +326,14 @@ function MailerLiteDashboard() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          {account?.account && <p className="text-sm text-secondary-500">{account.account.name} · {account.account.email}</p>}
+          {account?.account && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-success-50 border border-success-100 rounded-lg">
+              <div className="w-2 h-2 rounded-full bg-success-500 flex-shrink-0" />
+              <span className="text-xs font-medium text-success-700">Connected:</span>
+              <span className="text-xs text-success-700 font-semibold">{account.account.name}</span>
+              <span className="text-xs text-success-600">&middot; {account.account.email}</span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-4">
           <a href="https://app.mailerlite.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 font-medium">Open MailerLite <ExternalLink size={16} /></a>
