@@ -74,9 +74,25 @@ export async function GET(req: NextRequest) {
         account: { account: { name: userData.current_account_name || userData.name || "", email: userData.email || "" } },
         groups: (groupsRes.json.data ?? []).map(normGroup),
         campaigns: (campaignsRes.json.data ?? []).map(normCampaign),
-        automations: (automationsRes.json.data ?? []).map((a: Record<string, unknown>) => ({
-          id: String(a.id), name: a.name, enabled: a.enabled, steps_count: a.steps_count ?? 0,
-        })),
+        automations: (automationsRes.json.data ?? []).map((a: Record<string, unknown>) => {
+          const stats = a.stats as Record<string, unknown> | null;
+          const triggers = a.triggers as Array<Record<string, unknown>> | null;
+          const trigger = triggers?.[0];
+          const triggerGroups = trigger?.groups as Array<Record<string, unknown>> | null;
+          return {
+            id: String(a.id),
+            name: a.name,
+            enabled: a.enabled,
+            steps_count: a.emails_count ?? 0,
+            trigger_type: trigger?.type ?? null,
+            trigger_group: triggerGroups?.[0]?.name ?? null,
+            sent: stats?.sent ?? 0,
+            open_rate: stats?.open_rate ? Number((stats.open_rate as Record<string,unknown>).float ?? 0) : 0,
+            completed: stats?.completed_subscribers_count ?? 0,
+            in_queue: stats?.subscribers_in_queue_count ?? 0,
+            screenshot_url: a.first_email_screenshot_url ?? null,
+          };
+        }),
         forms: (formsRes.json.data ?? []).map((f: Record<string, unknown>) => ({
           id: String(f.id), name: f.name, type: f.type ?? "popup", conversions_count: f.conversions_count ?? 0,
         })),
@@ -116,9 +132,19 @@ export async function GET(req: NextRequest) {
 
     if (action === "automations") {
       const { json } = await ml("/automations?limit=25");
-      return NextResponse.json((json.data ?? []).map((a: Record<string, unknown>) => ({
-        id: String(a.id), name: a.name, enabled: a.enabled, steps_count: a.steps_count ?? 0,
-      })));
+      return NextResponse.json((json.data ?? []).map((a: Record<string, unknown>) => {
+        const stats = a.stats as Record<string, unknown> | null;
+        const triggers = a.triggers as Array<Record<string, unknown>> | null;
+        const trigger = triggers?.[0];
+        const triggerGroups = trigger?.groups as Array<Record<string, unknown>> | null;
+        return {
+          id: String(a.id), name: a.name, enabled: a.enabled, steps_count: a.emails_count ?? 0,
+          trigger_type: trigger?.type ?? null, trigger_group: triggerGroups?.[0]?.name ?? null,
+          sent: stats?.sent ?? 0, open_rate: stats?.open_rate ? Number((stats.open_rate as Record<string,unknown>).float ?? 0) : 0,
+          completed: stats?.completed_subscribers_count ?? 0, in_queue: stats?.subscribers_in_queue_count ?? 0,
+          screenshot_url: a.first_email_screenshot_url ?? null,
+        };
+      }));
     }
 
     if (action === "forms") {

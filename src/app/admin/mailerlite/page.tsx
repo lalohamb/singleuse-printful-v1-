@@ -8,7 +8,7 @@ interface SubscriberField { key: string; value: string }
 interface Subscriber { id: string; email: string; status: string; type: string; date_created: string; fields?: SubscriberField[] }
 interface Group { id: string; name: string; total: number; active: number }
 interface Campaign { id: string; name: string; status: string; date_created: string; opened: number; clicked: number; sent: number; unsubscribed: number; open_rate: number; click_rate: number }
-interface Automation { id: string; name: string; enabled: boolean; steps_count: number }
+interface Automation { id: string; name: string; enabled: boolean; steps_count: number; trigger_type: string | null; trigger_group: string | null; sent: number; open_rate: number; completed: number; in_queue: number; screenshot_url: string | null }
 interface Form { id: string; name: string; type: string; conversions_count: number }
 interface Account { account: { name: string; email: string }; statistics?: { total_subscribers: number; open_rate: { float: number }; click_rate: { float: number } } }
 
@@ -491,12 +491,38 @@ function MailerLiteDashboard() {
           ) : (
             <div className="divide-y divide-secondary-50">
               {automations.map((a) => (
-                <div key={a.id} className="flex items-center justify-between px-5 py-4 hover:bg-secondary-50 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${a.enabled ? "bg-success-50" : "bg-secondary-100"}`}><Zap size={18} className={a.enabled ? "text-success-500" : "text-secondary-400"} /></div>
-                    <div><p className="font-medium text-secondary-900">{a.name}</p><p className="text-xs text-secondary-500">{a.steps_count} steps</p></div>
+                <div key={a.id} className="p-5 hover:bg-secondary-50 transition-colors">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${a.enabled ? "bg-success-50" : "bg-secondary-100"}`}>
+                        <Zap size={18} className={a.enabled ? "text-success-500" : "text-secondary-400"} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-medium text-secondary-900">{a.name}</p>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${a.enabled ? "bg-success-50 text-success-600" : "bg-secondary-100 text-secondary-500"}`}>{a.enabled ? "Active" : "Disabled"}</span>
+                        </div>
+                        {(a.trigger_type || a.trigger_group) && (
+                          <p className="text-xs text-secondary-500 mt-0.5">
+                            Trigger: <span className="font-medium">{a.trigger_type?.replace(/_/g, " ")}</span>
+                            {a.trigger_group && <> → <span className="font-medium">{a.trigger_group}</span></>}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-4 mt-2 flex-wrap">
+                          <span className="text-xs text-secondary-500">{a.steps_count} email{a.steps_count !== 1 ? "s" : ""}</span>
+                          <span className="text-xs text-secondary-500">Sent: <span className="font-medium text-secondary-700">{a.sent}</span></span>
+                          <span className="text-xs text-secondary-500">Completed: <span className="font-medium text-secondary-700">{a.completed}</span></span>
+                          <span className="text-xs text-secondary-500">In queue: <span className="font-medium text-secondary-700">{a.in_queue}</span></span>
+                          <span className="text-xs text-secondary-500">Open rate: <span className="font-medium text-secondary-700">{a.open_rate ? `${Math.round(a.open_rate * 100)}%` : "—"}</span></span>
+                        </div>
+                      </div>
+                    </div>
+                    {a.screenshot_url && (
+                      <a href={a.screenshot_url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
+                        <img src={a.screenshot_url} alt="Email preview" className="w-16 h-20 object-cover rounded border border-secondary-100 hover:opacity-80 transition-opacity" />
+                      </a>
+                    )}
                   </div>
-                  <span className={`text-xs px-2 py-1 rounded-full ${a.enabled ? "bg-success-50 text-success-600" : "bg-secondary-100 text-secondary-500"}`}>{a.enabled ? "Active" : "Disabled"}</span>
                 </div>
               ))}
             </div>
