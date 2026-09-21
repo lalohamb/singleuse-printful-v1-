@@ -67,14 +67,18 @@ export async function GET(req: NextRequest) {
 
   try {
     if (action === "stats") {
-      const [userRes, groupsRes, campaignsRes, automationsRes, formsRes] = await Promise.all([
+      const [userRes, groupsRes, campaignsRes, automationsRes, popupFormsRes, embeddedFormsRes] = await Promise.all([
         ml("/user"),
         ml("/groups?limit=25"),
         ml("/campaigns?limit=25"),
         ml("/automations?limit=25"),
         ml("/forms/popup?limit=25"),
+        ml("/forms/embedded?limit=25"),
       ]);
       const userData = userRes.json.data ?? {};
+      const normForm = (type: string) => (f: Record<string, unknown>) => ({
+        id: String(f.id), name: f.name, type, conversions_count: f.conversions_count ?? 0, url: f.url ?? null,
+      });
       return NextResponse.json({
         account: { account: { name: userData.current_account_name || userData.name || "", email: userData.email || "" } },
         groups: (groupsRes.json.data ?? []).map(normGroup),
@@ -98,9 +102,10 @@ export async function GET(req: NextRequest) {
             screenshot_url: a.first_email_screenshot_url ?? null,
           };
         }),
-        forms: (formsRes.json.data ?? []).map((f: Record<string, unknown>) => ({
-          id: String(f.id), name: f.name, type: "popup", conversions_count: f.conversions_count ?? 0, url: f.url ?? null,
-        })),
+        forms: [
+          ...(popupFormsRes.json.data ?? []).map(normForm("popup")),
+          ...(embeddedFormsRes.json.data ?? []).map(normForm("embedded")),
+        ],
       });
     }
 
@@ -287,6 +292,12 @@ export async function POST(req: NextRequest) {
       if (!body.id || !/^[\w-]{1,64}$/.test(String(body.id))) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
       const { ok, status } = await ml(`/campaigns/${body.id}`, { method: "DELETE" });
       return NextResponse.json({ success: ok || status === 204 });
+    }
+
+    if (action === "duplicate_campaign") {
+      if (!body.id || !/^[\w-]{1,64}$/.test(String(body.id))) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+      const { json, status } = await ml(`/campaigns/${body.id}/duplicate`, { method: "POST", body: JSON.stringify({}) });
+      return NextResponse.json(json, { status });
     }
 
     if (action === "update_subscriber_fields") {

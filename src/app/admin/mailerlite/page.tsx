@@ -283,17 +283,16 @@ function MailerLiteDashboard() {
   const fetchAll = async () => {
     setLoading(true); setError(null);
     try {
-      const [statsData, subsData, formsData] = await Promise.all([
+      const [statsData, subsData] = await Promise.all([
         api("stats"),
         api("subscribers", "&limit=25"),
-        api("all_forms"),
       ]);
       if (statsData.error) throw new Error(statsData.error);
       setAccount(statsData.account);
       setGroups(statsData.groups || []);
       setCampaigns(statsData.campaigns || []);
       setAutomations(statsData.automations || []);
-      setForms(Array.isArray(formsData) ? formsData : (statsData.forms || []));
+      setForms(statsData.forms || []);
       setSubscribers(Array.isArray(subsData) ? subsData : (subsData.data || []));
       setSubMeta(subsData.meta || null);
     } catch (e: unknown) { setError(getErrorMessage(e)); }
@@ -528,11 +527,14 @@ function MailerLiteDashboard() {
                         <td className="px-4 py-3 text-sm text-secondary-600">{c.unsubscribed ?? "—"}</td>
                         <td className="px-4 py-3 text-sm text-secondary-500">{c.date_created ? new Date(c.date_created).toLocaleDateString() : "—"}</td>
                         <td className="px-4 py-3">
-                          {c.status === "draft" && (
-                            <button onClick={async () => { setDeleting(c.id); await post({ action: "delete_campaign", id: c.id }); setCampaigns((p) => p.filter((x) => x.id !== c.id)); setDeleting(null); }} disabled={deleting === c.id} className="p-1.5 text-secondary-400 hover:text-error-600 transition-colors">
-                              {deleting === c.id ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
-                            </button>
-                          )}
+                          <div className="flex items-center gap-1">
+                            <button onClick={async () => { await post({ action: "duplicate_campaign", id: c.id }); fetchAll(); }} className="p-1.5 text-secondary-400 hover:text-primary-600 transition-colors" title="Duplicate"><Copy size={15} /></button>
+                            {c.status === "draft" && (
+                              <button onClick={async () => { setDeleting(c.id); await post({ action: "delete_campaign", id: c.id }); setCampaigns((p) => p.filter((x) => x.id !== c.id)); setDeleting(null); }} disabled={deleting === c.id} className="p-1.5 text-secondary-400 hover:text-error-600 transition-colors">
+                                {deleting === c.id ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                   ))}
