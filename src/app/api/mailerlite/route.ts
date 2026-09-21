@@ -62,15 +62,18 @@ export async function GET(req: NextRequest) {
 
   try {
     if (action === "stats") {
-      const [accountRes, groupsRes, campaignsRes, automationsRes, formsRes] = await Promise.all([
-        ml("/me"),
+      const [accountRes, userRes, groupsRes, campaignsRes, automationsRes, formsRes] = await Promise.all([
+        ml("/account"),
+        ml("/user"),
         ml("/groups?limit=25"),
         ml("/campaigns?limit=25"),
         ml("/automations?limit=25"),
         ml("/forms/popup?limit=25"),
       ]);
+      const accountData = accountRes.json.data ?? {};
+      const userData = userRes.json.data ?? {};
       return NextResponse.json({
-        account: { account: { name: accountRes.json.data?.name ?? "", email: accountRes.json.data?.email ?? "" } },
+        account: { account: { name: accountData.name || userData.name || "", email: userData.email || "" } },
         groups: (groupsRes.json.data ?? []).map(normGroup),
         campaigns: (campaignsRes.json.data ?? []).map(normCampaign),
         automations: (automationsRes.json.data ?? []).map((a: Record<string, unknown>) => ({
