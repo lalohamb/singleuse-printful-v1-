@@ -70,7 +70,8 @@ function EmailPanel() {
     setCustomerEmails(unique);
   };
 
-  useEffect(() => { fetchEmails(); fetchEvents(); fetchCustomerEmails(); loadKey(); }, []);
+  useEffect(() => { fetchEmails(); fetchCustomerEmails(); loadKey(); }, []);
+  useEffect(() => { if (tab === "events") fetchEvents(); }, [tab]);
 
   const loadKey = async () => {
     const { data } = await supabase.from("settings").select("resend_api_key").limit(1).maybeSingle();

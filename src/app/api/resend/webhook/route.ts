@@ -25,19 +25,21 @@ export async function POST(req: NextRequest) {
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
     );
     const payload = JSON.parse(rawBody);
     const type: string = payload.type;
     const data = payload.data;
     if (!type || !data) return NextResponse.json({ received: true });
 
-    await supabase.from("email_events").insert({
+    const { error: insertError } = await supabase.from("email_events").insert({
       resend_id: data.email_id || data.id || "",
       to_email: Array.isArray(data.to) ? data.to[0] : (data.to || ""),
       subject: data.subject || "",
       event_type: type.replace("email.", ""),
     });
+    if (insertError) console.error("[resend-webhook] insert error:", insertError.message);
 
     return NextResponse.json({ received: true });
   } catch (err: unknown) {
