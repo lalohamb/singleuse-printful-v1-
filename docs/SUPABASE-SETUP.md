@@ -135,13 +135,13 @@ This shows secret names only — values are never displayed.
 
 ## Row Level Security
 
-RLS is enabled on all tables. The policies are created by `fresh_install.sql`. Do not disable RLS as a shortcut — the application is designed to work with RLS enabled.
+RLS is enabled on all tables. Admin operations on affiliate tables go through API routes that use the service role key, which bypasses RLS. The anon client never accesses affiliate data directly.
 
 Key access rules:
 - `products`, `categories`, `settings`, `policies`, `seo_settings` — public read, admin write
 - `orders` — public insert (checkout), admin read/update/delete
 - `admins` — authenticated users can read their own row only; super_admin can insert/delete
-- `email_events`, `affiliates`, `affiliate_*` — admin only
+- `email_events`, `affiliates`, `affiliate_*` — service role only (admin API routes); public insert on `affiliates` for the signup form
 
 ---
 

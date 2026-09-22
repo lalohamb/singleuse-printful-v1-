@@ -305,6 +305,13 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
     is_personalizable: product?.is_personalizable || false,
     personalization_label: product?.personalization_label || "",
   });
+  const [variantPrices, setVariantPrices] = useState<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
+    for (const v of product?.variants ?? []) map[v.id] = String(v.price ?? "");
+    return map;
+  });
+  const variants = product?.variants ?? [];
+  const uniqueSizes = Array.from(new Map(variants.map((v) => [v.size || v.label, v])).values());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -340,6 +347,9 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
       form.description !== (product.description || "") ||
       form.image_url !== (product.image_url || "")
     );
+    const updatedVariants = variants.length > 0
+      ? variants.map((v) => ({ ...v, price: parseFloat(variantPrices[v.id] ?? String(v.price)) || v.price }))
+      : undefined;
     const payload = {
       title: form.title, description: form.description,
       price: parseFloat(form.price) || 0, cost: parseFloat(form.cost) || 0,
@@ -351,6 +361,7 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
       is_personalizable: form.is_personalizable,
       personalization_label: form.personalization_label || null,
       images: form.image_url ? [form.image_url] : [], updated_at: new Date().toISOString(),
+      ...(updatedVariants ? { variants: updatedVariants } : {}),
     };
     const result = product ? await supabase.from("products").update(payload).eq("id", product.id) : await supabase.from("products").insert({ ...payload, variants: [{ id: "S", label: "Small", color: "Default" }] });
     if (result.error) { setError(result.error.message); setSaving(false); } else { fetch("/api/revalidate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths: ["/", "/shop"] }) }); onSave(); }
@@ -415,9 +426,39 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div><label className="label-text">Price ($)</label><input type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="input-field" placeholder="32.00" /></div>
+            <div><label className="label-text">Base Price ($)</label><input type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="input-field" placeholder="32.00" /></div>
             <div><label className="label-text">Cost ($)</label><input type="number" step="0.01" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} className="input-field" placeholder="12.50" /></div>
           </div>
+          {uniqueSizes.length > 1 && (
+            <div>
+              <label className="label-text">Variant Prices by Size</label>
+              <p className="text-xs text-secondary-400 mb-2">Override price per size. Leave blank to keep current. All colors at that size share the same price.</p>
+              <div className="grid grid-cols-2 gap-2">
+                {uniqueSizes.map((v) => (
+                  <div key={v.id} className="flex items-center gap-2">
+                    <span className="text-sm text-secondary-600 w-16 shrink-0">{v.size || v.label}</span>
+                    <input
+                      type="number" step="0.01" min="0"
+                      value={variantPrices[v.id] ?? ""}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        // Apply to all variants with the same size
+                        setVariantPrices((prev) => {
+                          const next = { ...prev };
+                          for (const vv of variants) {
+                            if ((vv.size || vv.label) === (v.size || v.label)) next[vv.id] = val;
+                          }
+                          return next;
+                        });
+                      }}
+                      className="input-field py-1.5 text-sm"
+                      placeholder={String(v.price ?? "")}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div><label className="label-text">Image URL</label><div className="grid grid-cols-4 gap-2 mb-2">{Array.from(new Set([...(product?.images ?? []), ...(product?.image_url ? [product.image_url] : [])])).map((url, i) => (<button key={i} type="button" onClick={() => setForm({ ...form, image_url: url })} className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-colors ${form.image_url === url ? "border-gold-500" : "border-transparent"}`}><AppImage fill src={url} alt="" className="w-full h-full object-cover" />{form.image_url === url && <span className="absolute inset-0 flex items-center justify-center bg-black/30 text-white text-lg">✓</span>}</button>))}</div><input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} className="input-field" placeholder="https://..." /></div>
           <div><label className="label-text">Category</label><select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })} className="input-field"><option value="">Uncategorized</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
 

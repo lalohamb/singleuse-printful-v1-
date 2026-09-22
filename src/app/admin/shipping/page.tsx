@@ -40,21 +40,57 @@ function ShippingPanel() {
   const [diag, setDiag] = useState<Diagnostic | null>(null);
   const [loading, setLoading] = useState(true);
   const [fallback, setFallback] = useState("6.99");
+  const [threshold, setThreshold] = useState("75");
+  const [badges, setBadges] = useState([
+    { text: "Free shipping on orders over $75", active: true },
+    { text: "Print on demand - made fresh for you", active: true },
+    { text: "Premium quality guarantee", active: true },
+  ]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [settingsId, setSettingsId] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.from("settings").select("id, default_shipping_cost").limit(1).maybeSingle().then(({ data }) => {
-      if (data) { setSettingsId(data.id); setFallback(String(data.default_shipping_cost ?? 6.99)); }
+    supabase.from("settings").select("id, default_shipping_cost, shipping_free_threshold, product_badge_1_text, product_badge_1_active, product_badge_2_text, product_badge_2_active, product_badge_3_text, product_badge_3_active").limit(1).maybeSingle().then(({ data }) => {
+      if (data) {
+        setSettingsId(data.id);
+        setFallback(String(data.default_shipping_cost ?? 6.99));
+        setThreshold(String(data.shipping_free_threshold ?? 75));
+        setBadges([
+          { text: data.product_badge_1_text ?? "Free shipping on orders over $75", active: data.product_badge_1_active !== false },
+          { text: data.product_badge_2_text ?? "Print on demand - made fresh for you", active: data.product_badge_2_active !== false },
+          { text: data.product_badge_3_text ?? "Premium quality guarantee", active: data.product_badge_3_active !== false },
+        ]);
+      }
     });
   }, []);
 
   const saveFallback = async () => {
-    if (!settingsId) return;
-    setSaving(true);
-    await supabase.from("settings").update({ default_shipping_cost: parseFloat(fallback) || 6.99 }).eq("id", settingsId);
-    setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
+    if (!settingsId) { setSaveError("No settings row found"); return; }
+    setSaving(true); setSaveError(null);
+    // Keep badge 1 text in sync with threshold if it matches the default pattern
+    const syncedBadges = badges.map((b, i) => {
+      if (i === 0 && /free shipping on orders over \$[\d.]+/i.test(b.text)) {
+        return { ...b, text: `Free shipping on orders over $${parseFloat(threshold) || 75}` };
+      }
+      return b;
+    });
+    const { error } = await supabase.from("settings").update({
+      default_shipping_cost: parseFloat(fallback) || 6.99,
+      shipping_free_threshold: parseFloat(threshold) || 75,
+      product_badge_1_text: syncedBadges[0].text,
+      product_badge_1_active: syncedBadges[0].active,
+      product_badge_2_text: syncedBadges[1].text,
+      product_badge_2_active: syncedBadges[1].active,
+      product_badge_3_text: syncedBadges[2].text,
+      product_badge_3_active: syncedBadges[2].active,
+    }).eq("id", settingsId);
+    setSaving(false);
+    if (error) { setSaveError(error.message); } else {
+      setBadges(syncedBadges);
+      setSaved(true); setTimeout(() => setSaved(false), 2000);
+    }
   };
 
   const runDiagnostic = async () => {
@@ -170,17 +206,45 @@ function ShippingPanel() {
           <Truck size={20} className="text-primary-500" />Fallback Shipping Rate
         </h2>
         <p className="text-sm text-secondary-500 mb-4">Used when a product has no Printify shipping profile stored. Keeps checkout from being blocked.</p>
-        <div className="flex items-center gap-3">
-          <span className="text-secondary-500 text-sm">$</span>
-          <input
-            type="number" min="0" step="0.01"
-            value={fallback}
-            onChange={(e) => setFallback(e.target.value)}
-            className="input-field w-32"
-          />
+        <div className="space-y-4">
+          <div>
+            <label className="label-text">Fallback rate (per order)</label>
+            <div className="flex items-center gap-3 mt-1">
+              <span className="text-secondary-500 text-sm">$</span>
+              <input type="number" min="0" step="0.01" value={fallback} onChange={(e) => setFallback(e.target.value)} className="input-field w-32" />
+            </div>
+          </div>
+          <div>
+            <label className="label-text">Free shipping threshold</label>
+            <p className="text-xs text-secondary-400 mb-1">Orders above this amount get free shipping. Shown on product pages and at checkout.</p>
+            <div className="flex items-center gap-3">
+              <span className="text-secondary-500 text-sm">$</span>
+              <input type="number" min="0" step="1" value={threshold} onChange={(e) => {
+                setThreshold(e.target.value);
+                setBadges((prev) => prev.map((b, i) =>
+                  i === 0 && /free shipping on orders over \$[\d.]*/i.test(b.text)
+                    ? { ...b, text: `Free shipping on orders over $${e.target.value}` }
+                    : b
+                ));
+              }} className="input-field w-32" />
+            </div>
+          </div>
+          <div>
+            <label className="label-text">Product Page Badges</label>
+            <p className="text-xs text-secondary-400 mb-3">These appear below the Add to Cart button on every product page. Uncheck to hide.</p>
+            <div className="space-y-3">
+              {badges.map((b, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <input type="checkbox" checked={b.active} onChange={(e) => setBadges((prev) => prev.map((x, j) => j === i ? { ...x, active: e.target.checked } : x))} className="w-4 h-4 rounded shrink-0" />
+                  <input type="text" value={b.text} onChange={(e) => setBadges((prev) => prev.map((x, j) => j === i ? { ...x, text: e.target.value } : x))} className="input-field flex-1 py-1.5 text-sm" />
+                </div>
+              ))}
+            </div>
+          </div>
           <button onClick={saveFallback} disabled={saving} className="btn-primary py-2 text-sm flex items-center gap-2">
             {saving ? <><Loader2 size={15} className="animate-spin" />Saving...</> : saved ? <><Check size={15} />Saved!</> : <><Save size={15} />Save</>}
           </button>
+          {saveError && <p className="text-sm text-error-600 mt-2">{saveError}</p>}
         </div>
       </section>
 

@@ -116,10 +116,11 @@ export async function createStripeCheckout(payload: {
   shipping_cost: number;
 }): Promise<{ url: string; session_id: string }> {
   const apiUrl = `${supabaseUrl}/functions/v1/stripe-checkout`;
+  const affiliate_code = (window as any).__affiliateCode ?? null;
   const res = await fetch(apiUrl, {
     method: "POST",
     headers: { Authorization: `Bearer ${supabaseAnonKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ ...payload, origin: window.location.origin }),
+    body: JSON.stringify({ ...payload, origin: window.location.origin, ...(affiliate_code ? { affiliate_code } : {}) }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Checkout failed" }));

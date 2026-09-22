@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { NextResponse } from "next/server";
 
 /**
@@ -12,32 +12,37 @@ import { NextResponse } from "next/server";
  */
 export async function requireAdmin(): Promise<NextResponse | null> {
   const cookieStore = await cookies();
+  const headersList = await headers();
 
-  // Supabase stores the access token in one of these cookie names depending on
-  // the client version / SSR setup.
-  const projectRef = process.env.NEXT_PUBLIC_SUPABASE_URL?.split("//")[1]?.split(".")[0];
-  const cookieKey = `sb-${projectRef}-auth-token`;
-
-  // Reassemble chunked cookies (.0, .1, ...) or fall back to base key
-  let raw = cookieStore.get(cookieKey)?.value ?? "";
-  if (!raw) {
-    let i = 0;
-    while (true) {
-      const chunk = cookieStore.get(`${cookieKey}.${i}`)?.value;
-      if (!chunk) break;
-      raw += chunk;
-      i++;
-    }
+  // Try Authorization header first (Bearer token)
+  let token = "";
+  const authHeader = headersList.get("authorization") ?? "";
+  if (authHeader.startsWith("Bearer ")) {
+    token = authHeader.slice(7);
   }
 
-  if (!raw) return unauthorized();
-
-  let token: string;
-  try {
-    const parsed = JSON.parse(decodeURIComponent(raw));
-    token = Array.isArray(parsed) ? parsed[0] : (parsed.access_token ?? parsed);
-  } catch {
-    token = raw;
+  // Fall back to cookie
+  if (!token) {
+    const projectRef = process.env.NEXT_PUBLIC_SUPABASE_URL?.split("//")[1]?.split(".")[0];
+    const cookieKey = `sb-${projectRef}-auth-token`;
+    let raw = cookieStore.get(cookieKey)?.value ?? "";
+    if (!raw) {
+      let i = 0;
+      while (true) {
+        const chunk = cookieStore.get(`${cookieKey}.${i}`)?.value;
+        if (!chunk) break;
+        raw += chunk;
+        i++;
+      }
+    }
+    if (raw) {
+      try {
+        const parsed = JSON.parse(decodeURIComponent(raw));
+        token = Array.isArray(parsed) ? parsed[0] : (parsed.access_token ?? parsed);
+      } catch {
+        token = raw;
+      }
+    }
   }
 
   if (!token) return unauthorized();

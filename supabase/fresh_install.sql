@@ -516,29 +516,11 @@ ALTER TABLE affiliate_clicks     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE affiliate_conversions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE affiliate_payouts    ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "admin_all_affiliates" ON affiliates;
-CREATE POLICY "admin_all_affiliates" ON affiliates FOR ALL
-  TO authenticated USING (EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()));
-
-DROP POLICY IF EXISTS "public_insert_affiliate_clicks" ON affiliate_clicks;
-CREATE POLICY "public_insert_affiliate_clicks" ON affiliate_clicks FOR INSERT
-  TO anon, authenticated WITH CHECK (true);
-
-DROP POLICY IF EXISTS "admin_read_affiliate_clicks" ON affiliate_clicks;
-CREATE POLICY "admin_read_affiliate_clicks" ON affiliate_clicks FOR SELECT
-  TO authenticated USING (EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()));
-
-DROP POLICY IF EXISTS "admin_all_affiliate_conversions" ON affiliate_conversions;
-CREATE POLICY "admin_all_affiliate_conversions" ON affiliate_conversions FOR ALL
-  TO authenticated USING (EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()));
-
-DROP POLICY IF EXISTS "affiliate_read_own_conversions" ON affiliate_conversions;
-CREATE POLICY "affiliate_read_own_conversions" ON affiliate_conversions FOR SELECT
-  TO anon, authenticated USING (true);
-
-DROP POLICY IF EXISTS "admin_all_affiliate_payouts" ON affiliate_payouts;
-CREATE POLICY "admin_all_affiliate_payouts" ON affiliate_payouts FOR ALL
-  TO authenticated USING (EXISTS (SELECT 1 FROM admins WHERE admins.id = auth.uid()));
+-- Affiliate tables are accessed server-side via service role (bypasses RLS).
+-- Only the public signup form needs an anon insert policy.
+DROP POLICY IF EXISTS "public_insert_affiliates" ON affiliates;
+CREATE POLICY "public_insert_affiliates" ON affiliates
+  FOR INSERT TO anon, authenticated WITH CHECK (true);
 
 CREATE INDEX IF NOT EXISTS idx_affiliate_clicks_code       ON affiliate_clicks(code);
 CREATE INDEX IF NOT EXISTS idx_affiliate_conversions_aff   ON affiliate_conversions(affiliate_id);

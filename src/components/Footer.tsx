@@ -157,7 +157,7 @@ export default async function Footer() {
               <li><Link href="/services#custom" className="hover:text-white transition-colors">Custom Orders</Link></li>
               <li><Link href="/services#bulk" className="hover:text-white transition-colors">Bulk &amp; Wholesale</Link></li>
               <li><Link href="/services#gifting" className="hover:text-white transition-colors">Gift Services</Link></li>
-              <li><Link href="/affiliate" className="hover:text-white transition-colors">Affiliate Program</Link></li>
+              <li><Link href="/affiliates" className="hover:text-white transition-colors">Affiliate Program</Link></li>
             </ul>
           </div>
         </div>

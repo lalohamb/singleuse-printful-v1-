@@ -42,33 +42,42 @@ export default function Integrations() {
       </div>
 
       {/* Stripe — managed on its own page */}
-      <div className="flex items-center justify-between p-4 bg-secondary-50 rounded-lg">
-        <div className="flex items-center gap-3">
-          <CreditCard size={22} className={stripeOk === "connected" ? "text-success-500" : stripeOk === "warning" ? "text-warning-500" : "text-secondary-400"} />
-          <div><p className="font-medium text-secondary-900">Stripe</p><p className="text-sm text-secondary-500">Payment processing</p></div>
+      <div className="flex items-start justify-between p-4 bg-secondary-50 rounded-lg gap-4">
+        <div className="flex items-start gap-3">
+          <CreditCard size={22} className={`mt-0.5 ${stripeOk === "connected" ? "text-success-500" : stripeOk === "warning" ? "text-warning-500" : "text-secondary-400"}`} />
+          <div className="space-y-1">
+            <p className="font-medium text-secondary-900">Stripe</p>
+            <p className="text-sm text-secondary-500">Handles all payment processing at checkout. Supports live and test modes so you can verify your setup before taking real payments. Keys and webhook secrets are stored securely in the database — no env file changes needed to switch modes.</p>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           <StatusBadge status={stripeOk} />
           <Link href="/admin/stripe" className="text-xs text-primary-600 hover:underline font-medium">Configure →</Link>
         </div>
       </div>
 
       {/* MailerLite */}
-      <div className="flex items-center justify-between p-4 bg-secondary-50 rounded-lg">
-        <div className="flex items-center gap-3">
-          <Send size={22} className={mailerOk === "connected" ? "text-success-500" : mailerOk === "warning" ? "text-warning-500" : "text-secondary-400"} />
-          <div><p className="font-medium text-secondary-900">MailerLite</p><p className="text-sm text-secondary-500">Email marketing</p></div>
+      <div className="flex items-start justify-between p-4 bg-secondary-50 rounded-lg gap-4">
+        <div className="flex items-start gap-3">
+          <Send size={22} className={`mt-0.5 ${mailerOk === "connected" ? "text-success-500" : mailerOk === "warning" ? "text-warning-500" : "text-secondary-400"}`} />
+          <div className="space-y-1">
+            <p className="font-medium text-secondary-900">MailerLite</p>
+            <p className="text-sm text-secondary-500">Email marketing platform used to grow and manage your subscriber list. Customers who complete a purchase are automatically added to your MailerLite group, keeping your audience in sync without any manual work. Configure your API key via the <Link href="/admin/mailerlite" className="text-primary-600 hover:underline">MailerLite page</Link>.</p>
+          </div>
         </div>
-        <StatusBadge status={mailerOk} />
+        <div className="shrink-0"><StatusBadge status={mailerOk} /></div>
       </div>
 
       {/* Resend */}
-      <div className="flex items-center justify-between p-4 bg-secondary-50 rounded-lg">
-        <div className="flex items-center gap-3">
-          <Mail size={22} className={resendOk === "connected" ? "text-success-500" : resendOk === "warning" ? "text-warning-500" : "text-secondary-400"} />
-          <div><p className="font-medium text-secondary-900">Resend</p><p className="text-sm text-secondary-500">Transactional email</p></div>
+      <div className="flex items-start justify-between p-4 bg-secondary-50 rounded-lg gap-4">
+        <div className="flex items-start gap-3">
+          <Mail size={22} className={`mt-0.5 ${resendOk === "connected" ? "text-success-500" : resendOk === "warning" ? "text-warning-500" : "text-secondary-400"}`} />
+          <div className="space-y-1">
+            <p className="font-medium text-secondary-900">Resend</p>
+            <p className="text-sm text-secondary-500">Transactional email service that sends order confirmations to customers after a successful payment. Also used to notify affiliates of new conversions. Requires a verified sending domain and API key set in your environment variables.</p>
+          </div>
         </div>
-        <StatusBadge status={resendOk} />
+        <div className="shrink-0"><StatusBadge status={resendOk} /></div>
       </div>
 
       <SaveBar onSave={() => save({ printify_shop_id: form.printify_shop_id })} saved={saved} error={error} />

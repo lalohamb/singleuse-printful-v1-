@@ -64,7 +64,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const value: CartContextValue = {
     ...state,
-    addToCart: (product, variant, quantity, personalization_text) => dispatch({ type: "ADD", item: { product_id: product.id, title: product.title, price: product.price, image_url: product.image_url || "", quantity, variant_id: variant.id, variant_label: variant.label, printify_id: product.printify_id, blueprint_id: product.blueprint_id, print_provider_id: product.print_provider_id, personalization_text: personalization_text || undefined } }),
+    addToCart: (product, variant, quantity, personalization_text) => dispatch({ type: "ADD", item: { product_id: product.id, title: product.title, price: variant.price ?? product.price, image_url: variant.image_url || product.image_url || "", quantity, variant_id: variant.id, variant_label: variant.label, printify_id: product.printify_id, blueprint_id: product.blueprint_id, print_provider_id: product.print_provider_id, personalization_text: personalization_text || undefined } }),
     removeFromCart: (product_id, variant_id) => dispatch({ type: "REMOVE", product_id, variant_id }),
     updateQuantity: (product_id, variant_id, quantity) => dispatch({ type: "UPDATE_QTY", product_id, variant_id, quantity }),
     clearCart: () => dispatch({ type: "CLEAR" }),

@@ -3,13 +3,24 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Minus, Plus, ShoppingBag, Check, Truck, RefreshCw, Pencil } from "lucide-react";
+import { ChevronLeft, Minus, Plus, ShoppingBag, Check, Truck, RefreshCw, Pencil, X, ZoomIn } from "lucide-react";
 import { formatPrice } from "@/lib/supabase";
 import { useCart } from "@/lib/cart";
 import type { Product, ProductVariant } from "@/types";
 import ProductCard from "@/components/ProductCard";
 
-export default function ProductDetailClient({ product, related }: { product: Product; related: Product[] }) {
+export default function ProductDetailClient({ product, related, freeShippingThreshold = 75, productBadges }: {
+  product: Product;
+  related: Product[];
+  freeShippingThreshold?: number;
+  productBadges?: { text: string; active: boolean }[];
+}) {
+  const defaultBadges = [
+    { text: `Free shipping on orders over $${freeShippingThreshold}`, active: true },
+    { text: "Print on demand - made fresh for you", active: true },
+    { text: "Premium quality guarantee", active: true },
+  ];
+  const badges = productBadges ?? defaultBadges;
   const router = useRouter();
   const { addToCart } = useCart();
   const variants = Array.isArray(product.variants) ? product.variants : [];
@@ -53,6 +64,31 @@ export default function ProductDetailClient({ product, related }: { product: Pro
   const [personalizationText, setPersonalizationText] = useState("");
   const [added, setAdded] = useState(false);
 
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxImg, setLightboxImg] = useState("");
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+  const openLightbox = (img: string) => { setLightboxImg(img); setLightboxOpen(true); setZoom(1); setPan({ x: 0, y: 0 }); };
+  const closeLightbox = () => { setLightboxOpen(false); setZoom(1); setPan({ x: 0, y: 0 }); };
+
+  const onWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    setZoom((z) => Math.min(5, Math.max(1, z - e.deltaY * 0.001)));
+  };
+  const onMouseDown = (e: React.MouseEvent) => {
+    if (zoom <= 1) return;
+    setDragging(true);
+    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+  };
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!dragging) return;
+    setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
+  };
+  const onMouseUp = () => setDragging(false);
+
   const pickColor = (c: string) => {
     setSelectedColor(c);
     const img = colorImage(c);
@@ -74,13 +110,17 @@ export default function ProductDetailClient({ product, related }: { product: Pro
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <button onClick={() => router.back()} className="flex items-center gap-1 text-secondary-600 hover:text-secondary-900 mb-6 transition-colors">
-        <ChevronLeft size={20} /> Back
+      <button onClick={() => router.back()} className="flex items-center gap-1 text-secondary-500 hover:text-secondary-900 mb-6 transition-colors text-sm">
+        <ChevronLeft size={18} /> Back
       </button>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16">
         <div>
-          <div className="aspect-[3/4] rounded-2xl overflow-hidden bg-secondary-50 mb-4 relative">
+          <div className="aspect-[3/4] rounded-2xl overflow-hidden bg-secondary-900 mb-3 relative cursor-zoom-in shadow-2xl" onClick={() => openLightbox(mainImage || product.image_url || "")}>
             <Image src={mainImage || product.image_url || "/product-placeholder.svg"} alt={product.title} fill sizes="(max-width: 1024px) 100vw, 50vw" className="object-cover transition-opacity duration-300" priority />
+            <div className="absolute top-3 right-3 bg-black/50 rounded-full p-1.5 text-white pointer-events-none">
+              <ZoomIn size={16} />
+            </div>
+            <div className="kente-bar absolute bottom-0 left-0 right-0 h-1" />
             {product.is_personalizable && personalizationText.trim() && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <span className="bg-black/50 text-white text-xl font-bold px-5 py-3 rounded-xl tracking-wide text-center max-w-[80%] break-words backdrop-blur-sm">
@@ -90,9 +130,9 @@ export default function ProductDetailClient({ product, related }: { product: Pro
             )}
           </div>
           {images.length > 1 && (
-            <div className="flex gap-3 flex-wrap">
+            <div className="flex gap-2 flex-wrap">
               {images.map((img, i) => (
-                <button key={i} onClick={() => setMainImage(img)} className={`w-20 h-20 rounded-lg overflow-hidden border-2 transition-all relative ${mainImage === img ? "border-secondary-900" : "border-transparent opacity-60 hover:opacity-100"}`}>
+                <button key={i} onClick={() => setMainImage(img)} className={`w-20 h-20 rounded-lg overflow-hidden border-2 transition-all relative ${mainImage === img ? "border-gold-500" : "border-secondary-200 opacity-60 hover:opacity-100"}`}>
                   <Image src={img} alt="" fill sizes="80px" className="object-cover" />
                 </button>
               ))}
@@ -100,10 +140,10 @@ export default function ProductDetailClient({ product, related }: { product: Pro
           )}
         </div>
         <div className="lg:py-4">
-          {product.featured && <span className="inline-block bg-gold-500 text-secondary-900 text-xs font-bold px-3 py-1 rounded-full mb-4">Featured</span>}
-          <h1 className="text-3xl lg:text-4xl font-bold text-secondary-900">{product.title}</h1>
-          <p className="text-2xl font-bold text-secondary-900 mt-4">{formatPrice(product.price)}</p>
-          <p className="text-secondary-600 mt-6 leading-relaxed whitespace-pre-wrap">{product.description}</p>
+          {product.featured && <span className="inline-block bg-gold-500 text-secondary-900 text-xs font-bold px-3 py-1 rounded-full mb-4 tracking-wide uppercase">Featured</span>}
+          <p className="text-gold-500 text-xs font-medium tracking-[0.2em] uppercase mb-2">Body &amp; Sleeves</p>
+          <h1 className="text-3xl lg:text-4xl font-display font-bold text-secondary-900 leading-tight">{product.title}</h1>
+          <p className="text-2xl font-bold text-gold-500 mt-3">{formatPrice(selectedVariant?.price ?? product.price)}</p>
           {hasColorChoice && (
             <div className="mt-8">
               <label className="label-text">Color: <span className="font-normal text-secondary-500">{selectedColor}</span></label>
@@ -125,9 +165,14 @@ export default function ProductDetailClient({ product, related }: { product: Pro
               <label className="label-text">{hasColorChoice ? "Size" : "Select Size / Style"}</label>
               <div className="flex flex-wrap gap-2">
                 {sizes.map((s) => {
+                  const v = variants.find((x) => x.color === selectedColor && (x.size || x.label) === s.label);
                   const active = (selectedVariant?.size || selectedVariant?.label) === s.label;
+                  const basePrice = variants.find((x) => x.color === selectedColor)?.price;
+                  const showPrice = v?.price !== undefined && v.price !== basePrice;
                   return (
-                    <button key={s.id + s.label} onClick={() => pickSize(s.label)} className={`px-4 py-2.5 border rounded-lg font-medium text-sm transition-all ${active ? "border-secondary-900 bg-secondary-900 text-white" : "border-secondary-200 text-secondary-700 hover:border-secondary-400"}`}>{s.label}</button>
+                    <button key={s.id + s.label} onClick={() => pickSize(s.label)} className={`px-4 py-2.5 border rounded-lg font-medium text-sm transition-all ${active ? "border-secondary-900 bg-secondary-900 text-white" : "border-secondary-200 text-secondary-700 hover:border-secondary-400"}`}>
+                      {s.label}{showPrice && <span className="ml-1.5 opacity-75 text-xs">{formatPrice(v!.price)}</span>}
+                    </button>
                   );
                 })}
               </div>
@@ -153,22 +198,57 @@ export default function ProductDetailClient({ product, related }: { product: Pro
               <span className="px-4 font-medium min-w-[3rem] text-center">{quantity}</span>
               <button onClick={() => setQuantity(quantity + 1)} className="p-3 text-secondary-600 hover:text-secondary-900" aria-label="Increase quantity"><Plus size={18} /></button>
             </div>
-            <button onClick={handleAddToCart} disabled={!selectedVariant || (product.is_personalizable && !personalizationText.trim())} className="btn-primary flex-1">
+            <button onClick={handleAddToCart} disabled={!selectedVariant || (product.is_personalizable && !personalizationText.trim())} className="btn-gold flex-1">
               {added ? <><Check size={20} className="mr-2" />Added to Cart</> : <><ShoppingBag size={20} className="mr-2" />Add to Cart</>}
             </button>
           </div>
-          <div className="mt-10 space-y-4 border-t border-secondary-100 pt-6">
-            <div className="flex items-center gap-3 text-secondary-600"><Truck size={20} className="text-primary-500" /><span className="text-sm">Free shipping on orders over $75</span></div>
-            <div className="flex items-center gap-3 text-secondary-600"><RefreshCw size={20} className="text-primary-500" /><span className="text-sm">Print on demand - made fresh for you</span></div>
-            <div className="flex items-center gap-3 text-secondary-600"><Check size={20} className="text-primary-500" /><span className="text-sm">Premium quality guarantee</span></div>
+          <div className="mt-6 space-y-3 pt-6">
+            <div className="kente-bar h-0.5 w-16 rounded-full mb-4" />
+            {badges.filter((b) => b.active).map((b, i) => (
+              <div key={i} className="flex items-center gap-3 text-secondary-600">
+                {i === 0 ? <Truck size={20} className="text-primary-500 shrink-0" /> : i === 1 ? <RefreshCw size={20} className="text-primary-500 shrink-0" /> : <Check size={20} className="text-primary-500 shrink-0" />}
+                <span className="text-sm">{b.text}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-6 border-t border-secondary-100 pt-6">
+            <p className="text-secondary-500 text-xs font-medium tracking-widest uppercase mb-3">About this piece</p>
+            <p className="text-secondary-600 leading-relaxed whitespace-pre-wrap">{product.description}</p>
           </div>
         </div>
       </div>
+      {lightboxOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90" onClick={closeLightbox}>
+          <button className="absolute top-4 right-4 text-white/70 hover:text-white p-2 z-10" onClick={closeLightbox}><X size={28} /></button>
+          {zoom > 1 && (
+            <button className="absolute top-4 left-4 text-white/70 hover:text-white p-2 z-10 text-sm" onClick={(e) => { e.stopPropagation(); setZoom(1); setPan({ x: 0, y: 0 }); }}>Reset</button>
+          )}
+          <div
+            className="relative w-full h-full overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+            onWheel={onWheel}
+            onMouseDown={onMouseDown}
+            onMouseMove={onMouseMove}
+            onMouseUp={onMouseUp}
+            onMouseLeave={onMouseUp}
+            style={{ cursor: zoom > 1 ? (dragging ? "grabbing" : "grab") : "default" }}
+          >
+            <div style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: "center", transition: dragging ? "none" : "transform 0.1s ease", width: "100%", height: "100%", position: "relative" }}>
+              <Image src={lightboxImg} alt={product.title} fill sizes="100vw" className="object-contain" draggable={false} />
+            </div>
+          </div>
+        </div>
+      )}
       {related.length > 0 && (
-        <section className="mt-20">
-          <h2 className="text-2xl lg:text-3xl font-bold text-secondary-900 mb-8">You May Also Like</h2>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-            {related.map((p) => <ProductCard key={p.id} product={p} />)}
+        <section className="mt-20 -mx-4 sm:-mx-6 lg:-mx-8 bg-secondary-900 bg-weave text-white py-14 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex items-center gap-4 mb-8">
+              <div className="kente-bar h-0.5 w-12 rounded-full" />
+              <h2 className="text-2xl lg:text-3xl font-display font-bold text-white">You May Also Like</h2>
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+              {related.map((p) => <ProductCard key={p.id} product={p} />)}
+            </div>
           </div>
         </section>
       )}

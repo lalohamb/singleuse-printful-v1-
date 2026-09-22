@@ -41,14 +41,21 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [productRes, relatedRes, seo] = await Promise.all([
+  const [productRes, relatedRes, seo, settingsRes] = await Promise.all([
     supabase.from("products").select("*").eq("id", id).maybeSingle(),
     supabase.from("products").select("*").eq("status", "active").neq("id", id).limit(4),
     getSeoSettings(),
+    supabase.from("settings").select("shipping_free_threshold, product_badge_1_text, product_badge_1_active, product_badge_2_text, product_badge_2_active, product_badge_3_text, product_badge_3_active").limit(1).maybeSingle(),
   ]);
 
   if (!productRes.data) notFound();
   const product = productRes.data as Product;
+  const freeShippingThreshold: number = settingsRes.data?.shipping_free_threshold ?? 75;
+  const productBadges = [
+    { text: settingsRes.data?.product_badge_1_text ?? "Free shipping on orders over $75", active: settingsRes.data?.product_badge_1_active !== false },
+    { text: settingsRes.data?.product_badge_2_text ?? "Print on demand - made fresh for you", active: settingsRes.data?.product_badge_2_active !== false },
+    { text: settingsRes.data?.product_badge_3_text ?? "Premium quality guarantee", active: settingsRes.data?.product_badge_3_active !== false },
+  ];
   const base = (seo?.site_url || "https://your-store.example").replace(/\/$/, "");
 
   const jsonLd = seo?.jsonld_enabled ? {
@@ -75,7 +82,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           {JSON.stringify(jsonLd)}
         </Script>
       )}
-      <ProductDetailClient product={product} related={(relatedRes.data || []) as Product[]} />
+      <ProductDetailClient product={product} related={(relatedRes.data || []) as Product[]} freeShippingThreshold={freeShippingThreshold} productBadges={productBadges} />
     </StorefrontLayout>
   );
 }

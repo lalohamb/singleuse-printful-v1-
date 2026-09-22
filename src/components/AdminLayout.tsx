@@ -14,6 +14,8 @@ const navItems = [
   { path: "/admin/categories", label: "Categories", icon: FolderTree },
   { path: "/admin/orders", label: "Orders - Printify", icon: ShoppingBag },
   { path: "/admin/customers", label: "Customers", icon: Users },
+  { path: "/admin/affiliates", label: "Affiliates", icon: Link2 },
+  { path: "/admin/affiliates/payouts", label: "Affiliate Payouts", icon: DollarSign },
   { path: "/admin/email", label: "Email - Resend", icon: Mail },
   { path: "/admin/stripe", label: "Stripe - Payments", icon: CreditCard },
   { path: "/admin/mailerlite", label: "MailerLite", icon: Send },
