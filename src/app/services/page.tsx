@@ -133,7 +133,7 @@ export default async function ServicesPage() {
             <div>
              
               <p className="text-secondary-400 leading-relaxed mb-6">
-                We partner with another Black-Owned Business <strong className="text-white">Atlas Cloud Hosting</strong> to deploy custom Next.js storefronts just like this one — fully branded, self-hosted, and connected to your own Printify catalog, Stripe payments, and email marketing.
+                We partner with another Black-Owned Business <strong className="text-white">Atlas Cloud Hosting</strong> to deploy custom Next.js storefronts just like this one — fully branded, self-hosted, and connected to your own product catalog, Stripe payments, and email marketing.
               </p>
               <ul className="space-y-2 mb-8">
                 {[
@@ -158,23 +158,23 @@ export default async function ServicesPage() {
                 >
                   Get Your Store Built <ExternalLink size={16} />
                 </a>
-                <a
+             {/*    <a
                   href="https://printify.com"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-outline border-white/20 text-white hover:bg-white/10 inline-flex items-center gap-2 text-sm"
                 >
                   Learn About Printify <ExternalLink size={15} />
-                </a>
+                </a> */}
               </div>
             </div>
             <div className="bg-white/5 border border-white/10 rounded-2xl p-8 space-y-5">
               <p className="text-gold-400 font-semibold text-sm uppercase tracking-widest">How it works</p>
               {[
-                { step: "01", title: "Connect Printify", desc: "Link your Printify catalog — hundreds of products, printed and shipped by global print partners." },
+                { step: "01", title: "Connect Products", desc: "Link your Product catalog — hundreds of products, printed and shipped by global print partners." },
                 { step: "02", title: "Customize your storefront", desc: "Your logo, colors, pages, and products — all managed from a built-in admin panel." },
-                { step: "03", title: "Accept payments via Stripe", desc: "Secure checkout, automatic order forwarding to Printify, and real-time order tracking." },
-                { step: "04", title: "Grow with email marketing", desc: "Built-in MailerLite integration for newsletters, automations, and subscriber management." },
+                { step: "03", title: "Accept payments via Stripe", desc: "Secure checkout, automatic order forwarding, and real-time order tracking." },
+                { step: "04", title: "Grow with email marketing", desc: "Built-in integration for newsletters, automations, and subscriber management." },
               ].map((item) => (
                 <div key={item.step} className="flex gap-4">
                   <span className="text-gold-500 font-bold text-lg w-8 flex-shrink-0">{item.step}</span>
