@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "payout") {
-      const { data: aff } = await sb().from("affiliates").select("id, name, email, payout_method, payout_handle, commission_rate").eq("id", affiliate_id).maybeSingle();
+      const { data: aff } = await sb().from("affiliates").select("id, name, email, code, payout_method, payout_handle, commission_rate").eq("id", affiliate_id).maybeSingle();
       if (!aff) return NextResponse.json({ error: "Affiliate not found" }, { status: 404 });
 
       const { data: approved } = await sb().from("affiliate_conversions").select("id, commission_amount").eq("affiliate_id", affiliate_id).eq("status", "approved");
