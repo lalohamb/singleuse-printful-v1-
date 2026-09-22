@@ -277,8 +277,6 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
         </section>
       </Reveal>
 
-      <NewsletterSignup />
-
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="relative rounded-2xl overflow-hidden bg-secondary-900 px-8 py-16 text-center">
           <div className="absolute inset-0">
@@ -312,7 +310,7 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
       </section>
 
       {trending.length > 0 && (
-        <section className="bg-secondary-900 bg-weave text-white py-14 overflow-hidden -mb-32">
+        <section className="bg-secondary-900 bg-weave text-white py-14 overflow-hidden">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-10 flex items-center justify-between">
             <div>
               <h2 className="text-3xl lg:text-4xl font-bold text-white">Trending Now</h2>

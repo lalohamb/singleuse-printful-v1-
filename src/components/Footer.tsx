@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Mail } from "lucide-react";
+import NewsletterSignup from "@/components/NewsletterSignup";
 import Image from "next/image";
 import { createClient } from "@supabase/supabase-js";
 import { unstable_noStore as noStore } from "next/cache";
@@ -96,30 +97,33 @@ export default async function Footer() {
   const footerText = data?.footer_text || "Made-to-order apparel designed for every body, every style, and every day. Wear what feels like you.";
   const footerBottomMessage = data?.footer_bottom_message || "Made to order. Made with love.";
   return (
-    <footer className="bg-secondary-900 text-secondary-300 mt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-12">
-          <div className="col-span-1 md:col-span-2">
-            <Image src={logoUrl} alt="Your Store" width={220} height={80} style={{ height: `${logoSize}px`, width: "auto" }} unoptimized />
-            <p className="mt-4 text-secondary-400 max-w-md">{footerText}</p>
-            <div className="flex items-center gap-4 mt-6 flex-wrap">
-              {(Object.keys(ICON_MAP) as Array<keyof typeof ICON_MAP>).map((key) => {
-                const entry = social[key as keyof StoreSettings["social_links"]];
-                if (!entry?.enabled || !entry.url) return null;
-                const Icon = ICON_MAP[key];
-                return (
-                  <a key={key} href={entry.url} target={entry.url.startsWith("mailto") ? undefined : "_blank"} rel="noopener noreferrer" className="text-secondary-400 hover:text-white transition-colors" aria-label={key}>
-                    <Icon size={22} />
-                  </a>
-                );
-              })}
-              {social.email?.enabled && social.email.url && (
-                <a href={social.email.url} className="text-secondary-400 hover:text-white transition-colors" aria-label="Email">
-                  <Mail size={22} />
+    <footer className="bg-secondary-900 text-secondary-300 mt-00">
+      <div className="px-4 sm:px-8 lg:px-16 py-16">
+        {/* Row 1: Logo + social icons centered */}
+        <div className="flex flex-col items-center text-center pb-12 border-b border-secondary-700">
+          <Image src={logoUrl} alt="Your Store" width={220} height={80} style={{ height: `${logoSize}px`, width: "auto" }} unoptimized />
+          <p className="mt-4 text-secondary-400 max-w-md">{footerText}</p>
+          <div className="flex items-center gap-4 mt-6 flex-wrap justify-center">
+            {(Object.keys(ICON_MAP) as Array<keyof typeof ICON_MAP>).map((key) => {
+              const entry = social[key as keyof StoreSettings["social_links"]];
+              if (!entry?.enabled || !entry.url) return null;
+              const Icon = ICON_MAP[key];
+              return (
+                <a key={key} href={entry.url} target={entry.url.startsWith("mailto") ? undefined : "_blank"} rel="noopener noreferrer" className="text-secondary-400 hover:text-white transition-colors" aria-label={key}>
+                  <Icon size={22} />
                 </a>
-              )}
-            </div>
+              );
+            })}
+            {social.email?.enabled && social.email.url && (
+              <a href={social.email.url} className="text-secondary-400 hover:text-white transition-colors" aria-label="Email">
+                <Mail size={22} />
+              </a>
+            )}
           </div>
+        </div>
+
+        {/* Row 2: 4 link columns */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-10 py-12 border-b border-secondary-700">
           <div>
             <h4 className="text-white font-semibold mb-4">Shop</h4>
             <ul className="space-y-3">
@@ -144,9 +148,23 @@ export default async function Footer() {
               <li><Link href="/about" className="hover:text-white transition-colors">About Us</Link></li>
               <li><Link href="/about#mission" className="hover:text-white transition-colors">Our Mission</Link></li>
               <li><Link href="/about#culture" className="hover:text-white transition-colors">The Culture</Link></li>
-
             </ul>
           </div>
+          <div>
+            <h4 className="text-white font-semibold mb-4">Services</h4>
+            <ul className="space-y-3">
+              <li><Link href="/services" className="hover:text-white transition-colors">What We Offer</Link></li>
+              <li><Link href="/services#custom" className="hover:text-white transition-colors">Custom Orders</Link></li>
+              <li><Link href="/services#bulk" className="hover:text-white transition-colors">Bulk &amp; Wholesale</Link></li>
+              <li><Link href="/services#gifting" className="hover:text-white transition-colors">Gift Services</Link></li>
+              <li><Link href="/affiliate" className="hover:text-white transition-colors">Affiliate Program</Link></li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Row 3: Newsletter full width */}
+        <div className="py-12 border-b border-secondary-700 flex flex-col items-center text-center">
+          <NewsletterSignup variant="footer" />
         </div>
         <div className="border-t border-secondary-700 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-sm text-secondary-500">&copy; {new Date().getFullYear()} {data?.store_name || "Your Store"}. All rights reserved.</p>

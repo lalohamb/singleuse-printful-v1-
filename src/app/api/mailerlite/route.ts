@@ -138,9 +138,11 @@ export async function GET(req: NextRequest) {
       const ALLOWED_FILTERS = new Set(["active", "unsubscribed", "bounced", "junk", "unconfirmed"]);
       const filter = ALLOWED_FILTERS.has(searchParams.get("filter") ?? "") ? searchParams.get("filter") : "";
       const cursor = searchParams.get("cursor") || "";
+      const groupId = searchParams.get("group_id") || "";
       let url = `/subscribers?limit=${limit}`;
       if (search) url += `&filter[email]=${encodeURIComponent(search)}`;
       if (filter) url += `&filter[status]=${filter}`;
+      if (groupId) url += `&filter[group_id]=${encodeURIComponent(groupId)}`;
       if (cursor) url += `&cursor=${cursor}`;
       const { json } = await ml(url);
       return NextResponse.json({
@@ -287,7 +289,28 @@ export async function POST(req: NextRequest) {
         });
         return NextResponse.json(sendJson, { status: sendStatus });
       }
+      if (body.scheduled_at) {
+        const { json: sendJson, status: sendStatus } = await ml(`/campaigns/${campaignId}/schedule`, {
+          method: "POST", body: JSON.stringify({ delivery: "scheduled", schedule: { date: body.scheduled_at } }),
+        });
+        return NextResponse.json(sendJson, { status: sendStatus });
+      }
       return NextResponse.json(campaign, { status: 201 });
+    }
+
+    if (action === "schedule_campaign") {
+      if (!body.id || !/^[\w-]{1,64}$/.test(String(body.id))) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+      const payload: Record<string, unknown> = { delivery: body.scheduled_at ? "scheduled" : "instant" };
+      if (body.scheduled_at) payload.schedule = { date: body.scheduled_at };
+      const { json, status } = await ml(`/campaigns/${body.id}/schedule`, { method: "POST", body: JSON.stringify(payload) });
+      return NextResponse.json(json, { status });
+    }
+
+    if (action === "toggle_automation") {
+      if (!body.id || !/^[\w-]{1,64}$/.test(String(body.id))) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+      const endpoint = body.enabled ? `/automations/${body.id}/activate` : `/automations/${body.id}/deactivate`;
+      const { json, status } = await ml(endpoint, { method: "POST", body: JSON.stringify({}) });
+      return NextResponse.json(json, { status });
     }
 
     if (action === "delete_campaign") {

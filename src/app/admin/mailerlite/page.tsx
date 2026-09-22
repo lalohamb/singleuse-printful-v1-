@@ -143,14 +143,14 @@ function EditSubscriberModal({ subscriber, groups, onClose, onDone }: { subscrib
 }
 
 function CreateCampaignModal({ groups, defaultFromName, defaultFromEmail, onClose, onDone }: { groups: Group[]; defaultFromName: string; defaultFromEmail: string; onClose: () => void; onDone: () => void }) {
-  const [form, setForm] = useState({ name: "", subject: "", from_name: defaultFromName, from_email: defaultFromEmail, html: "", group: "", send_now: false });
+  const [form, setForm] = useState({ name: "", subject: "", from_name: defaultFromName, from_email: defaultFromEmail, html: "", group: "", send_now: false, scheduled_at: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setLoading(true); setError(null);
-    const res = await post({ action: "create_campaign", ...form, groups: form.group ? [form.group] : [] });
+    const res = await post({ action: "create_campaign", ...form, groups: form.group ? [form.group] : [], scheduled_at: form.scheduled_at || undefined });
     if (res.error || res.message || res.errors) {
       const msg = typeof res.message === "string" ? res.message
         : typeof res.error === "string" ? res.error
@@ -182,10 +182,19 @@ function CreateCampaignModal({ groups, defaultFromName, defaultFromEmail, onClos
           <textarea required value={form.html} onChange={(e) => setForm({ ...form, html: e.target.value })} className="input-field min-h-[180px] font-mono text-xs" placeholder="<h1>Hello!</h1><p>Check out our latest collection...</p>" />
           <p className="text-xs text-secondary-400 mt-1">Tip: paste plain text or basic HTML. For rich designs use MailerLite&apos;s editor.</p>
         </div>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" checked={form.send_now} onChange={(e) => setForm({ ...form, send_now: e.target.checked })} className="w-4 h-4 rounded text-gold-500" />
-          <span className="text-sm text-secondary-700">Send immediately (uncheck to save as draft)</span>
-        </label>
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={form.send_now} onChange={(e) => setForm({ ...form, send_now: e.target.checked, scheduled_at: "" })} className="w-4 h-4 rounded text-gold-500" />
+            <span className="text-sm text-secondary-700">Send immediately</span>
+          </label>
+          {!form.send_now && (
+            <div>
+              <label className="label-text">Schedule for (optional)</label>
+              <input type="datetime-local" value={form.scheduled_at} onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })} className="input-field" />
+              <p className="text-xs text-secondary-400 mt-1">Leave blank to save as draft.</p>
+            </div>
+          )}
+        </div>
         {error && <ErrorMsg msg={error} />}
         <SubmitBtn loading={loading} done={done} label={form.send_now ? "Send Campaign" : "Save as Draft"} />
       </form>
@@ -275,9 +284,11 @@ function MailerLiteDashboard() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [cursor, setCursor] = useState("");
-  const [modal, setModal] = useState<"add_sub" | "edit_sub" | "add_group" | "edit_group" | "create_campaign" | null>(null);
+  const [modal, setModal] = useState<"add_sub" | "edit_sub" | "add_group" | "edit_group" | "create_campaign" | "group_subs" | null>(null);
   const [selectedSub, setSelectedSub] = useState<Subscriber | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [groupSubsData, setGroupSubsData] = useState<Subscriber[]>([]);
+  const [groupSubsLoading, setGroupSubsLoading] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
 
   const fetchAll = async () => {
@@ -307,6 +318,21 @@ function MailerLiteDashboard() {
   };
 
   useEffect(() => { fetchAll(); }, []);
+
+  const openGroupSubs = async (group: Group) => {
+    setSelectedGroup(group);
+    setGroupSubsLoading(true);
+    setGroupSubsData([]);
+    setModal("group_subs");
+    const data = await api("subscribers", `&limit=25&group_id=${group.id}`);
+    setGroupSubsData(Array.isArray(data) ? data : (data.data || []));
+    setGroupSubsLoading(false);
+  };
+
+  const toggleAutomation = async (a: Automation) => {
+    const res = await post({ action: "toggle_automation", id: a.id, enabled: !a.enabled });
+    if (!res.error) setAutomations((p) => p.map((x) => x.id === a.id ? { ...x, enabled: !a.enabled } : x));
+  };
 
   const deleteSub = async (id: string) => {
     setDeleting(id);
@@ -495,7 +521,8 @@ function MailerLiteDashboard() {
                     <div><p className="font-medium text-secondary-900">{group.name}</p><p className="text-xs text-secondary-500">{group.active ?? group.total ?? 0} active subscribers</p></div>
                   </div>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => { setSelectedGroup(group); setModal("edit_group"); }} className="p-1.5 text-secondary-400 hover:text-primary-600 transition-colors"><Edit2 size={15} /></button>
+                    <button onClick={() => openGroupSubs(group)} className="p-1.5 text-secondary-400 hover:text-primary-600 transition-colors" title="View subscribers"><Users size={15} /></button>
+                    <button onClick={() => { setSelectedGroup(group); setModal("edit_group"); }} className="p-1.5 text-secondary-400 hover:text-primary-600 transition-colors" title="Rename"><Edit2 size={15} /></button>
                     <button onClick={() => deleteGroup(group.id)} disabled={deleting === group.id} className="p-1.5 text-secondary-400 hover:text-error-600 transition-colors">
                       {deleting === group.id ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
                     </button>
@@ -584,6 +611,9 @@ function MailerLiteDashboard() {
                         <img src={a.screenshot_url} alt="Email preview" className="w-16 h-20 object-cover rounded border border-secondary-100 hover:opacity-80 transition-opacity" />
                       </a>
                     )}
+                    <button onClick={() => toggleAutomation(a)} className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors ${a.enabled ? "border-error-200 text-error-600 hover:bg-error-50" : "border-success-200 text-success-600 hover:bg-success-50"}`}>
+                      {a.enabled ? "Disable" : "Enable"}
+                    </button>
                   </div>
                 </div>
               ))}
@@ -610,6 +640,11 @@ function MailerLiteDashboard() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {f.type === "embedded" && f.url && (
+                      <button onClick={() => { navigator.clipboard.writeText(`<script src="${f.url}" defer><\/script>`); }} className="flex items-center gap-1 text-xs px-2 py-1.5 rounded border border-secondary-200 text-secondary-600 hover:border-secondary-400 transition-colors" title="Copy embed code">
+                        <Copy size={13} />Embed
+                      </button>
+                    )}
                     {f.url && (
                       <button onClick={() => { navigator.clipboard.writeText(f.url!); }} className="flex items-center gap-1 text-xs px-2 py-1.5 rounded border border-secondary-200 text-secondary-600 hover:border-secondary-400 transition-colors" title="Copy URL">
                         <Copy size={13} />Copy URL
@@ -626,6 +661,27 @@ function MailerLiteDashboard() {
         )}
       </div>
 
+      {modal === "group_subs" && selectedGroup && (
+        <Modal title={`Subscribers in "${selectedGroup.name}"`} onClose={() => setModal(null)}>
+          {groupSubsLoading ? (
+            <div className="flex justify-center py-10"><Loader2 size={24} className="animate-spin text-secondary-400" /></div>
+          ) : groupSubsData.length === 0 ? (
+            <p className="text-center text-secondary-400 py-10">No subscribers in this group.</p>
+          ) : (
+            <div className="divide-y divide-secondary-100">
+              {groupSubsData.map((s) => (
+                <div key={s.id} className="flex items-center justify-between py-2.5">
+                  <div>
+                    <p className="text-sm font-medium text-secondary-900">{s.email}</p>
+                    <p className="text-xs text-secondary-400">{s.fields?.find((f) => f.key === "name")?.value || ""}</p>
+                  </div>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${statusBadge[s.status] || "bg-secondary-100 text-secondary-500"}`}>{s.status}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Modal>
+      )}
       {modal === "add_sub" && <AddSubscriberModal groups={groups} onClose={() => setModal(null)} onDone={fetchAll} />}
       {modal === "edit_sub" && selectedSub && <EditSubscriberModal subscriber={selectedSub} groups={groups} onClose={() => setModal(null)} onDone={(patch) => { if (patch) setSubscribers((p) => p.map((s) => s.id === selectedSub.id ? { ...s, ...patch } : s)); else fetchAll(); }} />}
       {modal === "add_group" && <GroupModal onClose={() => setModal(null)} onDone={fetchAll} />}
