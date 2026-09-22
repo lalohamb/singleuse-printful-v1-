@@ -1,7 +1,15 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { Lock, Unlock, Save, Eye, EyeOff, ExternalLink, Bold, Italic, Underline, List, ListOrdered, Link as LinkIcon, Heading2, Heading3 } from "lucide-react";
+import {
+  Lock, Unlock, Save, Eye, EyeOff, ExternalLink,
+  Bold, Italic, Underline, Strikethrough,
+  List, ListOrdered, Link as LinkIcon, Unlink,
+  Heading1, Heading2, Heading3,
+  AlignLeft, AlignCenter, AlignRight,
+  Quote, Minus, Code, Superscript, Subscript,
+  Undo2, Redo2, RemoveFormatting, Palette,
+} from "lucide-react";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
 import { DEFAULT_POLICY_CONTENT, type PolicyId } from "@/lib/policy-content";
 
@@ -13,6 +21,46 @@ const POLICIES = [
   { id: "refund",  title: "Refund and Returns Policy", href: "/refund-policy" },
 ];
 
+const SEP = "sep";
+
+type ToolDef =
+  | typeof SEP
+  | { cmd: string; label: string; icon: React.ElementType; value?: string; custom?: never }
+  | { custom: "link" | "unlink" | "color" | "highlight"; label: string; icon: React.ElementType; cmd?: never };
+
+const TOOLS: ToolDef[] = [
+  { cmd: "undo",              label: "Undo",            icon: Undo2 },
+  { cmd: "redo",              label: "Redo",            icon: Redo2 },
+  SEP,
+  { cmd: "formatBlock",       label: "Heading 1",       icon: Heading1,   value: "<h1>" },
+  { cmd: "formatBlock",       label: "Heading 2",       icon: Heading2,   value: "<h2>" },
+  { cmd: "formatBlock",       label: "Heading 3",       icon: Heading3,   value: "<h3>" },
+  SEP,
+  { cmd: "bold",              label: "Bold",            icon: Bold },
+  { cmd: "italic",            label: "Italic",          icon: Italic },
+  { cmd: "underline",         label: "Underline",       icon: Underline },
+  { cmd: "strikeThrough",     label: "Strikethrough",   icon: Strikethrough },
+  { cmd: "superscript",       label: "Superscript",     icon: Superscript },
+  { cmd: "subscript",         label: "Subscript",       icon: Subscript },
+  SEP,
+  { cmd: "justifyLeft",       label: "Align left",      icon: AlignLeft },
+  { cmd: "justifyCenter",     label: "Align center",    icon: AlignCenter },
+  { cmd: "justifyRight",      label: "Align right",     icon: AlignRight },
+  SEP,
+  { cmd: "insertUnorderedList", label: "Bullet list",   icon: List },
+  { cmd: "insertOrderedList",   label: "Numbered list", icon: ListOrdered },
+  { cmd: "formatBlock",       label: "Blockquote",      icon: Quote,      value: "<blockquote>" },
+  { cmd: "formatBlock",       label: "Code block",      icon: Code,       value: "<pre>" },
+  { cmd: "insertHorizontalRule", label: "Divider",      icon: Minus },
+  SEP,
+  { custom: "link",           label: "Insert link",     icon: LinkIcon },
+  { custom: "unlink",         label: "Remove link",     icon: Unlink },
+  { custom: "color",          label: "Text color",      icon: Palette },
+  { custom: "highlight",      label: "Highlight",       icon: Palette },
+  SEP,
+  { cmd: "removeFormat",      label: "Clear formatting", icon: RemoveFormatting },
+];
+
 export default function PoliciesPage() {
   const [policies, setPolicies] = useState<Record<string, Policy>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -20,6 +68,7 @@ export default function PoliciesPage() {
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [dirty, setDirty] = useState<Record<string, boolean>>({});
   const [msg, setMsg] = useState<Record<string, string>>({});
+  const editorRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
     supabase.from("policies").select("*").then(({ data }) => {
@@ -29,27 +78,53 @@ export default function PoliciesPage() {
       data.forEach((p: Policy) => { map[p.id] = p; d[p.id] = p.content || DEFAULT_POLICY_CONTENT[p.id as PolicyId] || ""; });
       setPolicies(map);
       setDrafts(d);
+      data.forEach((p: Policy) => {
+        const el = editorRefs.current[p.id];
+        if (el) el.innerHTML = p.content || DEFAULT_POLICY_CONTENT[p.id as PolicyId] || "";
+      });
     });
   }, []);
 
-  const onChange = (id: string, val: string) => {
+  const readEditor = (id: string) => editorRefs.current[id]?.innerHTML ?? "";
+
+  const onInput = (id: string) => {
+    const val = readEditor(id);
     setDrafts((prev) => ({ ...prev, [id]: val }));
     setDirty((prev) => ({ ...prev, [id]: val !== policies[id]?.content }));
   };
 
   const format = (id: string, command: string, value?: string) => {
+    editorRefs.current[id]?.focus();
     document.execCommand(command, false, value);
-    const editor = document.querySelector(`[data-policy-editor="${id}"]`);
-    if (editor) onChange(id, editor.innerHTML);
+    onInput(id);
+  };
+
+  const handleCustom = (id: string, custom: string) => {
+    editorRefs.current[id]?.focus();
+    if (custom === "link") {
+      const url = window.prompt("Link URL (include https://)");
+      if (url) { document.execCommand("createLink", false, url); onInput(id); }
+    } else if (custom === "unlink") {
+      document.execCommand("unlink", false, undefined);
+      onInput(id);
+    } else if (custom === "color") {
+      const color = window.prompt("Text color (hex or name, e.g. #e53e3e or red)");
+      if (color) { document.execCommand("foreColor", false, color); onInput(id); }
+    } else if (custom === "highlight") {
+      const color = window.prompt("Highlight color (hex or name, e.g. #fef08a or yellow)");
+      if (color) { document.execCommand("hiliteColor", false, color); onInput(id); }
+    }
   };
 
   const save = async (id: string) => {
     if (policies[id]?.locked) return;
+    const content = readEditor(id);
     setSaving((prev) => ({ ...prev, [id]: true }));
-    const { error } = await supabase.from("policies").upsert({ id, title: POLICIES.find(p => p.id === id)!.title, content: drafts[id], locked: policies[id]?.locked ?? false, updated_at: new Date().toISOString() });
+    const { error } = await supabase.from("policies").upsert({ id, title: POLICIES.find(p => p.id === id)!.title, content, locked: policies[id]?.locked ?? false, updated_at: new Date().toISOString() });
     setSaving((prev) => ({ ...prev, [id]: false }));
     if (!error) {
-      setPolicies((prev) => ({ ...prev, [id]: { ...prev[id], content: drafts[id] } }));
+      setPolicies((prev) => ({ ...prev, [id]: { ...prev[id], content } }));
+      setDrafts((prev) => ({ ...prev, [id]: content }));
       setDirty((prev) => ({ ...prev, [id]: false }));
       setMsg((prev) => ({ ...prev, [id]: "Saved & published!" }));
       const policyHref = POLICIES.find(p => p.id === id)?.href;
@@ -66,6 +141,8 @@ export default function PoliciesPage() {
     setTimeout(() => setMsg((prev) => ({ ...prev, [id]: "" })), 2000);
   };
 
+  const btnClass = "p-1.5 text-secondary-600 hover:bg-white hover:text-secondary-900 rounded transition-colors disabled:opacity-30";
+
   return (
     <ProtectedAdmin>
       <div className="max-w-4xl space-y-8">
@@ -80,7 +157,7 @@ export default function PoliciesPage() {
           const isDirty = dirty[id] ?? false;
           return (
             <section key={id} className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6 space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-3">
                   <h2 className="text-lg font-semibold text-secondary-900">{title}</h2>
                   {isLocked && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium flex items-center gap-1"><Lock size={11} />Locked</span>}
@@ -103,40 +180,43 @@ export default function PoliciesPage() {
               {msg[id] && <p className="text-xs text-green-600 font-medium">{msg[id]}</p>}
 
               {isPreview ? (
-                <div className="min-h-[300px] max-h-[500px] overflow-y-auto border border-secondary-100 rounded-lg p-6 prose prose-sm max-w-none text-secondary-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: drafts[id] || "<em>No content yet.</em>" }}>
-                </div>
+                <div className="min-h-[300px] max-h-[500px] overflow-y-auto border border-secondary-100 rounded-lg p-6 text-secondary-600 leading-relaxed [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mb-2 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mb-1 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mb-1 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-2 [&_a]:text-primary-600 [&_a]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-secondary-300 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-secondary-500 [&_pre]:bg-secondary-50 [&_pre]:rounded [&_pre]:p-3 [&_pre]:text-sm [&_pre]:font-mono [&_hr]:border-secondary-200 [&_hr]:my-4" dangerouslySetInnerHTML={{ __html: drafts[id] || "<em>No content yet.</em>" }} />
               ) : (
                 <div className={`border border-secondary-200 rounded-lg overflow-hidden ${isLocked ? "opacity-50" : ""}`}>
-                  <div className="flex flex-wrap items-center gap-1 p-2 bg-secondary-50 border-b border-secondary-200">
-                    {[
-                      ["bold", "Bold", Bold], ["italic", "Italic", Italic], ["underline", "Underline", Underline],
-                      ["formatBlock", "Heading 2", Heading2, "<h2>"], ["formatBlock", "Heading 3", Heading3, "<h3>"],
-                      ["insertUnorderedList", "Bullet list", List], ["insertOrderedList", "Numbered list", ListOrdered],
-                    ].map(([command, label, Icon, value]) => (
-                      <button key={`${command}-${label}`} type="button" disabled={isLocked} onMouseDown={(e) => e.preventDefault()} onClick={() => format(id, command as string, value as string | undefined)} className="p-2 text-secondary-600 hover:bg-white hover:text-secondary-900 rounded" title={label as string} aria-label={label as string}>
-                        {(() => { const ToolIcon = Icon as typeof Bold; return <ToolIcon size={16} />; })()}
-                      </button>
-                    ))}
-                    <button type="button" disabled={isLocked} onMouseDown={(e) => e.preventDefault()} onClick={() => { const url = window.prompt("Link URL"); if (url) format(id, "createLink", url); }} className="p-2 text-secondary-600 hover:bg-white hover:text-secondary-900 rounded" title="Insert link" aria-label="Insert link"><LinkIcon size={16} /></button>
+                  {/* Toolbar */}
+                  <div className="flex flex-wrap items-center gap-0.5 p-2 bg-secondary-50 border-b border-secondary-200">
+                    {TOOLS.map((tool, i) => {
+                      if (tool === SEP) return <div key={i} className="w-px h-5 bg-secondary-200 mx-1" />;
+                      const { label, icon: Icon } = tool;
+                      if ("custom" in tool && tool.custom) {
+                        return (
+                          <button key={label} type="button" disabled={isLocked} onMouseDown={(e) => e.preventDefault()} onClick={() => handleCustom(id, tool.custom!)} className={btnClass} title={label} aria-label={label}>
+                            <Icon size={15} />
+                          </button>
+                        );
+                      }
+                      return (
+                        <button key={`${tool.cmd}-${label}`} type="button" disabled={isLocked} onMouseDown={(e) => e.preventDefault()} onClick={() => format(id, tool.cmd!, tool.value)} className={btnClass} title={label} aria-label={label}>
+                          <Icon size={15} />
+                        </button>
+                      );
+                    })}
                   </div>
+                  {/* Editor */}
                   <div
-                    key={id}
-                    data-policy-editor={id}
+                    ref={(el) => { editorRefs.current[id] = el; }}
                     contentEditable={!isLocked}
                     suppressContentEditableWarning
-                    onInput={(e) => onChange(id, e.currentTarget.innerHTML)}
+                    onInput={() => onInput(id)}
                     onPaste={(e) => {
                       e.preventDefault();
                       const html = e.clipboardData.getData("text/html");
                       const text = e.clipboardData.getData("text/plain");
                       const content = html || text.replace(/\n\n+/g, "</p><p>").replace(/\n/g, "<br>").replace(/^/, "<p>").replace(/$/, "</p>");
                       document.execCommand("insertHTML", false, content);
-                      const editor = document.querySelector(`[data-policy-editor="${id}"]`);
-                      if (editor) onChange(id, editor.innerHTML);
+                      onInput(id);
                     }}
-                    dangerouslySetInnerHTML={{ __html: drafts[id] || "" }}
-                    className="w-full min-h-[360px] p-4 prose prose-sm max-w-none text-secondary-700 leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary-200"
-                    data-placeholder={`Enter ${title} content here...`}
+                    className="w-full min-h-[360px] p-4 text-secondary-700 leading-relaxed focus:outline-none [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mb-2 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mb-1 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mb-1 [&_p]:mb-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-1 [&_a]:text-primary-600 [&_a]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-secondary-300 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-secondary-500 [&_pre]:bg-secondary-50 [&_pre]:rounded [&_pre]:p-3 [&_pre]:text-sm [&_pre]:font-mono [&_hr]:border-secondary-200 [&_hr]:my-4"
                   />
                 </div>
               )}
