@@ -27,17 +27,29 @@ export async function POST(req: NextRequest) {
   const authError = await requireAdmin();
   if (authError) return authError;
 
-  const { secret_key, activate = false } = await req.json();
+  const { secret_key, webhook_secret, activate = false } = await req.json();
 
   if (!secret_key)
     return NextResponse.json({ error: "secret_key is required" }, { status: 400 });
   if (!secret_key.startsWith("sk_live_") && !secret_key.startsWith("sk_test_"))
     return NextResponse.json({ error: "Invalid key — must start with sk_live_ or sk_test_" }, { status: 400 });
+  if (webhook_secret && !webhook_secret.startsWith("whsec_"))
+    return NextResponse.json({ error: "Invalid webhook_secret — must start with whsec_" }, { status: 400 });
 
   const mode: "live" | "test" = secret_key.startsWith("sk_live_") ? "live" : "test";
   const steps: string[] = [];
 
   try {
+    // If webhook secret was manually provided, skip auto-registration
+    if (webhook_secret) {
+      await saveStripeKeys(mode, secret_key, webhook_secret);
+      steps.push(`${mode} keys saved to database (webhook secret provided manually)`);
+      if (activate) {
+        await setStripeMode(mode);
+        steps.push(`stripe_mode set to ${mode}`);
+      }
+      return NextResponse.json({ ok: true, mode, activated: activate, steps });
+    }
     // Save keys to DB directly — webhook registration is optional and can be done separately
     const webhookUrl = getWebhookUrl();
     const client = new Stripe(secret_key, { apiVersion: "2026-08-26.dahlia" });
@@ -50,17 +62,20 @@ export async function POST(req: NextRequest) {
       // Reuse saved webhook secret from DB if available
       const saved = await getStripeSettings();
       const savedSecret = mode === "live" ? saved?.stripe_live_webhook_secret : saved?.stripe_test_webhook_secret;
-      webhookSecret = savedSecret ?? null;
-      if (webhookSecret) steps.push("Webhook already registered — reused existing endpoint");
-      else steps.push("Webhook exists in Stripe — signing secret already saved in DB");
-    } else {
-      try {
+      if (savedSecret) {
+        webhookSecret = savedSecret;
+        steps.push("Webhook already registered — reused existing endpoint");
+      } else {
+        // Secret not in DB (Stripe only returns it once) — delete and recreate to get a fresh one
+        await client.webhookEndpoints.del(match.id);
         const endpoint = await client.webhookEndpoints.create({ url: webhookUrl, enabled_events: WEBHOOK_EVENTS });
         webhookSecret = endpoint.secret!;
-        steps.push("Webhook registered in Stripe");
-      } catch {
-        steps.push("Webhook registration skipped — keys saved without webhook");
+        steps.push("Webhook recreated to recover signing secret");
       }
+    } else {
+      const endpoint = await client.webhookEndpoints.create({ url: webhookUrl, enabled_events: WEBHOOK_EVENTS });
+      webhookSecret = endpoint.secret!;
+      steps.push("Webhook registered in Stripe");
     }
 
     // Save keys to DB (webhook secret optional)

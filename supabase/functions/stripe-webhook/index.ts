@@ -101,7 +101,7 @@ Deno.serve(async (req: Request) => {
                     <p style="color:#666;font-size:13px;margin-top:32px">— The Body &amp; Sleeves Team</p>
                   </div>`,
                 }),
-              }).catch((e: Error) => console.error("Affiliate notification error:", e.message));
+              }).catch((e: Error) => console.error("Affiliate notification error:", String(e?.message ?? e).replace(/[\r\n]/g, " ")));
             }
           }
         }
@@ -114,7 +114,7 @@ Deno.serve(async (req: Request) => {
             method: "POST",
             headers: { "X-MailerLite-ApiKey": mailerLiteKey, "Content-Type": "application/json" },
             body: JSON.stringify({ email: session.metadata.email, name: mlName }),
-          }).catch((e: Error) => console.error("MailerLite sync error:", e.message));
+          }).catch((e: Error) => console.error("MailerLite sync error:", String(e?.message ?? e).replace(/[\r\n]/g, " ")));
         }
 
         // Send order confirmation email via Resend
@@ -162,7 +162,7 @@ Deno.serve(async (req: Request) => {
                 <p>— Your Store</p>
               </div>`,
             }),
-          }).catch((e: Error) => console.error("Resend error:", e.message));
+          }).catch((e: Error) => console.error("Resend error:", String(e?.message ?? e).replace(/[\r\n]/g, " ")));
         }
 
         // Optionally forward to Printify for fulfillment
@@ -224,7 +224,7 @@ Deno.serve(async (req: Request) => {
                 .eq("stripe_session_id", session.id);
             }
           } catch (printifyErr) {
-            console.error("Printify order submission failed:", printifyErr.message);
+            console.error("Printify order submission failed:", String((printifyErr as any)?.message ?? printifyErr).replace(/[\r\n]/g, " "));
           }
         }
         break;

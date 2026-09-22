@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { RefreshCw, ExternalLink, DollarSign, TrendingUp, CreditCard, ArrowDownCircle, X, Loader2, Check, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { RefreshCw, ExternalLink, DollarSign, TrendingUp, CreditCard, ArrowDownCircle, X, Loader2, Check, AlertCircle, Eye, EyeOff, Trash2 } from "lucide-react";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
 import { getErrorMessage } from "@/lib/errors";
 
@@ -107,9 +107,12 @@ interface KeyStatus { configured: boolean; key_configured: boolean; key_hint: st
 function StripeSetup({ activeMode: activeModeOverride, onActivated }: { activeMode?: string; onActivated: (mode: "live" | "test") => void }) {
   const [status, setStatus] = useState<{ live: KeyStatus; test: KeyStatus; active_mode: string } | null>(null);
   const [key, setKey] = useState("");
+  const [webhookSecret, setWebhookSecret] = useState("");
   const [showKey, setShowKey] = useState(false);
+  const [showWebhook, setShowWebhook] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activating, setActivating] = useState(false);
+  const [resetting, setResetting] = useState<"live" | "test" | null>(null);
   const [result, setResult] = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
   const fetchStatus = async () => {
@@ -126,7 +129,7 @@ function StripeSetup({ activeMode: activeModeOverride, onActivated }: { activeMo
     const r = await fetch("/api/stripe-setup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ secret_key: key, activate }),
+      body: JSON.stringify({ secret_key: key, webhook_secret: webhookSecret || undefined, activate }),
     });
     const data = await r.json();
     if (!r.ok) {
@@ -134,7 +137,7 @@ function StripeSetup({ activeMode: activeModeOverride, onActivated }: { activeMo
       activate ? setActivating(false) : setLoading(false);
     } else {
       setResult({ type: "success", msg: data.steps.join(" → ") });
-      setKey("");
+      setKey(""); setWebhookSecret("");
       if (activate) {
         const activatedMode = key.startsWith("sk_live_") ? "live" : "test";
         setActivating(false);
@@ -161,6 +164,21 @@ function StripeSetup({ activeMode: activeModeOverride, onActivated }: { activeMo
     onActivated(mode);
   };
 
+  const resetMode = async (mode: "live" | "test") => {
+    if (!confirm(`Clear all saved ${mode.toUpperCase()} Stripe keys from the database?`)) return;
+    setResetting(mode); setResult(null);
+    const r = await fetch("/api/stripe-reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode }),
+    });
+    const data = await r.json();
+    setResetting(null);
+    if (!r.ok) { setResult({ type: "error", msg: data.error }); return; }
+    setResult({ type: "success", msg: `${mode.toUpperCase()} keys cleared.` });
+    fetchStatus();
+  };
+
   const keyMode = key.startsWith("sk_live_") ? "live" : key.startsWith("sk_test_") ? "test" : null;
   const isValid = keyMode !== null;
   const activeMode = activeModeOverride ?? status?.active_mode ?? "test";
@@ -178,13 +196,25 @@ function StripeSetup({ activeMode: activeModeOverride, onActivated }: { activeMo
                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                   m === "live" ? "bg-success-100 text-success-700" : "bg-amber-100 text-amber-700"
                 }`}>{m.toUpperCase()}</span>
-                {activeMode === m
-                  ? <span className="text-xs text-success-600 font-medium flex items-center gap-1"><Check size={11} />Active</span>
-                  : status[m].key_configured
-                    ? <button onClick={() => switchMode(m)} disabled={activating} className="text-xs font-medium px-2 py-1 rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50">
-                        {activating ? <Loader2 size={11} className="animate-spin" /> : `Use ${m}`}
-                      </button>
-                    : <span className="text-xs text-secondary-400">Not set up</span>}
+                <div className="flex items-center gap-1">
+                  {activeMode === m
+                    ? <span className="text-xs text-success-600 font-medium flex items-center gap-1"><Check size={11} />Active</span>
+                    : status[m].key_configured
+                      ? <button onClick={() => switchMode(m)} disabled={activating || !!resetting} className="text-xs font-medium px-2 py-1 rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50">
+                          {activating ? <Loader2 size={11} className="animate-spin" /> : `Use ${m}`}
+                        </button>
+                      : <span className="text-xs text-secondary-400">Not set up</span>}
+                  {status[m].key_configured && (
+                    <button
+                      onClick={() => resetMode(m)}
+                      disabled={!!resetting || activating}
+                      title={`Clear ${m} keys`}
+                      className="p-1 text-secondary-400 hover:text-error-600 disabled:opacity-40 transition-colors"
+                    >
+                      {resetting === m ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                    </button>
+                  )}
+                </div>
               </div>
               {status[m].key_configured
                 ? <p className="text-xs font-mono text-secondary-500 truncate">{status[m].key_hint}</p>
@@ -197,6 +227,8 @@ function StripeSetup({ activeMode: activeModeOverride, onActivated }: { activeMo
       {/* Connect form */}
       <div className="bg-white rounded-xl border border-secondary-100 p-4 space-y-3">
         <p className="text-sm font-semibold text-secondary-900">Connect Stripe</p>
+
+        {/* Secret key */}
         <div className="relative">
           <input
             type={showKey ? "text" : "password"}
@@ -216,6 +248,24 @@ function StripeSetup({ activeMode: activeModeOverride, onActivated }: { activeMo
             {keyMode === "live" ? "✓ Live key — real payments" : keyMode === "test" ? "⚠ Test key — no real money" : "✗ Invalid key format"}
           </p>
         )}
+
+        {/* Webhook secret */}
+        <div className="relative">
+          <input
+            type={showWebhook ? "text" : "password"}
+            value={webhookSecret}
+            onChange={(e) => { setWebhookSecret(e.target.value); setResult(null); }}
+            placeholder="whsec_... (optional — auto-registered if blank)"
+            className="input-field pr-10 font-mono text-sm"
+          />
+          <button type="button" onClick={() => setShowWebhook((v) => !v)} className="absolute right-3 top-2.5 text-secondary-400">
+            {showWebhook ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        </div>
+        {webhookSecret && !webhookSecret.startsWith("whsec_") && (
+          <p className="text-xs text-error-600">✗ Invalid — must start with whsec_</p>
+        )}
+
         {result && (
           <div className={`rounded-lg p-3 text-xs ${
             result.type === "success" ? "bg-success-50 border border-success-200 text-success-800" : "bg-error-50 border border-error-100 text-error-700"

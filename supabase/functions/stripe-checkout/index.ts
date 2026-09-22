@@ -223,7 +223,7 @@ Deno.serve(async (req: Request) => {
     });
 
     if (orderError) {
-      console.error("Failed to create order:", orderError.message);
+      console.error("Failed to create order:", String(orderError?.message ?? orderError).replace(/[\r\n]/g, " "));
     }
 
     return jsonResponse(req, { url: session.url, session_id: session.id });
