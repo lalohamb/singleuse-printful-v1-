@@ -16,7 +16,7 @@ module.exports = { apps: [{ name: '<PM2_APP_NAME>', script: '.next/standalone/se
   "MAILER_LITE_API_KEY": "",
   "STRIPE_SECRET_KEY": "sk_test_51UEiW6KB3dxCEzFyHDS1XUdupz0sbyvBTb7RYm43SsWtH1o78HZq5VHD5UI1f9SFBWuE5LynY2liwNAnkWf2UZvb00ANyz6ByT",
   "STRIPE_WEBHOOK_SECRET": "whsec_af49BZjWXG544KmFFMOr2Y8ec6TW3Xtn",
-  "NEXT_PUBLIC_SITE_URL": "",
+  "NEXT_PUBLIC_SITE_URL": "https://bodyandsleeves.com",
   "PLATFORM_DOMAIN": "",
   "LICENSE_HMAC_SECRET": ""
 } }] };

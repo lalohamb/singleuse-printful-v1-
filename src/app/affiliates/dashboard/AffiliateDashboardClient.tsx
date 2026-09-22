@@ -35,8 +35,10 @@ export default function AffiliateDashboardClient() {
     setLoading(false);
   };
 
+  const origin = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || (typeof window !== "undefined" ? window.location.origin : "");
+
   const copy = () => {
-    navigator.clipboard.writeText(data.referral_url);
+    navigator.clipboard.writeText(`${origin}?ref=${data.affiliate.code}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -72,7 +74,7 @@ export default function AffiliateDashboardClient() {
           <div className="bg-white border border-secondary-100 rounded-2xl p-5 space-y-2 shadow-sm">
             <p className="text-sm font-semibold text-secondary-900">Your Referral Link</p>
             <div className="flex items-center gap-2">
-              <input readOnly value={data.referral_url} className="input-field flex-1 font-mono text-sm bg-secondary-50" />
+              <input readOnly value={`${origin}?ref=${data.affiliate.code}`} className="input-field flex-1 font-mono text-sm bg-secondary-50" />
               <button onClick={copy} className="btn-outline px-4 py-2 flex items-center gap-1.5 shrink-0">
                 {copied ? <><Check size={14} />Copied!</> : <><Copy size={14} />Copy</>}
               </button>

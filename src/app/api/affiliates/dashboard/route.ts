@@ -33,6 +33,8 @@ export async function GET(req: NextRequest) {
   const approvedEarnings = conversions.filter((c) => c.status === "approved").reduce((s, c) => s + Number(c.commission_amount), 0);
   const paidEarnings = conversions.filter((c) => c.status === "paid").reduce((s, c) => s + Number(c.commission_amount), 0);
 
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? `${req.nextUrl.protocol}//${req.nextUrl.host}`).replace(/\/$/, "");
+
   return NextResponse.json({
     affiliate,
     stats: {
@@ -44,6 +46,6 @@ export async function GET(req: NextRequest) {
     },
     conversions,
     payouts: payoutsRes.data ?? [],
-    referral_url: `${process.env.NEXT_PUBLIC_SITE_URL}?ref=${code}`,
+    referral_url: `${siteUrl}?ref=${code}`,
   });
 }
