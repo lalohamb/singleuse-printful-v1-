@@ -33,7 +33,7 @@ export default async function ServicesPage() {
       icon: Sparkles,
       title: "Custom Orders",
       tagline: "Your vision, made real.",
-      description: "Have a design idea, a special occasion, or a one-of-a-kind concept? We work with you to bring it to life. From personalized text and graphics to fully custom colorways, every piece is printed on demand — no minimums, no waste.",
+      description: "Have a design idea, a special occasion, or a one-of-a-kind concept? We work with you to bring it to life. From personalized text and graphics to fully custom colorways, every piece is made to order — no minimums, no waste.",
       bullets: ["Personalized names, dates, or messages", "Custom graphic placement", "Available on tees, hoodies, hats & more", "Turnaround in 3–7 business days"],
       cta: { label: "Start a Custom Order", href: `${emailHref.replace(/\?.*$/, "")}?subject=Custom%20Order` },
       accent: "bg-primary-50 border-primary-100",
@@ -139,7 +139,7 @@ export default async function ServicesPage() {
                 This entire storefront is built on <strong className="text-white">Printify Print-on-Demand</strong> — meaning zero inventory, zero upfront cost, and products printed and shipped only when a customer orders.
               </p>
               <p className="text-secondary-400 leading-relaxed mb-6">
-                We partner with <strong className="text-white">Atlas Cloud Hosting</strong> to deploy custom Next.js storefronts just like this one — fully branded, self-hosted, and connected to your own Printify catalog, Stripe payments, and email marketing.
+                We partner with another Black-Owned Business<strong className="text-white">Atlas Cloud Hosting</strong> to deploy custom Next.js storefronts just like this one — fully branded, self-hosted, and connected to your own Printify catalog, Stripe payments, and email marketing.
               </p>
               <ul className="space-y-2 mb-8">
                 {[
