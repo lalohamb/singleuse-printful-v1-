@@ -21,7 +21,6 @@ npm run build
 
 # ── Copy assets to standalone ─────────────────────────────────────────────────
 echo "📋 Copying assets to standalone..."
-cp -r .next/server .next/standalone/.next/server
 cp -r .next/static .next/standalone/.next/static
 cp -r public .next/standalone/public
 cp .env.local .next/standalone/.env.local
