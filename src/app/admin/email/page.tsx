@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Send, Loader2, Check, Mail, RefreshCw, Users, AlertTriangle, CheckCircle, XCircle, Info } from "lucide-react";
+import { Send, Loader2, Check, Mail, RefreshCw, Users, AlertTriangle, CheckCircle, XCircle, Info, Key, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
 
@@ -17,7 +17,14 @@ const eventBadge: Record<string, { label: string; cls: string }> = {
 };
 
 function EmailPanel() {
-  const [tab, setTab] = useState<"send" | "broadcast" | "events">("send");
+  const [tab, setTab] = useState<"send" | "broadcast" | "events" | "settings">("send");
+
+  // API key
+  const [resendKey, setResendKey] = useState("");
+  const [keyMasked, setKeyMasked] = useState(true);
+  const [keySaving, setKeySaving] = useState(false);
+  const [keyMsg, setKeyMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [keyValidating, setKeyValidating] = useState(false);
 
   // Single send
   const [form, setForm] = useState({ to: "", subject: "", html: "" });
@@ -63,7 +70,33 @@ function EmailPanel() {
     setCustomerEmails(unique);
   };
 
-  useEffect(() => { fetchEmails(); fetchEvents(); fetchCustomerEmails(); }, []);
+  useEffect(() => { fetchEmails(); fetchEvents(); fetchCustomerEmails(); loadKey(); }, []);
+
+  const loadKey = async () => {
+    const { data } = await supabase.from("settings").select("resend_api_key").limit(1).maybeSingle();
+    if (data?.resend_api_key) setResendKey(data.resend_api_key);
+  };
+
+  const validateKey = async () => {
+    if (!resendKey.trim()) return;
+    setKeyValidating(true); setKeyMsg(null);
+    const res = await fetch("/api/resend?path=/domains", {
+      headers: { "x-resend-key-override": resendKey.trim() },
+    });
+    setKeyValidating(false);
+    if (res.ok) setKeyMsg({ text: "Key is valid ✓", ok: true });
+    else setKeyMsg({ text: "Invalid key — check and try again", ok: false });
+  };
+
+  const saveKey = async () => {
+    setKeySaving(true); setKeyMsg(null);
+    const { data: row } = await supabase.from("settings").select("id").limit(1).maybeSingle();
+    if (!row?.id) { setKeyMsg({ text: "Settings row not found", ok: false }); setKeySaving(false); return; }
+    const { error } = await supabase.from("settings").update({ resend_api_key: resendKey.trim() || null }).eq("id", row.id);
+    setKeySaving(false);
+    setKeyMsg(error ? { text: error.message, ok: false } : { text: "Saved!", ok: true });
+    setTimeout(() => setKeyMsg(null), 3000);
+  };
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,7 +163,7 @@ function EmailPanel() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-secondary-100 p-1 rounded-lg w-fit">
-        {([["send", "Send Email"], ["broadcast", "Broadcast"], ["events", "Delivery Events"]] as const).map(([key, label]) => (
+        {([["send", "Send Email"], ["broadcast", "Broadcast"], ["events", "Delivery Events"], ["settings", "API Key"]] as const).map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === key ? "bg-white text-secondary-900 shadow-sm" : "text-secondary-500 hover:text-secondary-700"}`}>
             {label}{key === "broadcast" && customerEmails.length > 0 && <span className="ml-1.5 text-xs bg-primary-100 text-primary-600 px-1.5 py-0.5 rounded-full">{customerEmails.length}</span>}
           </button>
@@ -194,7 +227,7 @@ function EmailPanel() {
           <div className="flex items-center justify-between p-6 border-b border-secondary-100">
             <div>
               <h2 className="font-semibold text-secondary-900">Delivery Events</h2>
-              <p className="text-xs text-secondary-400 mt-0.5">Webhook URL: <code className="bg-secondary-100 px-1 rounded">{typeof window !== "undefined" ? window.location.origin : "https://your-store.example"}/api/resend/webhook</code></p>
+              <p className="text-xs text-secondary-400 mt-0.5">Webhook URL: <code className="bg-secondary-100 px-1 rounded">{(process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== "undefined" ? window.location.origin : "")).replace(/\/$/, "")}/api/resend/webhook</code></p>
             </div>
             <button onClick={fetchEvents} className="text-secondary-400 hover:text-secondary-700"><RefreshCw size={16} className={loadingEvents ? "animate-spin" : ""} /></button>
           </div>
@@ -225,6 +258,45 @@ function EmailPanel() {
                 })}
               </div>
             )}
+        </section>
+      )}
+
+      {tab === "settings" && (
+        <section className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6 space-y-5">
+          <div className="flex items-center gap-2">
+            <Key size={18} className="text-primary-500" />
+            <h2 className="font-semibold text-secondary-900">Resend API Key</h2>
+          </div>
+          <p className="text-sm text-secondary-500">Get your API key from <a href="https://resend.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-primary-600 underline">resend.com/api-keys</a>. Stored in your database — takes priority over any environment variable.</p>
+          {keyMsg && <p className={`text-sm px-3 py-2 rounded-lg ${keyMsg.ok ? "bg-success-50 text-success-700" : "bg-error-50 text-error-700"}`}>{keyMsg.text}</p>}
+          <div className="space-y-3">
+            <label className="label-text">API Key</label>
+            <div className="relative">
+              <input
+                type={keyMasked ? "password" : "text"}
+                value={resendKey}
+                onChange={(e) => setResendKey(e.target.value)}
+                placeholder="re_xxxxxxxxxxxxxxxxxxxx"
+                className="input-field pr-10 font-mono text-sm"
+              />
+              <button type="button" onClick={() => setKeyMasked(m => !m)} className="absolute right-3 top-2.5 text-secondary-400 hover:text-secondary-700">
+                {keyMasked ? <Eye size={16} /> : <EyeOff size={16} />}
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={validateKey} disabled={!resendKey.trim() || keyValidating} className="btn-outline py-2 text-sm flex items-center gap-1.5">
+                {keyValidating ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+                {keyValidating ? "Validating..." : "Validate"}
+              </button>
+              <button onClick={saveKey} disabled={keySaving} className="btn-primary py-2 text-sm flex items-center gap-1.5">
+                {keySaving ? <Loader2 size={15} className="animate-spin" /> : <Key size={15} />}
+                {keySaving ? "Saving..." : "Save Key"}
+              </button>
+              {resendKey && (
+                <button onClick={() => { setResendKey(""); saveKey(); }} className="btn-outline py-2 text-sm text-error-600 border-error-200 hover:bg-error-50">Remove</button>
+              )}
+            </div>
+          </div>
         </section>
       )}
     </div>

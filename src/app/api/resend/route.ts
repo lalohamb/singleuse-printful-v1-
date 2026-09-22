@@ -1,16 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/require-admin";
+import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 
 const RESEND_API = "https://api.resend.com";
-const key = process.env.RESEND_API_KEY;
+
+function sbService() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
+
+async function getResendKey(): Promise<string | null> {
+  // DB key takes priority over env var
+  const { data } = await sbService().from("settings").select("resend_api_key").limit(1).maybeSingle();
+  return data?.resend_api_key || process.env.RESEND_API_KEY || null;
+}
 
 export async function POST(req: NextRequest) {
   const authError = await requireAdmin();
   if (authError) return authError;
 
-  if (!key) return NextResponse.json({ error: "RESEND_API_KEY not set" }, { status: 500 });
+  const key = await getResendKey();
+  if (!key) return NextResponse.json({ error: "Resend API key not configured. Add it in Admin → Email." }, { status: 500 });
   const raw = await req.json();
   // Allowlist fields forwarded to Resend — never proxy arbitrary keys
   const allowed = ["from", "to", "subject", "html", "text", "reply_to", "cc", "bcc", "tags"] as const;
@@ -30,7 +45,8 @@ export async function POST(req: NextRequest) {
 const ALLOWED_PATHS = new Set(["/emails", "/domains", "/api-keys"]);
 
 export async function GET(req: NextRequest) {
-  if (!key) return NextResponse.json({ error: "RESEND_API_KEY not set" }, { status: 500 });
+  const key = await getResendKey();
+  if (!key) return NextResponse.json({ error: "Resend API key not configured. Add it in Admin → Email." }, { status: 500 });
 
   const path = new URL(req.url).searchParams.get("path") ?? "/emails";
   if (!ALLOWED_PATHS.has(path))

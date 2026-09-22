@@ -21,7 +21,8 @@ async function getAuthedSb(req: NextRequest) {
 }
 
 async function sendEmail(to: string, subject: string, html: string) {
-  const key = process.env.RESEND_API_KEY;
+  const { data } = await sb().from("settings").select("resend_api_key").limit(1).maybeSingle();
+  const key = data?.resend_api_key || process.env.RESEND_API_KEY;
   if (!key) return;
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
   await fetch("https://api.resend.com/emails", {
