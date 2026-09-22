@@ -19,6 +19,7 @@ import AboutHero from "./sections/AboutHero";
 import AboutStory from "./sections/AboutStory";
 import AboutMission from "./sections/AboutMission";
 import AboutCulture from "./sections/AboutCulture";
+import AdminAccounts from "./sections/AdminAccounts";
 
 const TITLES: Record<string, string> = {
   "store-information": "Store Information",
@@ -40,6 +41,7 @@ const TITLES: Record<string, string> = {
   footer:              "Footer",
   integrations:        "Integrations",
   social:              "Social Links",
+  "admin-accounts":    "Admin Accounts",
 };
 
 const SECTIONS: Record<string, React.ComponentType> = {
@@ -62,6 +64,7 @@ const SECTIONS: Record<string, React.ComponentType> = {
   footer:              Footer,
   integrations:        Integrations,
   social:              Social,
+  "admin-accounts":    AdminAccounts,
 };
 
 export default function SettingsSectionClient({ section }: { section: string }) {

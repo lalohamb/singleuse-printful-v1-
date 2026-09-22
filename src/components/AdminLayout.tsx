@@ -2,7 +2,7 @@
 import { type ReactNode, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingBag, LogOut, Menu, FolderTree, ExternalLink, Mail, CreditCard, Send, Search, Truck, Image, FileText, AlertTriangle, Palette, Home, Users, PanelBottom, Plug, Share2, Megaphone, Store, Sparkles, BarChart3, Heart, BookOpen, MessageCircle, Link2, DollarSign } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag, LogOut, Menu, FolderTree, ExternalLink, Mail, CreditCard, Send, Search, Truck, Image, FileText, AlertTriangle, Palette, Home, Users, PanelBottom, Plug, Share2, Megaphone, Store, Sparkles, BarChart3, Heart, BookOpen, MessageCircle, Link2, DollarSign, ShieldCheck } from "lucide-react";
 import { useAdminAuth } from "@/lib/admin-auth";
 import { supabase } from "@/lib/supabase";
 import { resolveStorageUrl } from "@/lib/storage";
@@ -45,6 +45,7 @@ const settingsItems = [
   { path: "/admin/settings/footer", label: "Footer", icon: PanelBottom },
   { path: "/admin/settings/integrations", label: "Integrations", icon: Plug },
   { path: "/admin/settings/social", label: "Social Links", icon: Share2 },
+  { path: "/admin/settings/admin-accounts", label: "Admin Accounts", icon: ShieldCheck },
   { path: "/admin/danger", label: "Danger Zone", icon: AlertTriangle },
 ];
 

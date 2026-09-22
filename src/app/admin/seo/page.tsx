@@ -65,7 +65,7 @@ function SeoPanel() {
     fetch("/api/seo")
       .then((r) => r.json())
       .then((data) => {
-        if (data) setForm((f) => ({ ...f, ...data }));
+        if (data) setForm((f) => ({ ...f, ...Object.fromEntries(Object.entries(data).map(([k, v]) => [k, v ?? ""])) }));
         setLoading(false);
       });
   }, []);

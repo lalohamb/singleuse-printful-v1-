@@ -11,6 +11,14 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [attempts, setAttempts] = useState(0);
+  const [lockedUntil, setLockedUntil] = useState<number | null>(null);
+
+  const MAX_ATTEMPTS = 5;
+  const LOCKOUT_MS = 15 * 60 * 1000;
+
+  const isLocked = lockedUntil !== null && Date.now() < lockedUntil;
+  const lockMinsLeft = lockedUntil ? Math.ceil((lockedUntil - Date.now()) / 60000) : 0;
 
   // Redirect once admin is confirmed — avoids race with checkAdmin()
   useEffect(() => {
@@ -19,10 +27,20 @@ export default function AdminLoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLocked) return;
     setSubmitting(true); setError(null);
     const { error } = await signIn(email, password);
-    if (error) { setError(error); setSubmitting(false); }
-    // on success: do nothing — useEffect above handles redirect once admin row is confirmed
+    if (error) {
+      const newAttempts = attempts + 1;
+      setAttempts(newAttempts);
+      if (newAttempts >= MAX_ATTEMPTS) {
+        setLockedUntil(Date.now() + LOCKOUT_MS);
+        setError(`Too many failed attempts. Try again in ${LOCKOUT_MS / 60000} minutes.`);
+      } else {
+        setError(`${error} (${MAX_ATTEMPTS - newAttempts} attempt${MAX_ATTEMPTS - newAttempts === 1 ? "" : "s"} remaining)`);
+      }
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -50,7 +68,8 @@ export default function AdminLoginPage() {
               </div>
             </div>
             {error && <div className="bg-error-50 border border-error-100 text-error-700 rounded-lg p-3 text-sm">{error}</div>}
-            <button type="submit" disabled={submitting} className="btn-primary w-full">
+            {isLocked && <div className="bg-error-50 border border-error-100 text-error-700 rounded-lg p-3 text-sm">Account locked. Try again in {lockMinsLeft} minute{lockMinsLeft !== 1 ? "s" : ""}.</div>}
+            <button type="submit" disabled={submitting || isLocked} className="btn-primary w-full">
               {submitting ? <><Loader2 size={20} className="mr-2 animate-spin" />Verifying...</> : "Sign In"}
             </button>
           </form>

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Package, ShoppingBag, DollarSign, TrendingUp, Clock, CheckCircle, PauseCircle, PlayCircle, CreditCard, XCircle } from "lucide-react";
+import { Package, ShoppingBag, DollarSign, TrendingUp, Clock, CheckCircle, PauseCircle, PlayCircle, CreditCard, XCircle, Users } from "lucide-react";
 import { supabase, formatPrice } from "@/lib/supabase";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
 import { useAdminAuth } from "@/lib/admin-auth";
@@ -10,9 +10,10 @@ import AppImage from "@/components/AppImage";
 
 function Dashboard() {
   const { session } = useAdminAuth();
-  const [stats, setStats] = useState({ totalOrders: 0, totalRevenue: 0, pendingOrders: 0, cancelledOrders: 0, totalProducts: 0 });
+  const [stats, setStats] = useState({ totalOrders: 0, totalRevenue: 0, pendingOrders: 0, cancelledOrders: 0, totalProducts: 0, totalCustomers: 0 });
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [recentProducts, setRecentProducts] = useState<Product[]>([]);
+  const [topBySales, setTopBySales] = useState<{ title: string; image_url: string; units: number; revenue: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [paused, setPaused] = useState(false);
   const [pauseLoading, setPauseLoading] = useState(false);
@@ -31,11 +32,33 @@ function Dashboard() {
       supabase.from("orders").select("id, total, status", { count: "exact" }).neq("status", "cancelled").neq("status", "pending"),
       supabase.from("orders").select("id", { count: "exact" }).eq("status", "pending"),
       supabase.from("orders").select("id", { count: "exact" }).eq("status", "cancelled"),
-    ]).then(([ordersRes, productsRes, settingsRes, countRes, pendingRes, cancelledRes]) => {
+      supabase.from("customer_profiles").select("id", { count: "exact" }),
+      supabase.from("orders").select("items").in("status", ["paid","fulfilled","shipped","delivered"]),
+    ]).then(([ordersRes, productsRes, settingsRes, countRes, pendingRes, cancelledRes, customersRes, paidOrdersRes]) => {
       const orders = (ordersRes.data || []) as Order[];
       const products = (productsRes.data || []) as Product[];
       const s = settingsRes.data as Pick<StoreSettings, "id" | "orders_paused"> | null;
       const allPaidOrders = (countRes.data || []) as { total: number; status: string }[];
+
+      // Aggregate items across all paid orders into per-product sales totals
+      const salesMap = new Map<string, { title: string; image_url: string; units: number; revenue: number }>();
+      for (const order of (paidOrdersRes.data || [])) {
+        for (const item of (Array.isArray(order.items) ? order.items : [])) {
+          const key = item.title || item.product_id || "unknown";
+          const existing = salesMap.get(key);
+          const units = Number(item.quantity) || 1;
+          const revenue = (Number(item.price) || 0) * units;
+          if (existing) {
+            existing.units += units;
+            existing.revenue += revenue;
+          } else {
+            salesMap.set(key, { title: item.title || key, image_url: item.image_url || "", units, revenue });
+          }
+        }
+      }
+      const top = [...salesMap.values()].sort((a, b) => b.units - a.units).slice(0, 5);
+      setTopBySales(top);
+
       setRecentOrders(orders);
       setStats({
         totalOrders: countRes.count ?? 0,
@@ -43,6 +66,7 @@ function Dashboard() {
         pendingOrders: pendingRes.count ?? 0,
         cancelledOrders: cancelledRes.count ?? 0,
         totalProducts: products.length,
+        totalCustomers: customersRes.count ?? 0,
       });
       setRecentProducts(products.slice(0, 5));
       if (s) { setSettingsId(s.id); setPaused(!!s.orders_paused); }
@@ -75,6 +99,7 @@ function Dashboard() {
   const statCards = [
     { label: "Total Revenue", value: formatPrice(stats.totalRevenue), icon: DollarSign, color: "bg-success-50 text-success-600" },
     { label: "Total Orders", value: stats.totalOrders, icon: ShoppingBag, color: "bg-primary-50 text-primary-600" },
+    { label: "Total Customers", value: stats.totalCustomers, icon: Users, color: "bg-blue-50 text-blue-600" },
     { label: "Pending Orders", value: stats.pendingOrders, icon: Clock, color: "bg-warning-50 text-warning-600" },
     { label: "Cancelled Orders", value: stats.cancelledOrders, icon: XCircle, color: "bg-red-50 text-red-500" },
     { label: "Total Products", value: stats.totalProducts, icon: Package, color: "bg-accent-50 text-accent-600" },
@@ -104,7 +129,7 @@ function Dashboard() {
           {pauseLoading ? <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" /> : paused ? <><PlayCircle size={16} />Resume Orders</> : <><PauseCircle size={16} />Pause Orders</>}
         </button>
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {statCards.map((stat) => (
           <div key={stat.label} className="bg-white rounded-xl p-6 border border-secondary-100 shadow-sm">
             <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-4 ${stat.color}`}><stat.icon size={24} /></div>
@@ -167,6 +192,44 @@ function Dashboard() {
               ))}
             </div>
           )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Top Products by Sales */}
+        <div className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp size={18} className="text-gold-500" />
+            <h2 className="font-semibold text-secondary-900">Top Products by Sales</h2>
+          </div>
+          {topBySales.length === 0 ? (
+            <p className="text-secondary-400 text-center py-8 text-sm">No sales data yet</p>
+          ) : (
+            <div className="space-y-3">
+              {topBySales.map((p, i) => (
+                <div key={p.title} className="flex items-center gap-3">
+                  <span className="text-lg font-display font-bold text-secondary-200 w-6 text-center">{i + 1}</span>
+                  <AppImage src={p.image_url || ""} alt={p.title} width={44} height={44} className="w-11 h-11 rounded-lg object-cover bg-secondary-100 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm text-secondary-900 truncate">{p.title}</p>
+                    <p className="text-xs text-secondary-500">{p.units} unit{p.units !== 1 ? "s" : ""} sold</p>
+                  </div>
+                  <span className="text-sm font-semibold text-success-600">{formatPrice(p.revenue)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Quick Actions */}
+        <div className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6">
+          <h2 className="font-semibold text-secondary-900 mb-4">Quick Actions</h2>
+          <div className="space-y-3">
+            <Link href="/admin/products" className="flex items-center justify-between p-3 rounded-lg hover:bg-secondary-50 transition-colors"><span className="flex items-center gap-3 text-secondary-700"><Package size={20} className="text-primary-500" />Manage Products</span><TrendingUp size={18} className="text-secondary-300" /></Link>
+            <Link href="/admin/orders" className="flex items-center justify-between p-3 rounded-lg hover:bg-secondary-50 transition-colors"><span className="flex items-center gap-3 text-secondary-700"><ShoppingBag size={20} className="text-primary-500" />View Orders</span><TrendingUp size={18} className="text-secondary-300" /></Link>
+            <Link href="/admin/customers" className="flex items-center justify-between p-3 rounded-lg hover:bg-secondary-50 transition-colors"><span className="flex items-center gap-3 text-secondary-700"><Users size={20} className="text-primary-500" />View Customers</span><TrendingUp size={18} className="text-secondary-300" /></Link>
+            <Link href="/admin/settings" className="flex items-center justify-between p-3 rounded-lg hover:bg-secondary-50 transition-colors"><span className="flex items-center gap-3 text-secondary-700"><DollarSign size={20} className="text-primary-500" />Store Settings</span><TrendingUp size={18} className="text-secondary-300" /></Link>
+          </div>
         </div>
       </div>
     </div>
