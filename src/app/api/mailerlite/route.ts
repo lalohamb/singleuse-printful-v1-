@@ -216,9 +216,14 @@ export async function POST(req: NextRequest) {
 
     if (action === "update_subscriber") {
       if (!body.id || !/^[\w-]{1,64}$/.test(String(body.id))) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
-      const name = body.fields?.find((f: { key: string }) => f.key === "name")?.value;
+      const fields: Record<string, string> = {};
+      if (Array.isArray(body.fields)) {
+        for (const f of body.fields) {
+          if (f.key && typeof f.value === "string") fields[f.key] = f.value;
+        }
+      }
       const payload: Record<string, unknown> = { status: body.status };
-      if (name !== undefined) payload.fields = { name };
+      if (Object.keys(fields).length) payload.fields = fields;
       const { json, status } = await ml(`/subscribers/${body.id}`, { method: "PUT", body: JSON.stringify(payload) });
       return NextResponse.json(json, { status });
     }

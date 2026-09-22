@@ -15,6 +15,7 @@ interface Account { account: { name: string; email: string }; statistics?: { tot
 const statusBadge: Record<string, string> = {
   active: "bg-success-50 text-success-600",
   unsubscribed: "bg-secondary-100 text-secondary-500",
+  unconfirmed: "bg-warning-50 text-warning-600",
   bounced: "bg-error-50 text-error-600",
   junk: "bg-warning-50 text-warning-600",
   sent: "bg-primary-50 text-primary-600",
@@ -65,11 +66,13 @@ function AddSubscriberModal({ groups, onClose, onDone }: { groups: Group[]; onCl
 }
 
 function EditSubscriberModal({ subscriber, groups, onClose, onDone }: { subscriber: Subscriber; groups: Group[]; onClose: () => void; onDone: (patch?: Partial<Subscriber>) => void }) {
-  const [status, setStatus] = useState(subscriber.type || subscriber.status);
+  const currentStatus = subscriber.status || subscriber.type || "active";
+  const [status, setStatus] = useState(currentStatus);
   const [name, setName] = useState(subscriber.fields?.find((f) => f.key === "name")?.value || "");
   const [lastName, setLastName] = useState(subscriber.fields?.find((f) => f.key === "last_name")?.value || "");
   const [subGroups, setSubGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(false);
+  const [groupLoading, setGroupLoading] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,21 +82,37 @@ function EditSubscriberModal({ subscriber, groups, onClose, onDone }: { subscrib
 
   const handleSave = async () => {
     setLoading(true); setError(null);
-    const res = await post({ action: "update_subscriber", id: subscriber.id, status, fields: subscriber.fields?.map(f => f.key === "name" ? { ...f, value: name } : f.key === "last_name" ? { ...f, value: lastName } : f) || [{ key: "name", value: name }, { key: "last_name", value: lastName }] });
+    const fields = [
+      ...(subscriber.fields?.filter(f => f.key !== "name" && f.key !== "last_name") || []),
+      { key: "name", value: name },
+      { key: "last_name", value: lastName },
+    ];
+    const res = await post({ action: "update_subscriber", id: subscriber.id, status, fields });
     if (res.error) setError(typeof res.error === "string" ? res.error : JSON.stringify(res.error));
-    else { setDone(true); setTimeout(() => { onDone(); onClose(); }, 800); }
+    else {
+      setDone(true);
+      setTimeout(() => {
+        onDone({ status, type: status, fields: fields.map(f => ({ key: f.key, value: f.value })) });
+        onClose();
+      }, 800);
+    }
     setLoading(false);
   };
 
   const removeFromGroup = async (groupId: string) => {
+    setGroupLoading(groupId);
     await post({ action: "remove_from_group", group_id: groupId, subscriber_id: subscriber.id });
     setSubGroups((p) => p.filter((g) => g.id !== groupId));
+    setGroupLoading(null);
   };
 
   const addToGroup = async (groupId: string) => {
+    if (!groupId || subGroups.find(sg => sg.id === groupId)) return;
+    setGroupLoading(groupId);
     await post({ action: "assign_group", group_id: groupId, email: subscriber.email });
     const g = groups.find((g) => g.id === groupId);
-    if (g && !subGroups.find((sg) => sg.id === groupId)) setSubGroups((p) => [...p, g]);
+    if (g) setSubGroups((p) => [...p, g]);
+    setGroupLoading(null);
   };
 
   return (
@@ -106,7 +125,7 @@ function EditSubscriberModal({ subscriber, groups, onClose, onDone }: { subscrib
         </div>
         <div><label className="label-text">Status</label>
           <select value={status} onChange={(e) => setStatus(e.target.value)} className="input-field">
-            {["active", "unsubscribed", "bounced", "junk"].map((s) => <option key={s} value={s}>{s}</option>)}
+            {["active", "unsubscribed", "unconfirmed", "bounced", "junk"].map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
         {(subscriber.sent !== undefined) && (
@@ -125,14 +144,21 @@ function EditSubscriberModal({ subscriber, groups, onClose, onDone }: { subscrib
             {subGroups.map((g) => (
               <span key={g.id} className="flex items-center gap-1 text-xs bg-primary-50 text-primary-700 px-2 py-1 rounded-full">
                 {g.name}
-                <button onClick={() => removeFromGroup(g.id)} className="hover:text-error-600"><X size={11} /></button>
+                {groupLoading === g.id
+                  ? <Loader2 size={11} className="animate-spin" />
+                  : <button onClick={() => removeFromGroup(g.id)} className="hover:text-error-600"><X size={11} /></button>}
               </span>
             ))}
             {subGroups.length === 0 && <span className="text-xs text-secondary-400">No groups</span>}
           </div>
-          <select onChange={(e) => { if (e.target.value) addToGroup(e.target.value); e.target.value = ""; }} className="input-field text-sm" defaultValue="">
-            <option value="">+ Add to group...</option>
-            {groups.filter((g) => !subGroups.find((sg) => sg.id === g.id)).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+          <select
+            onChange={(e) => { if (e.target.value) { addToGroup(e.target.value); e.target.value = ""; } }}
+            className="input-field text-sm"
+            defaultValue=""
+            disabled={!!groupLoading}
+          >
+            <option value="">+ Add to group…</option>
+            {groups.filter((g) => !subGroups.find((sg) => sg.id === g.id)).map((g) => <option key={g.id} value={g.id}>{g.name} ({g.active ?? g.total ?? 0})</option>)}
           </select>
         </div>
         {error && <ErrorMsg msg={error} />}
@@ -334,15 +360,19 @@ function MailerLiteDashboard() {
     if (!res.error) setAutomations((p) => p.map((x) => x.id === a.id ? { ...x, enabled: !a.enabled } : x));
   };
 
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
   const deleteSub = async (id: string) => {
-    setDeleting(id);
+    setDeleting(id); setConfirmDelete(null);
     await post({ action: "delete_subscriber", id });
     setSubscribers((p) => p.filter((s) => s.id !== id));
     setDeleting(null);
   };
 
+  const [confirmUnsub, setConfirmUnsub] = useState<string | null>(null);
+
   const unsubscribeSub = async (id: string) => {
-    setDeleting(id);
+    setDeleting(id); setConfirmUnsub(null);
     await post({ action: "unsubscribe", id });
     setSubscribers((p) => p.map((s) => s.id === id ? { ...s, type: "unsubscribed", status: "unsubscribed" } : s));
     setDeleting(null);
@@ -483,10 +513,31 @@ function MailerLiteDashboard() {
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1">
                             <button onClick={() => { setSelectedSub(sub); setModal("edit_sub"); }} className="p-1.5 text-secondary-400 hover:text-primary-600 transition-colors" title="Edit"><Edit2 size={15} /></button>
-                            <button onClick={() => unsubscribeSub(sub.id)} disabled={deleting === sub.id || sub.type === "unsubscribed" || sub.status === "unsubscribed"} className="p-1.5 text-secondary-400 hover:text-warning-600 transition-colors disabled:opacity-30" title="Unsubscribe"><UserMinus size={15} /></button>
-                            <button onClick={() => deleteSub(sub.id)} disabled={deleting === sub.id} className="p-1.5 text-secondary-400 hover:text-error-600 transition-colors" title="Delete">
-                              {deleting === sub.id ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
-                            </button>
+                            {confirmUnsub === sub.id ? (
+                              <span className="flex items-center gap-1">
+                                <span className="text-xs text-secondary-500">Unsub?</span>
+                                <button onClick={() => unsubscribeSub(sub.id)} className="text-xs px-1.5 py-0.5 rounded bg-warning-500 text-white hover:bg-warning-600">Yes</button>
+                                <button onClick={() => setConfirmUnsub(null)} className="text-xs px-1.5 py-0.5 rounded bg-secondary-200 text-secondary-700 hover:bg-secondary-300">No</button>
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => setConfirmUnsub(sub.id)}
+                                disabled={deleting === sub.id || sub.status === "unsubscribed" || sub.type === "unsubscribed"}
+                                className="p-1.5 text-secondary-400 hover:text-warning-600 transition-colors disabled:opacity-30"
+                                title={sub.status === "unsubscribed" || sub.type === "unsubscribed" ? "Already unsubscribed" : "Unsubscribe"}
+                              >{deleting === sub.id ? <Loader2 size={15} className="animate-spin" /> : <UserMinus size={15} />}</button>
+                            )}
+                            {confirmDelete === sub.id ? (
+                              <span className="flex items-center gap-1">
+                                <span className="text-xs text-secondary-500">Delete?</span>
+                                <button onClick={() => deleteSub(sub.id)} className="text-xs px-1.5 py-0.5 rounded bg-error-500 text-white hover:bg-error-600">Yes</button>
+                                <button onClick={() => setConfirmDelete(null)} className="text-xs px-1.5 py-0.5 rounded bg-secondary-200 text-secondary-700 hover:bg-secondary-300">No</button>
+                              </span>
+                            ) : (
+                              <button onClick={() => setConfirmDelete(sub.id)} disabled={deleting === sub.id} className="p-1.5 text-secondary-400 hover:text-error-600 transition-colors" title="Delete">
+                                {deleting === sub.id ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
