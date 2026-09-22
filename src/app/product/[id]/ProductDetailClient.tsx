@@ -168,10 +168,11 @@ export default function ProductDetailClient({ product, related, freeShippingThre
                   const v = variants.find((x) => x.color === selectedColor && (x.size || x.label) === s.label);
                   const active = (selectedVariant?.size || selectedVariant?.label) === s.label;
                   const basePrice = variants.find((x) => x.color === selectedColor)?.price;
+                  const vPrice = v?.price ?? 0;
                   const showPrice = v?.price !== undefined && v.price !== basePrice;
                   return (
                     <button key={s.id + s.label} onClick={() => pickSize(s.label)} className={`px-4 py-2.5 border rounded-lg font-medium text-sm transition-all ${active ? "border-secondary-900 bg-secondary-900 text-white" : "border-secondary-200 text-secondary-700 hover:border-secondary-400"}`}>
-                      {s.label}{showPrice && <span className="ml-1.5 opacity-75 text-xs">{formatPrice(v!.price)}</span>}
+                      {s.label}{showPrice && <span className="ml-1.5 opacity-75 text-xs">{formatPrice(vPrice)}</span>}
                     </button>
                   );
                 })}
