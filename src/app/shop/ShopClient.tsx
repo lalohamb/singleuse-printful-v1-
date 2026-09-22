@@ -12,6 +12,7 @@ export default function ShopClient({ products, categories }: { products: Product
   const [sortBy, setSortBy] = useState("featured");
   const [flagFilter, setFlagFilter] = useState<"" | "is_new_arrival" | "is_trending">("");
   const activeCategory = searchParams.get("category") || "";
+  const searchQuery = searchParams.get("q") || "";
 
   const setCategory = (slug: string) => {
     router.push(slug ? `/shop?category=${slug}` : "/shop");
@@ -22,6 +23,10 @@ export default function ShopClient({ products, categories }: { products: Product
     if (activeCategory) {
       const cat = categories.find((c) => c.slug === activeCategory);
       if (cat) list = list.filter((p) => p.category_id === cat.id);
+    }
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter((p) => p.title.toLowerCase().includes(q) || (p.description || "").toLowerCase().includes(q));
     }
     if (flagFilter) list = list.filter((p) => (p as unknown as Record<string, boolean>)[flagFilter]);
     if (sortBy === "price-low") list.sort((a, b) => a.price - b.price);
@@ -67,7 +72,13 @@ export default function ShopClient({ products, categories }: { products: Product
         </aside>
         <div className="flex-1">
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3 flex-wrap">
+              {searchQuery && (
+                <div className="flex items-center gap-1.5 bg-secondary-100 text-secondary-700 text-sm px-3 py-1 rounded-full">
+                  <span>Search: <strong>{searchQuery}</strong></span>
+                  <button onClick={() => router.push(activeCategory ? `/shop?category=${activeCategory}` : "/shop")} className="ml-1 hover:text-secondary-900"><X size={14} /></button>
+                </div>
+              )}
               <label className="text-sm text-secondary-600">Sort by:</label>
               <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="text-sm border border-secondary-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500">
                 <option value="featured">Featured</option>

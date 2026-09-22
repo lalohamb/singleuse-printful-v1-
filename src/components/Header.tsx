@@ -19,6 +19,17 @@ export default function Header() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const submitSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = searchQuery.trim();
+    if (!q) return;
+    setSearchOpen(false);
+    setSearchQuery("");
+    router.push(`/shop?q=${encodeURIComponent(q)}`);
+  };
   const menuSettings: SiteMenuSettings = {
     ...DEFAULT_SITE_MENU_SETTINGS,
     ...((settings?.site_menu_settings as Partial<SiteMenuSettings> | null) || {}),
@@ -83,7 +94,14 @@ export default function Header() {
                 <UserCircle size={20} />
                 {user ? "My Account" : "Account"}
               </Link>
-              <button onClick={() => router.push("/shop")} className="p-2 transition-colors" style={{ color: menuSettings.textColor }} aria-label="Search products"><Search size={22} /></button>
+              {searchOpen ? (
+                <form onSubmit={submitSearch} className="flex items-center gap-1">
+                  <input autoFocus value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search..." className="border border-secondary-300 rounded-lg px-3 py-1.5 text-sm text-secondary-900 w-40 sm:w-56 focus:outline-none focus:ring-2 focus:ring-gold-500" />
+                  <button type="button" onClick={() => { setSearchOpen(false); setSearchQuery(""); }} className="p-2" style={{ color: menuSettings.textColor }}><X size={18} /></button>
+                </form>
+              ) : (
+                <button onClick={() => setSearchOpen(true)} className="p-2 transition-colors" style={{ color: menuSettings.textColor }} aria-label="Search products"><Search size={22} /></button>
+              )}
               <button onClick={toggleCart} className="relative p-2 transition-colors" style={{ color: menuSettings.textColor }} aria-label="Open cart">
                 <ShoppingBag size={22} />
                 {itemCount > 0 && <span className="absolute -top-1 -right-1 bg-accent-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center animate-fade-in">{itemCount}</span>}
