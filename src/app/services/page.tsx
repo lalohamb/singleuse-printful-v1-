@@ -131,15 +131,9 @@ export default async function ServicesPage() {
         <div className="max-w-5xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
-              <p className="text-gold-400 uppercase tracking-widest text-sm font-semibold mb-3">For Entrepreneurs</p>
-              <h2 className="text-3xl lg:text-4xl font-bold leading-tight mb-5">
-                Want a store like this — powered by Printify?
-              </h2>
-              <p className="text-secondary-400 leading-relaxed mb-4">
-                This entire storefront is built on <strong className="text-white">Printify Print-on-Demand</strong> — meaning zero inventory, zero upfront cost, and products printed and shipped only when a customer orders.
-              </p>
+             
               <p className="text-secondary-400 leading-relaxed mb-6">
-                We partner with another Black-Owned Business<strong className="text-white">Atlas Cloud Hosting</strong> to deploy custom Next.js storefronts just like this one — fully branded, self-hosted, and connected to your own Printify catalog, Stripe payments, and email marketing.
+                We partner with another Black-Owned Business <strong className="text-white">Atlas Cloud Hosting</strong> to deploy custom Next.js storefronts just like this one — fully branded, self-hosted, and connected to your own Printify catalog, Stripe payments, and email marketing.
               </p>
               <ul className="space-y-2 mb-8">
                 {[
