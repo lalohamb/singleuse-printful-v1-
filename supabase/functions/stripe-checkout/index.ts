@@ -62,6 +62,9 @@ Deno.serve(async (req: Request) => {
       apiVersion: "2024-12-18.acacia",
     });
 
+    // Derive livemode from the key prefix — test keys start with sk_test_
+    const isLiveMode = !stripeSecretKey.startsWith("sk_test_");
+
     const body = sanitize(await req.json());
     const { items, shipping_address, shipping_name, email, shipping_cost, affiliate_code } = body;
 
@@ -192,11 +195,7 @@ Deno.serve(async (req: Request) => {
           printify_id: item.printify_id,
           variant_id: item.variant_id,
           quantity: item.quantity,
-          title: item.title.slice(0, 60),
-          price: item.price,
-          image_url: item.image_url,
-          variant_label: item.variant_label,
-          personalization_text: item.personalization_text,
+          ...(item.personalization_text ? { pt: item.personalization_text.slice(0, 50) } : {}),
         }))),
         ...(affiliate_code ? { affiliate_code: String(affiliate_code).slice(0, 50) } : {}),
       },
@@ -218,6 +217,7 @@ Deno.serve(async (req: Request) => {
       subtotal: verifiedSubtotal,
       total: verifiedTotal,
       status: "pending",
+      livemode: isLiveMode,
       items: verifiedItems,
       ...(affiliate_code ? { affiliate_code } : {}),
     });

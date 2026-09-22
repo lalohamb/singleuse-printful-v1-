@@ -1,14 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Package, ShoppingBag, DollarSign, TrendingUp, Clock, CheckCircle, PauseCircle, PlayCircle, CreditCard } from "lucide-react";
+import { Package, ShoppingBag, DollarSign, TrendingUp, Clock, CheckCircle, PauseCircle, PlayCircle, CreditCard, XCircle } from "lucide-react";
 import { supabase, formatPrice } from "@/lib/supabase";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
+import { useAdminAuth } from "@/lib/admin-auth";
 import type { Order, Product, StoreSettings } from "@/types";
 import AppImage from "@/components/AppImage";
 
 function Dashboard() {
-  const [stats, setStats] = useState({ totalOrders: 0, totalRevenue: 0, pendingOrders: 0, totalProducts: 0 });
+  const { session } = useAdminAuth();
+  const [stats, setStats] = useState({ totalOrders: 0, totalRevenue: 0, pendingOrders: 0, cancelledOrders: 0, totalProducts: 0 });
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [recentProducts, setRecentProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,16 +23,27 @@ function Dashboard() {
     fetch("/api/stripe-mode", { cache: "no-store" }).then(r => r.ok ? r.json() : null).then(d => { if (d) setStripeLive(d.active_mode === "live"); });
 
   useEffect(() => {
+    if (!session) return;
     Promise.all([
       supabase.from("orders").select("*").order("created_at", { ascending: false }).limit(5),
       supabase.from("products").select("*").order("created_at", { ascending: false }),
       supabase.from("settings").select("id, orders_paused").limit(1).maybeSingle(),
-    ]).then(([ordersRes, productsRes, settingsRes]) => {
+      supabase.from("orders").select("id, total, status", { count: "exact" }).neq("status", "cancelled").neq("status", "pending"),
+      supabase.from("orders").select("id", { count: "exact" }).eq("status", "pending"),
+      supabase.from("orders").select("id", { count: "exact" }).eq("status", "cancelled"),
+    ]).then(([ordersRes, productsRes, settingsRes, countRes, pendingRes, cancelledRes]) => {
       const orders = (ordersRes.data || []) as Order[];
       const products = (productsRes.data || []) as Product[];
       const s = settingsRes.data as Pick<StoreSettings, "id" | "orders_paused"> | null;
+      const allPaidOrders = (countRes.data || []) as { total: number; status: string }[];
       setRecentOrders(orders);
-      setStats({ totalOrders: orders.length, totalRevenue: orders.filter((o) => ["paid","fulfilled","shipped","delivered"].includes(o.status)).reduce((sum, o) => sum + Number(o.total), 0), pendingOrders: orders.filter((o) => o.status === "pending").length, totalProducts: products.length });
+      setStats({
+        totalOrders: countRes.count ?? 0,
+        totalRevenue: allPaidOrders.filter((o) => ["paid","fulfilled","shipped","delivered"].includes(o.status)).reduce((sum, o) => sum + Number(o.total), 0),
+        pendingOrders: pendingRes.count ?? 0,
+        cancelledOrders: cancelledRes.count ?? 0,
+        totalProducts: products.length,
+      });
       setRecentProducts(products.slice(0, 5));
       if (s) { setSettingsId(s.id); setPaused(!!s.orders_paused); }
       setLoading(false);
@@ -48,7 +61,7 @@ function Dashboard() {
       window.removeEventListener("stripe-mode-changed", onModeChanged);
       window.removeEventListener("focus", onFocus);
     };
-  }, []);
+  }, [session]);
 
   const togglePause = async () => {
     if (!settingsId) return;
@@ -63,6 +76,7 @@ function Dashboard() {
     { label: "Total Revenue", value: formatPrice(stats.totalRevenue), icon: DollarSign, color: "bg-success-50 text-success-600" },
     { label: "Total Orders", value: stats.totalOrders, icon: ShoppingBag, color: "bg-primary-50 text-primary-600" },
     { label: "Pending Orders", value: stats.pendingOrders, icon: Clock, color: "bg-warning-50 text-warning-600" },
+    { label: "Cancelled Orders", value: stats.cancelledOrders, icon: XCircle, color: "bg-red-50 text-red-500" },
     { label: "Total Products", value: stats.totalProducts, icon: Package, color: "bg-accent-50 text-accent-600" },
   ];
 
@@ -90,7 +104,7 @@ function Dashboard() {
           {pauseLoading ? <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" /> : paused ? <><PlayCircle size={16} />Resume Orders</> : <><PauseCircle size={16} />Pause Orders</>}
         </button>
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {statCards.map((stat) => (
           <div key={stat.label} className="bg-white rounded-xl p-6 border border-secondary-100 shadow-sm">
             <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-4 ${stat.color}`}><stat.icon size={24} /></div>
