@@ -16,77 +16,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-const SERVICES = [
-  {
-    id: "custom",
-    icon: Sparkles,
-    title: "Custom Orders",
-    tagline: "Your vision, made real.",
-    description:
-      "Have a design idea, a special occasion, or a one-of-a-kind concept? We work with you to bring it to life. From personalized text and graphics to fully custom colorways, every piece is printed on demand — no minimums, no waste.",
-    bullets: [
-      "Personalized names, dates, or messages",
-      "Custom graphic placement",
-      "Available on tees, hoodies, hats & more",
-      "Turnaround in 3–7 business days",
-    ],
-    cta: { label: "Start a Custom Order", href: "mailto:hello@bodyandsleeves.com?subject=Custom Order" },
-    accent: "bg-primary-50 border-primary-100",
-    iconColor: "text-primary-500 bg-primary-100",
-  },
-  {
-    id: "bulk",
-    icon: Package,
-    title: "Bulk & Wholesale",
-    tagline: "Outfit your team, crew, or event.",
-    description:
-      "Need 10, 50, or 500 pieces? We offer bulk pricing for teams, organizations, events, and resellers. Every order is still printed on demand through Printify — meaning no inventory risk and consistent quality at scale.",
-    bullets: [
-      "Discounted pricing at 10+ units",
-      "Mix sizes and styles in one order",
-      "Perfect for events, uniforms & merch drops",
-      "White-label options available",
-    ],
-    cta: { label: "Request a Bulk Quote", href: "mailto:hello@bodyandsleeves.com?subject=Bulk Order Quote" },
-    accent: "bg-warning-50 border-warning-100",
-    iconColor: "text-warning-600 bg-warning-100",
-  },
-  {
-    id: "gifting",
-    icon: Gift,
-    title: "Gift Services",
-    tagline: "The gift that actually fits.",
-    description:
-      "Send a thoughtful, made-to-order gift directly to someone special. We offer gift-ready packaging, personalized notes, and direct shipping to any address. Great for birthdays, holidays, corporate gifting, and more.",
-    bullets: [
-      "Gift-ready packaging on request",
-      "Personalized message cards",
-      "Ship directly to the recipient",
-      "E-gift cards available",
-    ],
-    cta: { label: "Shop Gift Ideas", href: "/shop" },
-    accent: "bg-accent-50 border-accent-100",
-    iconColor: "text-accent-600 bg-accent-100",
-  },
-  {
-    id: "affiliate",
-    icon: Users,
-    title: "Affiliate Program",
-    tagline: "Share the brand. Earn every time.",
-    description:
-      "Love Body & Sleeves? Join our affiliate program and earn a commission on every sale you refer. Whether you're a content creator, stylist, or just someone with great taste and a following — we want to partner with you.",
-    bullets: [
-      "Competitive commission on every referred sale",
-      "Unique tracking link provided",
-      "Monthly payouts via PayPal or Venmo",
-      "Early access to new drops for affiliates",
-    ],
-    cta: { label: "Apply to Affiliate Program", href: "/affiliate" },
-    accent: "bg-success-50 border-success-100",
-    iconColor: "text-success-600 bg-success-100",
-  },
-];
-
 export default async function ServicesPage() {
   const { data } = await supabase
     .from("settings")
@@ -97,6 +26,53 @@ export default async function ServicesPage() {
   type SocialEntry = { url: string; enabled: boolean };
   const social = (data?.social_links ?? {}) as Record<string, SocialEntry>;
   const emailHref = social.email?.enabled && social.email.url ? social.email.url : "mailto:hello@bodyandsleeves.com";
+
+  const SERVICES = [
+    {
+      id: "custom",
+      icon: Sparkles,
+      title: "Custom Orders",
+      tagline: "Your vision, made real.",
+      description: "Have a design idea, a special occasion, or a one-of-a-kind concept? We work with you to bring it to life. From personalized text and graphics to fully custom colorways, every piece is printed on demand — no minimums, no waste.",
+      bullets: ["Personalized names, dates, or messages", "Custom graphic placement", "Available on tees, hoodies, hats & more", "Turnaround in 3–7 business days"],
+      cta: { label: "Start a Custom Order", href: `${emailHref.replace(/\?.*$/, "")}?subject=Custom%20Order` },
+      accent: "bg-primary-50 border-primary-100",
+      iconColor: "text-primary-500 bg-primary-100",
+    },
+    {
+      id: "bulk",
+      icon: Package,
+      title: "Bulk & Wholesale",
+      tagline: "Outfit your team, crew, or event.",
+      description: "Need 10, 50, or 500 pieces? We offer bulk pricing for teams, organizations, events, and resellers. Every order is still printed on demand through Printify — meaning no inventory risk and consistent quality at scale.",
+      bullets: ["Discounted pricing at 10+ units", "Mix sizes and styles in one order", "Perfect for events, uniforms & merch drops", "White-label options available"],
+      cta: { label: "Request a Bulk Quote", href: `${emailHref.replace(/\?.*$/, "")}?subject=Bulk%20Order%20Quote` },
+      accent: "bg-warning-50 border-warning-100",
+      iconColor: "text-warning-600 bg-warning-100",
+    },
+    {
+      id: "gifting",
+      icon: Gift,
+      title: "Gift Services",
+      tagline: "The gift that actually fits.",
+      description: "Send a thoughtful, made-to-order gift directly to someone special. We offer gift-ready packaging, personalized notes, and direct shipping to any address. Great for birthdays, holidays, corporate gifting, and more.",
+      bullets: ["Gift-ready packaging on request", "Personalized message cards", "Ship directly to the recipient", "E-gift cards available"],
+      cta: { label: "Shop Gift Ideas", href: "/shop" },
+      accent: "bg-accent-50 border-accent-100",
+      iconColor: "text-accent-600 bg-accent-100",
+    },
+    {
+      id: "affiliate",
+      icon: Users,
+      title: "Affiliate Program",
+      tagline: "Share the brand. Earn every time.",
+      description: "Love Body & Sleeves? Join our affiliate program and earn a commission on every sale you refer. Whether you're a content creator, stylist, or just someone with great taste and a following — we want to partner with you.",
+      bullets: ["Competitive commission on every referred sale", "Unique tracking link provided", "Monthly payouts via PayPal or Venmo", "Early access to new drops for affiliates"],
+      cta: { label: "Apply to Affiliate Program", href: "/affiliate" },
+      accent: "bg-success-50 border-success-100",
+      iconColor: "text-success-600 bg-success-100",
+    },
+  ];
 
   return (
     <StorefrontLayout>
