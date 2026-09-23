@@ -126,7 +126,7 @@ function json(data: unknown, status = 200) {
   });
 }
 
-async function sendShippingEmail(resendKey: string, order: {
+async function sendShippingEmail(resendKey: string, fromAddr: string, supportAddr: string, storeName: string, order: {
   email: string;
   shipping_name: string;
   id: string;
@@ -151,13 +151,13 @@ async function sendShippingEmail(resendKey: string, order: {
     method: "POST",
     headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      from: "Your Store <orders@your-store.example>",
+      from: `${storeName} <${fromAddr}>`,
       to: order.email,
       subject: `Your order #${orderRef} has shipped! 📦`,
       html: `
         <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#1a1a1a">
           <div style="background:#1a1a1a;padding:24px;text-align:center">
-            <h1 style="color:#fff;margin:0;font-size:22px;letter-spacing:2px">GENDER APPAREL</h1>
+            <h1 style="color:#fff;margin:0;font-size:22px;letter-spacing:2px">${storeName.toUpperCase()}</h1>
           </div>
           <div style="padding:32px 24px">
             <h2 style="margin-top:0">Your order is on its way, ${firstName}! 🎉</h2>
@@ -165,8 +165,8 @@ async function sendShippingEmail(resendKey: string, order: {
             ${trackingHtml}
             <h3 style="margin-top:32px;margin-bottom:8px;font-size:14px;text-transform:uppercase;letter-spacing:1px;color:#888">Items Shipped</h3>
             <table style="width:100%;border-collapse:collapse;font-size:14px">${itemsHtml}</table>
-            <p style="margin-top:32px;color:#888;font-size:13px">Questions? Reply to this email or reach us at hello@your-store.example</p>
-            <p style="color:#888;font-size:13px">— Your Store Team</p>
+            <p style="margin-top:32px;color:#888;font-size:13px">Questions? Reply to this email or reach us at ${supportAddr}</p>
+            <p style="color:#888;font-size:13px">— ${storeName} Team</p>
           </div>
         </div>
       `,
@@ -279,7 +279,11 @@ Deno.serve(async (req: Request) => {
 
       const resendKey = Deno.env.get("RESEND_API_KEY");
       if (resendKey && order?.email) {
-        await sendShippingEmail(resendKey, {
+        const { data: emailSettings } = await supabase.from("settings").select("store_name, email_from, email_support").limit(1).maybeSingle();
+        const fromAddr = emailSettings?.email_from || Deno.env.get("EMAIL_FROM") || "orders@your-store.example";
+        const supportAddr = emailSettings?.email_support || emailSettings?.email_from || Deno.env.get("EMAIL_FROM") || "hello@your-store.example";
+        const storeName = emailSettings?.store_name || "Your Store";
+        await sendShippingEmail(resendKey, fromAddr, supportAddr, storeName, {
           ...order,
           tracking_number: trackingNumber,
           tracking_url: trackingUrl,

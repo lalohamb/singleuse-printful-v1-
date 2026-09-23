@@ -25,6 +25,8 @@ function EmailPanel() {
   const [keySaving, setKeySaving] = useState(false);
   const [keyMsg, setKeyMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [keyValidating, setKeyValidating] = useState(false);
+  const [emailFrom, setEmailFrom] = useState("");
+  const [emailSupport, setEmailSupport] = useState("");
 
   // Single send
   const [form, setForm] = useState({ to: "", subject: "", html: "" });
@@ -46,6 +48,11 @@ function EmailPanel() {
   // Delivery events
   const [events, setEvents] = useState<EmailEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
+  const [webhookConfigured, setWebhookConfigured] = useState(false);
+
+  useEffect(() => {
+    setWebhookConfigured(localStorage.getItem("resend_webhook_configured") === "1");
+  }, []);
 
   const fetchEmails = async () => {
     setLoadingEmails(true);
@@ -74,8 +81,10 @@ function EmailPanel() {
   useEffect(() => { if (tab === "events") fetchEvents(); }, [tab]);
 
   const loadKey = async () => {
-    const { data } = await supabase.from("settings").select("resend_api_key").limit(1).maybeSingle();
+    const { data } = await supabase.from("settings").select("resend_api_key, email_from, email_support").limit(1).maybeSingle();
     if (data?.resend_api_key) setResendKey(data.resend_api_key);
+    if (data?.email_from) setEmailFrom(data.email_from);
+    if (data?.email_support) setEmailSupport(data.email_support);
   };
 
   const validateKey = async () => {
@@ -93,7 +102,7 @@ function EmailPanel() {
     setKeySaving(true); setKeyMsg(null);
     const { data: row } = await supabase.from("settings").select("id").limit(1).maybeSingle();
     if (!row?.id) { setKeyMsg({ text: "Settings row not found", ok: false }); setKeySaving(false); return; }
-    const { error } = await supabase.from("settings").update({ resend_api_key: resendKey.trim() || null }).eq("id", row.id);
+    const { error } = await supabase.from("settings").update({ resend_api_key: resendKey.trim() || null, email_from: emailFrom.trim() || null, email_support: emailSupport.trim() || null }).eq("id", row.id);
     setKeySaving(false);
     setKeyMsg(error ? { text: error.message, ok: false } : { text: "Saved!", ok: true });
     setTimeout(() => setKeyMsg(null), 3000);
@@ -232,10 +241,18 @@ function EmailPanel() {
             </div>
             <button onClick={fetchEvents} className="text-secondary-400 hover:text-secondary-700"><RefreshCw size={16} className={loadingEvents ? "animate-spin" : ""} /></button>
           </div>
-          {events.length === 0 && !loadingEvents && (
-            <div className="p-4 bg-amber-50 border-b border-amber-100 flex items-start gap-2 text-sm text-amber-800">
-              <AlertTriangle size={15} className="flex-shrink-0 mt-0.5 text-amber-500" />
-              <span>Add the webhook URL above in your <a href="https://resend.com/webhooks" target="_blank" rel="noreferrer" className="underline font-medium">Resend dashboard → Webhooks</a> to start receiving delivery events.</span>
+          {events.length === 0 && !loadingEvents && !webhookConfigured && (
+            <div className="p-4 bg-amber-50 border-b border-amber-100 flex items-start justify-between gap-2 text-sm text-amber-800">
+              <div className="flex items-start gap-2">
+                <AlertTriangle size={15} className="flex-shrink-0 mt-0.5 text-amber-500" />
+                <span>Add the webhook URL above in your <a href="https://resend.com/webhooks" target="_blank" rel="noreferrer" className="underline font-medium">Resend dashboard → Webhooks</a> to start receiving delivery events.</span>
+              </div>
+              <button
+                onClick={() => { localStorage.setItem("resend_webhook_configured", "1"); setWebhookConfigured(true); }}
+                className="flex-shrink-0 text-xs bg-amber-100 hover:bg-amber-200 text-amber-800 px-2 py-1 rounded font-medium whitespace-nowrap"
+              >
+                Already configured
+              </button>
             </div>
           )}
           {loadingEvents ? <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-6 w-6 border-2 border-secondary-300 border-t-secondary-900" /></div>
@@ -269,6 +286,18 @@ function EmailPanel() {
             <h2 className="font-semibold text-secondary-900">Resend API Key</h2>
           </div>
           <p className="text-sm text-secondary-500">Get your API key from <a href="https://resend.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-primary-600 underline">resend.com/api-keys</a>. Stored in your database — takes priority over any environment variable.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="label-text">From Address</label>
+              <input value={emailFrom} onChange={(e) => setEmailFrom(e.target.value)} className="input-field font-mono text-sm" placeholder="orders@yourdomain.com" />
+              <p className="text-xs text-secondary-400 mt-1">Used as the sender on all transactional emails. Must be a verified Resend domain.</p>
+            </div>
+            <div>
+              <label className="label-text">Support Address</label>
+              <input value={emailSupport} onChange={(e) => setEmailSupport(e.target.value)} className="input-field font-mono text-sm" placeholder="hello@yourdomain.com" />
+              <p className="text-xs text-secondary-400 mt-1">Shown in email footers as the reply-to contact address.</p>
+            </div>
+          </div>
           {keyMsg && <p className={`text-sm px-3 py-2 rounded-lg ${keyMsg.ok ? "bg-success-50 text-success-700" : "bg-error-50 text-error-700"}`}>{keyMsg.text}</p>}
           <div className="space-y-3">
             <label className="label-text">API Key</label>

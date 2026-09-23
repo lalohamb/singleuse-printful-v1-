@@ -81,12 +81,15 @@ Deno.serve(async (req: Request) => {
             // Notify affiliate of new conversion
             const resendKey = Deno.env.get("RESEND_API_KEY");
             const siteUrl = Deno.env.get("SITE_URL") || "https://your-store.example";
+            const { data: affSettings } = await supabase.from("settings").select("store_name, email_from").limit(1).maybeSingle();
+            const affFromAddr = affSettings?.email_from || Deno.env.get("EMAIL_FROM") || "no-reply@your-store.example";
+            const affStoreName = affSettings?.store_name || "Your Store";
             if (resendKey && affiliate.email) {
               await fetch("https://api.resend.com/emails", {
                 method: "POST",
                 headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  from: "Your Store <no-reply@your-store.example>",
+                  from: `${affStoreName} <${affFromAddr}>`,
                   to: affiliate.email,
                   subject: `You earned ${commission.toFixed(2)} — new sale through your link! 🎉`,
                   html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px">
@@ -119,6 +122,10 @@ Deno.serve(async (req: Request) => {
 
         // Send order confirmation email via Resend
         const resendKey = Deno.env.get("RESEND_API_KEY");
+        const { data: emailSettings } = await supabase.from("settings").select("store_name, email_from, email_support").limit(1).maybeSingle();
+        const fromAddr = emailSettings?.email_from || Deno.env.get("EMAIL_FROM") || "orders@your-store.example";
+        const supportAddr = emailSettings?.email_support || emailSettings?.email_from || Deno.env.get("EMAIL_FROM") || "hello@your-store.example";
+        const storeName = emailSettings?.store_name || "Your Store";
         if (resendKey && session.metadata?.email) {
           const customerEmail = session.metadata.email;
           // Fetch full items from DB (has image_url, stripped from metadata to avoid Stripe 500-char limit)
@@ -145,7 +152,7 @@ Deno.serve(async (req: Request) => {
             method: "POST",
             headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
             body: JSON.stringify({
-              from: "Your Store <orders@your-store.example>",
+              from: `${storeName} <${fromAddr}>`,
               to: customerEmail,
               subject: `Order Confirmed – #${session.id.slice(-8).toUpperCase()}`,
               html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
@@ -157,9 +164,9 @@ Deno.serve(async (req: Request) => {
                 <p>We'll send you another email when your order ships.</p>
                 <p></p>
                 <p>If you have any questions, feel free to reply to this email </p>
-                <p>or contact us at <a href="mailto:hello@your-store.example?subject=Regarding%20Order%20%23${session.id.slice(-8).toUpperCase()}">hello@your-store.example</a></p>
+                <p>or contact us at <a href="mailto:${supportAddr}?subject=Regarding%20Order%20%23${session.id.slice(-8).toUpperCase()}">${supportAddr}</a></p>
                 <p>Thanks for supporting our small business!</p>
-                <p>— Your Store</p>
+                <p>— ${storeName}</p>
               </div>`,
             }),
           }).catch((e: Error) => console.error("Resend error:", String(e?.message ?? e).replace(/[\r\n]/g, " ")));
