@@ -3,8 +3,22 @@ import Stripe from "stripe";
 import { requireAdmin } from "@/lib/require-admin";
 import { getStripeConfig } from "@/lib/stripe-config";
 import { getErrorMessage } from "@/lib/errors";
+import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
+
+function sbService() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
+
+async function getResendKey(): Promise<string | null> {
+  const { data } = await sbService().from("settings").select("resend_api_key").limit(1).maybeSingle();
+  return data?.resend_api_key || process.env.RESEND_API_KEY || null;
+}
 
 async function getStripe() {
   const config = await getStripeConfig();
@@ -57,7 +71,65 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
         params.amount = parsed;
       }
-      return NextResponse.json(await stripe.refunds.create(params));
+      const refund = await stripe.refunds.create(params);
+
+      // Send refund confirmation email
+      try {
+        const supabase = sbService();
+        const resendKey = await getResendKey();
+        if (resendKey) {
+          // Look up order by stripe_payment_intent_id via the charge
+          const charge = await stripe.charges.retrieve(charge_id);
+          const paymentIntentId = typeof charge.payment_intent === "string" ? charge.payment_intent : null;
+          const { data: order } = paymentIntentId
+            ? await supabase.from("orders").select("email, shipping_name, total, id").eq("stripe_payment_intent_id", paymentIntentId).maybeSingle()
+            : { data: null };
+          const { data: emailSettings } = await supabase.from("settings").select("store_name, email_from, email_support").limit(1).maybeSingle();
+          const fromAddr = emailSettings?.email_from || process.env.RESEND_API_KEY || "orders@your-store.example";
+          const supportAddr = emailSettings?.email_support || emailSettings?.email_from || "hello@your-store.example";
+          const storeName = emailSettings?.store_name || "Your Store";
+          const customerEmail = order?.email || charge.billing_details?.email;
+          const refundAmount = ((refund.amount ?? 0) / 100).toFixed(2);
+          const orderRef = order?.id ? order.id.slice(-8).toUpperCase() : charge_id.slice(-8).toUpperCase();
+          const firstName = order?.shipping_name?.split(" ")[0] || "there";
+
+          if (customerEmail) {
+            await fetch("https://api.resend.com/emails", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                from: `${storeName} <${fromAddr}>`,
+                to: customerEmail,
+                subject: `Your refund of $${refundAmount} is on its way — #${orderRef}`,
+                html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#1a1a1a">
+                  <div style="background:#1a1a1a;padding:24px;text-align:center">
+                    <h1 style="color:#fff;margin:0;font-size:22px;letter-spacing:2px">${storeName.toUpperCase()}</h1>
+                  </div>
+                  <div style="padding:32px 24px">
+                    <h2 style="margin-top:0">Refund Confirmed, ${firstName}</h2>
+                    <p style="color:#555">We've issued a refund of <strong>$${refundAmount}</strong> for order <strong>#${orderRef}</strong>.</p>
+                    <div style="background:#f9f9f9;border:1px solid #eee;border-radius:8px;padding:20px;margin:24px 0">
+                      <table style="width:100%;border-collapse:collapse;font-size:14px">
+                        <tr><td style="padding:6px 0;color:#666">Refund amount</td><td style="padding:6px 0;text-align:right;font-weight:600">$${refundAmount}</td></tr>
+                        <tr><td style="padding:6px 0;color:#666">Order</td><td style="padding:6px 0;text-align:right">#${orderRef}</td></tr>
+                        <tr><td style="padding:6px 0;color:#666">Status</td><td style="padding:6px 0;text-align:right;color:#16a34a;font-weight:600">Processed</td></tr>
+                      </table>
+                    </div>
+                    <p style="color:#555">Refunds typically appear on your statement within <strong>5–10 business days</strong> depending on your bank.</p>
+                    <p style="color:#888;font-size:13px;margin-top:32px">Questions? Contact us at <a href="mailto:${supportAddr}">${supportAddr}</a></p>
+                    <p style="color:#888;font-size:13px">— ${storeName} Team</p>
+                  </div>
+                </div>`,
+              }),
+            });
+          }
+        }
+      } catch (emailErr) {
+        // Non-fatal — refund already succeeded, just log
+        console.error("Refund email failed:", getErrorMessage(emailErr));
+      }
+
+      return NextResponse.json(refund);
     }
 
     if (action === "register_webhook") {
