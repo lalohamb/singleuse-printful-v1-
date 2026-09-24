@@ -48,6 +48,7 @@ function EmailPanel() {
   // Delivery events
   const [events, setEvents] = useState<EmailEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
+  const [eventFilter, setEventFilter] = useState<string>("all");
   const [webhookConfigured, setWebhookConfigured] = useState(false);
 
   useEffect(() => {
@@ -241,41 +242,61 @@ function EmailPanel() {
             </div>
             <button onClick={fetchEvents} className="text-secondary-400 hover:text-secondary-700"><RefreshCw size={16} className={loadingEvents ? "animate-spin" : ""} /></button>
           </div>
+
           {events.length === 0 && !loadingEvents && !webhookConfigured && (
             <div className="p-4 bg-amber-50 border-b border-amber-100 flex items-start justify-between gap-2 text-sm text-amber-800">
               <div className="flex items-start gap-2">
                 <AlertTriangle size={15} className="flex-shrink-0 mt-0.5 text-amber-500" />
                 <span>Add the webhook URL above in your <a href="https://resend.com/webhooks" target="_blank" rel="noreferrer" className="underline font-medium">Resend dashboard → Webhooks</a> to start receiving delivery events.</span>
               </div>
-              <button
-                onClick={() => { localStorage.setItem("resend_webhook_configured", "1"); setWebhookConfigured(true); }}
-                className="flex-shrink-0 text-xs bg-amber-100 hover:bg-amber-200 text-amber-800 px-2 py-1 rounded font-medium whitespace-nowrap"
-              >
-                Already configured
-              </button>
+              <button onClick={() => { localStorage.setItem("resend_webhook_configured", "1"); setWebhookConfigured(true); }} className="flex-shrink-0 text-xs bg-amber-100 hover:bg-amber-200 text-amber-800 px-2 py-1 rounded font-medium whitespace-nowrap">Already configured</button>
             </div>
           )}
-          {loadingEvents ? <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-6 w-6 border-2 border-secondary-300 border-t-secondary-900" /></div>
-            : events.length === 0 ? <div className="p-10 text-center text-secondary-400"><Mail size={36} className="mx-auto mb-2 text-secondary-200" />No events yet — add the webhook in Resend to start tracking</div>
-            : (
-              <div className="divide-y divide-secondary-50">
-                {events.map((ev, i) => {
-                  const badge = eventBadge[ev.event_type] || { label: ev.event_type, cls: "bg-secondary-100 text-secondary-500" };
-                  return (
-                    <div key={i} className="flex items-center justify-between px-5 py-3 hover:bg-secondary-50">
-                      <div>
-                        <p className="text-sm font-medium text-secondary-900">{ev.subject || "—"}</p>
-                        <p className="text-xs text-secondary-500">{ev.to_email}</p>
-                      </div>
-                      <div className="flex items-center gap-3 ml-4">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badge.cls}`}>{badge.label}</span>
-                        <p className="text-xs text-secondary-400 whitespace-nowrap">{new Date(ev.created_at).toLocaleDateString()}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+
+          {/* Stats */}
+          {events.length > 0 && (
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-px bg-secondary-100 border-b border-secondary-100">
+              {Object.entries(eventBadge).map(([key, { label, cls }]) => {
+                const count = events.filter(e => e.event_type === key).length;
+                return (
+                  <button key={key} onClick={() => setEventFilter(eventFilter === key ? "all" : key)}
+                    className={`flex flex-col items-center py-3 px-2 bg-white hover:bg-secondary-50 transition-colors ${eventFilter === key ? "ring-2 ring-inset ring-primary-400" : ""}`}>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cls}`}>{label}</span>
+                    <span className="text-lg font-bold text-secondary-900 mt-1">{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {loadingEvents
+            ? <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-6 w-6 border-2 border-secondary-300 border-t-secondary-900" /></div>
+            : events.length === 0
+              ? <div className="p-10 text-center text-secondary-400"><Mail size={36} className="mx-auto mb-2 text-secondary-200" />No events yet — add the webhook in Resend to start tracking</div>
+              : (
+                <div className="divide-y divide-secondary-50">
+                  {events
+                    .filter(ev => eventFilter === "all" || ev.event_type === eventFilter)
+                    .map((ev, i) => {
+                      const badge = eventBadge[ev.event_type] || { label: ev.event_type, cls: "bg-secondary-100 text-secondary-500" };
+                      return (
+                        <div key={i} className="flex items-center justify-between px-5 py-3 hover:bg-secondary-50">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-secondary-900 truncate">{ev.subject || "—"}</p>
+                            <p className="text-xs text-secondary-500">{ev.to_email}</p>
+                          </div>
+                          <div className="flex items-center gap-3 ml-4 flex-shrink-0">
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badge.cls}`}>{badge.label}</span>
+                            <p className="text-xs text-secondary-400 whitespace-nowrap">{new Date(ev.created_at).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  {eventFilter !== "all" && events.filter(ev => ev.event_type === eventFilter).length === 0 && (
+                    <p className="text-center text-secondary-400 text-sm py-8">No {eventBadge[eventFilter]?.label.toLowerCase()} events</p>
+                  )}
+                </div>
+              )}
         </section>
       )}
 

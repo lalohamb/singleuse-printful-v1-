@@ -41,6 +41,8 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
 
   const stage = getOrderStage(order);
   const address = order.shipping_address;
+  const isCancelled = order.status === "cancelled";
+  const awaitingApproval = stage === 2;
 
   return (
     <AccountShell>
@@ -63,13 +65,28 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mt-6">
-            {ORDER_STEPS.map((step, index) => (
-              <div key={step} className={`rounded-lg border px-3 py-2 text-xs ${index <= stage ? "border-success-200 bg-success-50 text-success-700" : "border-secondary-100 bg-secondary-50 text-secondary-400"}`}>
-                {step}
+          <div className="grid grid-cols-2 md:grid-cols-7 gap-2 mt-6">
+            {isCancelled ? (
+              <div className="col-span-2 md:col-span-7 rounded-lg border border-error-200 bg-error-50 text-error-700 px-3 py-2 text-xs font-medium">
+                This order has been cancelled.
               </div>
-            ))}
+            ) : (
+              ORDER_STEPS.map((step, index) => (
+                <div key={step} className={`rounded-lg border px-3 py-2 text-xs ${
+                  index <= stage
+                    ? "border-success-200 bg-success-50 text-success-700 font-medium"
+                    : "border-secondary-100 bg-secondary-50 text-secondary-400"
+                }`}>
+                  {step}
+                </div>
+              ))
+            )}
           </div>
+          {awaitingApproval && (
+            <p className="text-xs text-secondary-500 mt-3 bg-secondary-50 border border-secondary-100 rounded-lg px-4 py-3">
+              ⏳ Your payment was received. Orders are reviewed before being sent to production — this usually takes 1–2 business days. You&apos;ll receive a shipping email once your order is on its way.
+            </p>
+          )}
         </section>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

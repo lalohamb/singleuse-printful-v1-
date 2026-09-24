@@ -45,7 +45,8 @@ export async function POST(req: NextRequest) {
 const ALLOWED_PATHS = new Set(["/emails", "/domains", "/api-keys"]);
 
 export async function GET(req: NextRequest) {
-  const key = await getResendKey();
+  const overrideKey = req.headers.get("x-resend-key-override");
+  const key = overrideKey || await getResendKey();
   if (!key) return NextResponse.json({ error: "Resend API key not configured. Add it in Admin → Email." }, { status: 500 });
 
   const path = new URL(req.url).searchParams.get("path") ?? "/emails";

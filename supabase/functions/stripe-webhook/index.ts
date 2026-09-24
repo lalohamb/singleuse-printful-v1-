@@ -148,7 +148,7 @@ Deno.serve(async (req: Request) => {
               <td style="padding:12px 0;vertical-align:top;text-align:right;white-space:nowrap">$${(item.price * item.quantity).toFixed(2)}</td>
             </tr>`
           ).join("");
-          await fetch("https://api.resend.com/emails", {
+          const resendRes = await fetch("https://api.resend.com/emails", {
             method: "POST",
             headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -169,7 +169,11 @@ Deno.serve(async (req: Request) => {
                 <p>— ${storeName}</p>
               </div>`,
             }),
-          }).catch((e: Error) => console.error("Resend error:", String(e?.message ?? e).replace(/[\r\n]/g, " ")));
+          });
+          if (!resendRes.ok) {
+            const resendErr = await resendRes.text();
+            console.error("Resend error:", resendRes.status, resendErr.replace(/[\r\n]/g, " "));
+          }
         }
 
         // Optionally forward to Printify for fulfillment

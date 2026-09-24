@@ -92,19 +92,21 @@ export function formatAddress(address: CustomerAddress): string {
 }
 
 export function getOrderStage(order: Pick<Order, "status" | "fulfillment_status" | "tracking_number" | "printify_order_id">): number {
-  if (order.status === "cancelled") return 0;
-  if (order.status === "delivered" || order.fulfillment_status === "delivered") return 5;
-  if (order.status === "shipped" || order.tracking_number) return 4;
-  if (order.fulfillment_status && ["in-production", "fulfilled", "partially-fulfilled"].includes(order.fulfillment_status)) return 3;
-  if (order.printify_order_id || order.status === "fulfilled") return 2;
-  if (["paid", "pending"].includes(order.status)) return 1;
+  if (order.status === "cancelled") return -1;
+  if (order.status === "delivered" || order.fulfillment_status === "delivered") return 6;
+  if (order.status === "shipped" || order.tracking_number) return 5;
+  if (order.fulfillment_status && ["in-production", "fulfilled", "partially-fulfilled"].includes(order.fulfillment_status)) return 4;
+  if (order.printify_order_id || order.status === "fulfilled") return 3;
+  if (order.status === "paid") return 2;
+  if (order.status === "pending") return 1;
   return 0;
 }
 
 export const ORDER_STEPS = [
   "Order placed",
   "Payment received",
-  "Sent to production",
+  "Awaiting approval",
+  "Sent to fulfillment",
   "In production",
   "Shipped",
   "Delivered",

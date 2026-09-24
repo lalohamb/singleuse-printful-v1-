@@ -44,7 +44,7 @@ export function OrdersClient() {
                   </div>
                   <div className="min-w-0">
                     <p className="font-semibold text-secondary-900">#{order.id.slice(-8).toUpperCase()}</p>
-                    <p className="text-sm text-secondary-500 truncate">{new Date(order.created_at).toLocaleDateString()} · {order.items.length} {order.items.length === 1 ? "item" : "items"} · {order.status}</p>
+                    <p className="text-sm text-secondary-500 truncate">{new Date(order.created_at).toLocaleDateString()} · {order.items.length} {order.items.length === 1 ? "item" : "items"} · <span className={order.status === "cancelled" ? "text-error-600" : order.status === "shipped" || order.status === "delivered" ? "text-success-600" : "text-secondary-500"}>{order.fulfillment_status === "in-production" ? "In production" : order.tracking_number ? "Shipped" : order.status === "paid" && !order.printify_order_id ? "Awaiting approval" : order.status}</span></p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">

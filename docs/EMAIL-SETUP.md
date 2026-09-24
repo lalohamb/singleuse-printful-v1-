@@ -2,6 +2,8 @@
 
 The storefront supports two email integrations. Both are optional — the storefront checkout and order flow work without them, but customers will not receive email notifications unless Resend is configured.
 
+> For full Resend documentation including API key setup, domain verification, webhook configuration, email templates, and troubleshooting — see [RESEND-SETUP.md](./RESEND-SETUP.md).
+
 ---
 
 ## Resend — Transactional Email

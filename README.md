@@ -30,6 +30,7 @@ Use [docs/SETUP-CHECKLIST.md](./docs/SETUP-CHECKLIST.md) to track your progress.
 | [PRINTIFY-SETUP.md](./docs/PRINTIFY-SETUP.md) | Printify connection and product sync |
 | [STRIPE-SETUP.md](./docs/STRIPE-SETUP.md) | Stripe connection and webhook setup |
 | [EMAIL-SETUP.md](./docs/EMAIL-SETUP.md) | Resend and MailerLite configuration |
+| [RESEND-SETUP.md](./docs/RESEND-SETUP.md) | Resend full setup, API key, webhooks, troubleshooting |
 | [LOCAL-DEVELOPMENT.md](./docs/LOCAL-DEVELOPMENT.md) | Running locally |
 | [DEPLOYMENT.md](./docs/DEPLOYMENT.md) | Deploying to production |
 | [ADMIN-GUIDE.md](./docs/ADMIN-GUIDE.md) | Admin panel walkthrough |
