@@ -36,6 +36,94 @@ function ModeBadge({ mode }: { mode: Diagnostic["mode"] }) {
   );
 }
 
+function ProductRatesTable() {
+  const [products, setProducts] = useState<Array<{
+    id: string;
+    title: string;
+    image_url: string | null;
+    shipping_info: { profiles?: Array<{ countries: string[]; first_item?: { cost?: number }; additional_items?: { cost?: number } }> } | null;
+  }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase
+      .from("products")
+      .select("id, title, image_url, shipping_info")
+      .eq("status", "active")
+      .order("title")
+      .then(({ data }) => {
+        setProducts(data ?? []);
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) return <div className="flex justify-center py-6"><div className="animate-spin rounded-full h-6 w-6 border-2 border-secondary-300 border-t-secondary-900" /></div>;
+  if (!products.length) return <p className="text-sm text-secondary-400">No active products found.</p>;
+
+  return (
+    <div className="space-y-2">
+      {products.map((p) => {
+        const profiles = p.shipping_info?.profiles ?? [];
+        const usProfiles = profiles.filter((pr) => pr.countries?.includes("US"));
+        const hasRates = usProfiles.length > 0;
+        const isOpen = expanded === p.id;
+
+        return (
+          <div key={p.id} className="border border-secondary-100 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setExpanded(isOpen ? null : p.id)}
+              className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-secondary-50 hover:bg-secondary-100 transition-colors text-left"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                {p.image_url
+                  ? <img src={p.image_url} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />
+                  : <div className="w-8 h-8 rounded bg-secondary-200 flex-shrink-0" />}
+                <span className="text-sm font-medium text-secondary-900 truncate">{p.title}</span>
+              </div>
+              <div className="flex items-center gap-3 flex-shrink-0">
+                {hasRates
+                  ? <span className="text-xs text-success-600 font-medium">
+                      US: ${(Math.min(...usProfiles.map(pr => pr.first_item?.cost ?? 0)) / 100).toFixed(2)} first item
+                    </span>
+                  : <span className="text-xs text-error-500 font-medium">No US rate</span>}
+                <span className="text-secondary-400 text-xs">{isOpen ? "▲" : "▼"}</span>
+              </div>
+            </button>
+
+            {isOpen && (
+              <div className="px-4 py-3 border-t border-secondary-100">
+                {profiles.length === 0 ? (
+                  <p className="text-xs text-secondary-400">No shipping profiles stored. Run a product sync.</p>
+                ) : (
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-secondary-500 border-b border-secondary-100">
+                        <th className="text-left pb-2 font-medium">Region</th>
+                        <th className="text-right pb-2 font-medium">First item</th>
+                        <th className="text-right pb-2 font-medium">Additional</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-secondary-50">
+                      {profiles.map((pr, i) => (
+                        <tr key={i} className="text-secondary-700">
+                          <td className="py-1.5">{pr.countries?.join(", ") ?? "—"}</td>
+                          <td className="py-1.5 text-right">${((pr.first_item?.cost ?? 0) / 100).toFixed(2)}</td>
+                          <td className="py-1.5 text-right">${((pr.additional_items?.cost ?? 0) / 100).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ShippingPanel() {
   const [diag, setDiag] = useState<Diagnostic | null>(null);
   const [loading, setLoading] = useState(true);
@@ -200,6 +288,20 @@ function ShippingPanel() {
         ) : null}
       </section>
 
+      {/* Per-product shipping rates */}
+      <section className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-secondary-900 flex items-center gap-2 mb-4">
+          <Package size={20} className="text-primary-500" />Shipping Rates by Product
+        </h2>
+        <p className="text-sm text-secondary-500 mb-4">Stored rates from the last Printify sync. Used as fallback when the live API is unavailable.</p>
+        <div className="bg-secondary-50 border border-secondary-100 rounded-lg p-4 text-xs text-secondary-600 space-y-1.5 mb-4">
+          <p>• Products fulfilled by multiple Printify print providers will show <strong>more than one US rate</strong> — each provider has its own cost. This is expected.</p>
+          <p>• The collapsed view shows the <strong>lowest stored US rate</strong> as an estimate. At checkout, Printify's live API returns the exact rate for the actual provider fulfilling the order.</p>
+          <p>• Non-US rows (CA, AU, REST_OF_THE_WORLD) are stored from the sync but <strong>not used</strong> — this store ships to the US only.</p>
+        </div>
+        <ProductRatesTable />
+      </section>
+
       {/* Fallback rate control */}
       <section className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6">
         <h2 className="text-lg font-semibold text-secondary-900 flex items-center gap-2 mb-2">
@@ -255,8 +357,8 @@ function ShippingPanel() {
           <p className="font-semibold text-secondary-900">Shipping is managed by Printify</p>
           <p className="text-sm text-secondary-600">
             Rates, carriers, and delivery windows are configured in your Printify account.
-            During each product sync, this store fetches the static shipping rate profile for each product&apos;s blueprint and print provider and stores it locally.
-            At checkout, rates are calculated from those stored profiles — no live API call needed.
+            At checkout, this store calls Printify&apos;s live Calculate Shipping API with the customer&apos;s exact cart to get the real fulfillment cost.
+            If that call fails, it falls back to the static profiles stored during the last product sync.
           </p>
           <a href="https://printify.com/app/store/shipping" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 underline mt-1">
             Open Printify Shipping Settings <ExternalLink size={13} />
@@ -271,9 +373,9 @@ function ShippingPanel() {
         </h2>
         <ol className="space-y-4 text-sm text-secondary-700">
           {[
-            { icon: RefreshCw, title: "Product sync fetches shipping profiles", desc: "When you sync products from Printify, the shipping rate profile for each product's blueprint and print provider is fetched from Printify's catalog API and stored in the database." },
-            { icon: Globe, title: "Customer selects their country at checkout", desc: "The checkout page looks up the stored shipping profile for each cart item and finds the rate matching the customer's country." },
-            { icon: Package, title: "Rate is calculated and charged", desc: "Cost = first item rate + (quantity − 1) × additional item rate, summed across all products. This exact amount is shown to the customer and passed to Stripe." },
+            { icon: RefreshCw, title: "Product sync stores shipping profiles as fallback", desc: "When you sync products from Printify, the shipping rate profile for each product's blueprint and print provider is stored in the database as a fallback." },
+            { icon: Globe, title: "Live rate fetched at checkout", desc: "When a customer checks out, the server calls Printify's Calculate Shipping API with the exact cart items to get the real fulfillment cost. No client-side calculation." },
+            { icon: Package, title: "Exact rate passed to Stripe", desc: "Printify's response is used directly as the shipping amount in the Stripe Checkout Session. If the live call fails, the stored fallback profiles are used instead." },
           ].map(({ icon: Icon, title, desc }, i) => (
             <li key={i} className="flex gap-4">
               <div className="w-8 h-8 rounded-full bg-primary-50 flex items-center justify-center flex-shrink-0 text-primary-600 font-bold text-sm">{i + 1}</div>
@@ -313,8 +415,8 @@ function ShippingPanel() {
       <div className="rounded-lg border border-secondary-200 bg-secondary-50 p-4 text-xs text-secondary-500 flex gap-2">
         <Info size={14} className="flex-shrink-0 mt-0.5 text-secondary-400" />
         <p>
-          If a product has no shipping profile stored, checkout falls back to a flat <strong>$6.99</strong> rate for that item so orders are never blocked.
-          After changing shipping rates in Printify, run a product sync to pull the updated profiles.
+          If Printify&apos;s live shipping API is unavailable, checkout falls back to the static profiles stored during the last sync, or <strong>$6.99</strong> if no profiles exist.
+          After changing shipping rates in Printify, the live API will reflect them immediately — no sync needed.
         </p>
       </div>
 

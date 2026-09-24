@@ -6,10 +6,10 @@ import Stripe from "npm:stripe@17.3.1";
 //   supabase secrets set SITE_URL=https://yourdomain.com
 function corsHeaders(req: Request): Record<string, string> {
   const siteUrl = Deno.env.get("SITE_URL") ?? "";
-  const allowedOrigin = siteUrl || "http://localhost:3000";
   const requestOrigin = req.headers.get("origin") ?? "";
-  // Only reflect the origin header when it matches the allowed origin
-  const origin = requestOrigin === allowedOrigin ? allowedOrigin : "null";
+  const isLocalhost = requestOrigin.startsWith("http://localhost:") || requestOrigin.startsWith("http://127.0.0.1:");
+  const isAllowed = requestOrigin === siteUrl || isLocalhost;
+  const origin = isAllowed ? requestOrigin : "null";
   return {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "POST, OPTIONS",

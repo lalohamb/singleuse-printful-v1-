@@ -11,7 +11,7 @@ import type { StoreSettings, Category } from "@/types";
 import { DEFAULT_SITE_MENU_SETTINGS, type SiteMenuSettings } from "@/lib/site-menu-settings";
 import AppImage from "@/components/AppImage";
 
-export default function Header() {
+export default function Header({ initialLogo }: { initialLogo?: { url: string | null; size: number } }) {
   const { itemCount, toggleCart } = useCart();
   const { user } = useCustomerAuth();
   const router = useRouter();
@@ -21,6 +21,10 @@ export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Use server-supplied logo immediately, update when settings load client-side
+  const logoUrl = settings?.logo_url ?? initialLogo?.url ?? null;
+  const logoSize = settings?.logo_size ?? initialLogo?.size ?? 40;
 
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,18 +72,17 @@ export default function Header() {
         <div className="bg-secondary-900 text-white text-center py-2 px-4 text-sm font-medium">{settings.announcement}</div>
       )}
       <header className={`sticky top-0 z-40 transition-all duration-300 ${scrolled ? "shadow-md" : "backdrop-blur-sm"}`} style={{ backgroundColor: menuSettings.backgroundColor, color: menuSettings.textColor }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 lg:h-20">
             <div className="flex items-center gap-4">
                 <button onClick={() => setMobileOpen(true)} className="lg:hidden p-2 -ml-2" style={{ color: menuSettings.textColor }} aria-label="Open menu">
                 <Menu size={24} />
               </button>
               <Link href="/" className="flex items-center gap-2">
-                {settings?.logo_url ? (
-                  <AppImage src={resolveStorageUrl(settings.logo_url)} alt={settings.store_name || "Your Store"} width={240} height={80} style={{ height: `${settings.logo_size ?? 40}px`, width: "auto" }} />
-                ) : (
-                  <AppImage src="/store-logo-placeholder.svg" alt="Your Store" width={240} height={80} style={{ height: `${settings?.logo_size ?? 40}px`, width: "auto" }} />
-                )}
+                {logoUrl
+                  ? <AppImage src={resolveStorageUrl(logoUrl)} alt={settings?.store_name || "Your Store"} width={240} height={80} style={{ height: `${logoSize}px`, width: "auto" }} />
+                  : <AppImage src="/store-logo-placeholder.svg" alt="Your Store" width={240} height={80} style={{ height: `${logoSize}px`, width: "auto" }} />
+                }
               </Link>
             </div>
               <nav className="hidden lg:flex items-center gap-8" style={menuTypography}>
