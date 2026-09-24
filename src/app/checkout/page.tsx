@@ -84,7 +84,6 @@ export default function CheckoutPage() {
         shipping_address: { line1: form.address1, line2: form.address2 || undefined, city: form.city, state: form.state, zip: form.zip, country: form.country },
         shipping_name: `${form.firstName} ${form.lastName}`,
         email: form.email,
-        shipping_cost: resolvedShipping,
       });
       clearCart();
       window.location.href = result.url;
@@ -129,9 +128,6 @@ export default function CheckoutPage() {
             </div>
             <select value={form.country} onChange={(e) => updateForm("country", e.target.value)} className="input-field mt-4">
               <option value="US">United States</option>
-              <option value="CA">Canada</option>
-              <option value="GB">United Kingdom</option>
-              <option value="AU">Australia</option>
             </select>
           </div>
           {error && <div className="bg-error-50 border border-error-100 text-error-700 rounded-lg p-4 text-sm">{error}</div>}

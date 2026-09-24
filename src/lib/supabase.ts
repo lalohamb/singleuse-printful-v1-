@@ -113,7 +113,6 @@ export async function createStripeCheckout(payload: {
   shipping_address: { line1: string; line2?: string; city: string; state: string; zip: string; country: string };
   shipping_name: string;
   email: string;
-  shipping_cost: number;
 }): Promise<{ url: string; session_id: string }> {
   const apiUrl = `${supabaseUrl}/functions/v1/stripe-checkout`;
   const affiliate_code = (window as any).__affiliateCode ?? null;

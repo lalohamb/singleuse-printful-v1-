@@ -42,6 +42,72 @@ function sanitize<T>(value: T, depth = 0): T {
   return safe as T;
 }
 
+// ── Printify live shipping quote ────────────────────────────────────────────
+type VerifiedItemForShipping = {
+  printify_id: string | null;
+  variant_id: string;
+  quantity: number;
+};
+
+async function getLiveShippingCost(
+  supabase: ReturnType<typeof createClient>,
+  items: VerifiedItemForShipping[]
+): Promise<number> {
+  const FALLBACK = 6.99;
+
+  try {
+    const { data: settings } = await supabase
+      .from("settings")
+      .select("printify_shop_id, default_shipping_cost")
+      .limit(1)
+      .maybeSingle();
+
+    const shopId = settings?.printify_shop_id;
+    const fallback = Number(settings?.default_shipping_cost) || FALLBACK;
+    const token = Deno.env.get("PRINTIFY_API_TOKEN");
+
+    if (!shopId || !token) return fallback;
+
+    // Only include items that have a Printify product ID
+    const lineItems = items
+      .filter((i) => i.printify_id)
+      .map((i) => ({
+        product_id: i.printify_id!,
+        variant_id: Number(i.variant_id),
+        quantity: i.quantity,
+      }));
+
+    if (!lineItems.length) return fallback;
+
+    const res = await fetch(
+      `https://api.printify.com/v1/shops/${shopId}/orders/shipping.json`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          line_items: lineItems,
+          address_to: { country: "US" },
+        }),
+      }
+    );
+
+    if (!res.ok) return fallback;
+
+    const data = await res.json();
+    // Printify returns costs in cents — convert to dollars
+    const cents = Number(data?.standard) || 0;
+    if (cents <= 0) return fallback;
+
+    return Math.round(cents) / 100;
+  } catch {
+    return 6.99;
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders(req) });
@@ -66,7 +132,7 @@ Deno.serve(async (req: Request) => {
     const isLiveMode = !stripeSecretKey.startsWith("sk_test_");
 
     const body = sanitize(await req.json());
-    const { items, shipping_address, shipping_name, email, shipping_cost, affiliate_code } = body;
+    const { items, shipping_address, shipping_name, email, affiliate_code } = body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return errorResponse(req, "Items are required", 400);
@@ -142,11 +208,17 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Compute authoritative subtotal and total from verified items
+    // Compute authoritative subtotal from verified items
     const verifiedSubtotal = Math.round(
       verifiedItems.reduce((sum, i) => sum + i.price * i.quantity, 0) * 100
     ) / 100;
-    const resolvedShipping = Math.max(0, Number(shipping_cost) || 0);
+
+    // ── Live Printify shipping quote ──────────────────────────────────────────
+    // Fetch the real fulfillment cost from Printify instead of trusting the
+    // client-supplied value. Falls back to DB-cached rates on any error.
+    const resolvedShipping = await getLiveShippingCost(supabase, verifiedItems);
+    // ─────────────────────────────────────────────────────────────────────────
+
     const verifiedTotal = Math.round((verifiedSubtotal + resolvedShipping) * 100) / 100;
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -167,21 +239,25 @@ Deno.serve(async (req: Request) => {
       },
     }));
 
-    if (resolvedShipping > 0) {
-      lineItems.push({
-        quantity: 1,
-        price_data: {
-          currency: "usd",
-          unit_amount: Math.round(resolvedShipping * 100),
-          product_data: { name: "Shipping" },
-        },
-      });
-    }
+    const shippingOptions = resolvedShipping > 0
+      ? [{
+          shipping_rate_data: {
+            type: "fixed_amount" as const,
+            fixed_amount: { amount: Math.round(resolvedShipping * 100), currency: "usd" },
+            display_name: "Standard Shipping",
+            delivery_estimate: {
+              minimum: { unit: "business_day" as const, value: 7 },
+              maximum: { unit: "business_day" as const, value: 14 },
+            },
+          },
+        }]
+      : [];
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       customer_email: email,
       line_items: lineItems,
+      ...(shippingOptions.length ? { shipping_options: shippingOptions } : {}),
       success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/checkout/cancel`,
       metadata: {
@@ -200,7 +276,7 @@ Deno.serve(async (req: Request) => {
         ...(affiliate_code ? { affiliate_code: String(affiliate_code).slice(0, 50) } : {}),
       },
       shipping_address_collection: {
-        allowed_countries: ["US", "CA", "GB", "AU"],
+        allowed_countries: ["US"],
       },
       phone_number_collection: {
         enabled: true,
