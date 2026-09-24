@@ -278,6 +278,7 @@ Deno.serve(async (req: Request) => {
       shipping_address_collection: {
         allowed_countries: ["US"],
       },
+      allow_promotion_codes: true,
       phone_number_collection: {
         enabled: true,
       },
