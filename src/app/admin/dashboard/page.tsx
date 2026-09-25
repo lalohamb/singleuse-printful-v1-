@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Package, ShoppingBag, DollarSign, TrendingUp, Clock, CheckCircle, PauseCircle, PlayCircle, CreditCard, XCircle, Users } from "lucide-react";
+import { Package, ShoppingBag, DollarSign, TrendingUp, Clock, CheckCircle, PauseCircle, PlayCircle, CreditCard, Users } from "lucide-react";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { supabase, formatPrice } from "@/lib/supabase";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
@@ -37,7 +37,7 @@ const priceFormatter = (v: number) => `$${(v / 100).toFixed(0)}`;
 
 function Dashboard() {
   const { session } = useAdminAuth();
-  const [stats, setStats] = useState({ totalOrders: 0, totalRevenue: 0, pendingOrders: 0, cancelledOrders: 0, totalProducts: 0, totalCustomers: 0, avgOrderValue: 0 });
+  const [stats, setStats] = useState({ totalOrders: 0, totalRevenue: 0, awaitingFulfillment: 0, inProduction: 0, totalProducts: 0, totalCustomers: 0, avgOrderValue: 0 });
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [recentProducts, setRecentProducts] = useState<Product[]>([]);
   const [topBySales, setTopBySales] = useState<{ title: string; image_url: string; units: number; revenue: number }[]>([]);
@@ -58,12 +58,12 @@ function Dashboard() {
       supabase.from("products").select("*").order("created_at", { ascending: false }),
       supabase.from("settings").select("id, orders_paused").limit(1).maybeSingle(),
       supabase.from("orders").select("id, total, status", { count: "exact" }).neq("status", "cancelled").neq("status", "pending"),
-      supabase.from("orders").select("id", { count: "exact" }).eq("status", "pending"),
-      supabase.from("orders").select("id", { count: "exact" }).eq("status", "cancelled"),
+      supabase.from("orders").select("id", { count: "exact" }).eq("status", "paid").is("printify_order_id", null),
+      supabase.from("orders").select("id", { count: "exact" }).eq("fulfillment_status", "in-production"),
       supabase.from("customer_profiles").select("id", { count: "exact" }),
       supabase.from("orders").select("items").in("status", ["paid","fulfilled","shipped","delivered"]),
       supabase.from("orders").select("created_at, total").in("status", ["paid","fulfilled","shipped","delivered"]).gte("created_at", new Date(Date.now() - 30 * 86400000).toISOString()),
-    ]).then(([ordersRes, productsRes, settingsRes, countRes, pendingRes, cancelledRes, customersRes, paidOrdersRes, chartRes]) => {
+    ]).then(([ordersRes, productsRes, settingsRes, countRes, awaitingRes, inProductionRes, customersRes, paidOrdersRes, chartRes]) => {
       const orders = (ordersRes.data || []) as Order[];
       const products = (productsRes.data || []) as Product[];
       const s = settingsRes.data as Pick<StoreSettings, "id" | "orders_paused"> | null;
@@ -89,8 +89,8 @@ function Dashboard() {
       setStats({
         totalOrders,
         totalRevenue,
-        pendingOrders: pendingRes.count ?? 0,
-        cancelledOrders: cancelledRes.count ?? 0,
+        awaitingFulfillment: awaitingRes.count ?? 0,
+        inProduction: inProductionRes.count ?? 0,
         totalProducts: products.length,
         totalCustomers: customersRes.count ?? 0,
         avgOrderValue: totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0,
@@ -129,8 +129,8 @@ function Dashboard() {
     { label: "Total Orders", value: stats.totalOrders, icon: ShoppingBag, color: "bg-primary-50 text-primary-600" },
     { label: "Total Customers", value: stats.totalCustomers, icon: Users, color: "bg-blue-50 text-blue-600" },
     { label: "Avg Order Value", value: formatPrice(stats.avgOrderValue), icon: TrendingUp, color: "bg-purple-50 text-purple-600" },
-    { label: "Pending Orders", value: stats.pendingOrders, icon: Clock, color: "bg-warning-50 text-warning-600" },
-    { label: "Cancelled Orders", value: stats.cancelledOrders, icon: XCircle, color: "bg-red-50 text-red-500" },
+    { label: "Awaiting Fulfillment", value: stats.awaitingFulfillment, icon: Clock, color: stats.awaitingFulfillment > 0 ? "bg-amber-50 text-amber-600" : "bg-secondary-50 text-secondary-400" },
+    { label: "In Production", value: stats.inProduction, icon: Package, color: "bg-primary-50 text-primary-600" },
   ];
 
   if (loading) return <div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-2 border-secondary-300 border-t-secondary-900" /></div>;

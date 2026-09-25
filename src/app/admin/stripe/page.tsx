@@ -308,6 +308,9 @@ function StripeDashboard() {
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [balanceCurrency, setBalanceCurrency] = useState("usd");
   const [webhookStatus, setWebhookStatus] = useState<{ live: boolean; test: boolean }>({ live: false, test: false });
+  const [lastFetched, setLastFetched] = useState<Date | null>(null);
+  const [allTimeRevenue, setAllTimeRevenue] = useState(0);
+  const [allTimeRefunded, setAllTimeRefunded] = useState(0);
 
   const loadStripeData = async (knownMode?: "live" | "test", showSpinner = true) => {
     if (showSpinner) { setLoading(true); setError(null); }
@@ -334,6 +337,22 @@ function StripeDashboard() {
       const chargeList: Charge[] = chargesData.data || [];
       setCharges(chargeList);
       setPayouts(payoutsData.data || []);
+      setLastFetched(new Date());
+      // Fetch all-time revenue from Supabase orders
+      const isLive = (knownMode ?? setupData.active_mode) === "live";
+      const { supabase: sbClient } = await import("@/lib/supabase");
+      const { data: revenueRows } = await sbClient
+        .from("orders")
+        .select("total, status")
+        .eq("livemode", isLive);
+      const paid = (revenueRows || []).filter((o) => ["paid", "fulfilled", "shipped"].includes(o.status));
+      setAllTimeRevenue(paid.reduce((s, o) => s + (o.total || 0), 0));
+      const { data: refundRows } = await sbClient
+        .from("orders")
+        .select("total")
+        .eq("status", "refunded")
+        .eq("livemode", isLive);
+      setAllTimeRefunded((refundRows || []).reduce((s, o) => s + (o.total || 0), 0));
       // Always reset orderMap so stale IDs from previous mode don't persist
       const piIds = chargeList.map((c) => c.payment_intent).filter(Boolean) as string[];
       if (piIds.length) {
@@ -376,9 +395,6 @@ function StripeDashboard() {
   });
   const available = balance?.available.reduce((s, b) => s + b.amount, 0) ?? 0;
   const pending = balance?.pending.reduce((s, b) => s + b.amount, 0) ?? 0;
-  const totalVolume = charges.filter((c) => c.status === "succeeded").reduce((s, c) => s + c.amount, 0);
-  const totalRefunded = charges.reduce((s, c) => s + c.amount_refunded, 0);
-  const chargeCurrency = charges[0]?.currency ?? balanceCurrency;
 
   if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-2 border-secondary-300 border-t-secondary-900" /></div>;
 
@@ -447,10 +463,10 @@ function StripeDashboard() {
       {/* Balance Cards */}
       {(() => {
         const balanceCards = [
-          { label: "Available Balance", value: fmt(available, balanceCurrency), icon: DollarSign, color: "bg-success-50 text-success-600" },
-          { label: "Pending Balance", value: fmt(pending, balanceCurrency), icon: TrendingUp, color: "bg-warning-50 text-warning-600" },
-          { label: "Volume (last 20)", value: fmt(totalVolume, chargeCurrency), icon: CreditCard, color: "bg-primary-50 text-primary-600" },
-          { label: "Refunded (last 20)", value: fmt(totalRefunded, chargeCurrency), icon: ArrowDownCircle, color: "bg-error-50 text-error-600" },
+          { label: "Available Balance", value: fmt(available, balanceCurrency), icon: DollarSign, color: "bg-success-50 text-success-600", desc: "cleared funds in Stripe, not yet paid out to bank" },
+          { label: "Pending Balance", value: fmt(pending, balanceCurrency), icon: TrendingUp, color: "bg-warning-50 text-warning-600", desc: "held by Stripe (~7 days), then moves to available" },
+          { label: "Revenue (all time)", value: `$${allTimeRevenue.toFixed(2)}`, icon: CreditCard, color: "bg-primary-50 text-primary-600", desc: "all paid orders" },
+          { label: "Net Revenue", value: `$${(allTimeRevenue - allTimeRefunded).toFixed(2)}`, icon: ArrowDownCircle, color: "bg-error-50 text-error-600", desc: "total paid − refunded" },
         ];
         return (
           <>
@@ -477,9 +493,13 @@ function StripeDashboard() {
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${card.color}`}><card.icon size={20} /></div>
                   <p className="text-xl font-bold text-secondary-900">{card.value}</p>
                   <p className="text-xs text-secondary-500 mt-1">{card.label}</p>
+                  {"desc" in card && <p className="text-xs text-secondary-400 mt-0.5">{card.desc}</p>}
                 </div>
               ))}
             </div>
+            {lastFetched && (
+              <p className="text-xs text-secondary-400 text-right">as of {lastFetched.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
+            )}
           </>
         );
       })()}
