@@ -274,6 +274,7 @@ Deno.serve(async (req: Request) => {
           ...(item.personalization_text ? { pt: item.personalization_text.slice(0, 50) } : {}),
         }))),
         ...(affiliate_code ? { affiliate_code: String(affiliate_code).slice(0, 50) } : {}),
+        ...(body.phone ? { phone: String(body.phone).slice(0, 20) } : {}),
       },
       shipping_address_collection: {
         allowed_countries: ["US"],

@@ -313,7 +313,7 @@ Deno.serve(async (req: Request) => {
         .eq("printify_order_id", printifyOrderId);
     }
 
-    if (type === "order:canceled") {
+    if (type === "order:canceled" || type === "order:cancelled") {
       await supabase
         .from("orders")
         .update({

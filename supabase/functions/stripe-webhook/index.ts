@@ -201,7 +201,7 @@ Deno.serve(async (req: Request) => {
                 first_name: session.metadata.shipping_name?.split(" ")[0] || "",
                 last_name: session.metadata.shipping_name?.split(" ").slice(1).join(" ") || "",
                 email: session.metadata.email || "",
-                phone: session.customer_details?.phone || "",
+                phone: session.customer_details?.phone || session.metadata?.phone || "0000000000",
                 country: shippingAddress.country || "US",
                 region: shippingAddress.state || "",
                 city: shippingAddress.city || "",
