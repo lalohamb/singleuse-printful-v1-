@@ -209,7 +209,7 @@ export async function POST(req: NextRequest) {
     if (action === "add_subscriber") {
       const payload: Record<string, unknown> = { email: body.email };
       if (body.name) payload.fields = { name: body.name };
-      if (body.groups?.length) payload.groups = body.groups.map((id: string) => ({ id }));
+      if (body.groups?.length) payload.groups = body.groups.map((id: string) => Number(id));
       const { json, status } = await ml("/subscribers", { method: "POST", body: JSON.stringify(payload) });
       return NextResponse.json(json, { status });
     }
