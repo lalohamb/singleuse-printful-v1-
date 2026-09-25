@@ -68,6 +68,12 @@ const TEMPLATE_SETTINGS: StoreSettings = {
   printify_connected: false,
   printify_shop_id: null,
   stripe_connected: false,
+  music_url: null,
+  music_enabled: false,
+  music_tracks: [],
+  music_shuffle: false,
+  video_enabled: false,
+  video_tracks: [],
   social_links: {
     instagram: { url: "https://instagram.com/yourstore", enabled: true },
     tiktok: { url: "https://tiktok.com/@yourstore", enabled: true },

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { CartProvider } from "@/lib/cart";
 import { createClient } from "@supabase/supabase-js";
+import PersistentMusicPlayer from "@/components/PersistentMusicPlayer";
 
 const SUPABASE_ORIGIN = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).origin;
 
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <CartProvider>
           {children}
+          <PersistentMusicPlayer />
         </CartProvider>
       </body>
     </html>

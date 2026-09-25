@@ -10,6 +10,8 @@ import { resolveStorageUrl } from "@/lib/storage";
 import type { StoreSettings, Category } from "@/types";
 import { DEFAULT_SITE_MENU_SETTINGS, type SiteMenuSettings } from "@/lib/site-menu-settings";
 import AppImage from "@/components/AppImage";
+import PersistentMusicPlayer from "@/components/PersistentMusicPlayer";
+import PersistentVideoPlayer from "@/components/PersistentVideoPlayer";
 
 export default function Header({ initialLogo }: { initialLogo?: { url: string | null; size: number } }) {
   const { itemCount, toggleCart } = useCart();
@@ -91,6 +93,8 @@ export default function Header({ initialLogo }: { initialLogo?: { url: string | 
                 <Link key={cat.id} href={`/shop?category=${cat.slug}`} className="transition-colors" style={{ color: menuSettings.textColor }}>{cat.name}</Link>
               ))}
               <Link href="/about" className="transition-colors" style={{ color: menuSettings.textColor }}>About</Link>
+              <PersistentMusicPlayer />
+              <PersistentVideoPlayer />
             </nav>
             <div className="flex items-center gap-2 sm:gap-4">
               <Link href="/account" className="hidden sm:flex items-center gap-1.5 text-sm font-medium transition-colors" style={{ color: menuSettings.textColor }}>

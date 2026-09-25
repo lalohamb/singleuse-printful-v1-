@@ -119,6 +119,12 @@ export interface StoreSettings {
   printify_connected: boolean;
   printify_shop_id: string | null;
   stripe_connected: boolean;
+  music_url: string | null;
+  music_enabled: boolean;
+  music_tracks: { id: string; name: string; url: string; enabled: boolean; cover_url?: string }[];
+  music_shuffle: boolean;
+  video_enabled: boolean;
+  video_tracks: { id: string; name: string; url: string; enabled: boolean; thumb_url?: string }[];
   social_links: {
     instagram: { url: string; enabled: boolean };
     tiktok:    { url: string; enabled: boolean };

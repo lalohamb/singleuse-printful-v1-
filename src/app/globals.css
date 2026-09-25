@@ -48,3 +48,43 @@
 ::-webkit-scrollbar-track { background: #f5f5f5; }
 ::-webkit-scrollbar-thumb { background: #c7c7c7; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #aeaeae; }
+
+@keyframes float-note {
+  0%   { opacity: 0; transform: translateY(0) scale(0.8); }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-28px) scale(1.1); }
+}
+.animate-float-note-1 { animation: float-note 2s ease-in-out infinite; color: #a78bfa; }
+.animate-float-note-2 { animation: float-note 2s ease-in-out infinite 0.7s; color: #f9a8d4; }
+.animate-float-note-3 { animation: float-note 2s ease-in-out infinite 1.3s; color: #6ee7b7; }
+
+/* Signal bar animations */
+@keyframes signal-bar {
+  0%, 100% { opacity: 0.2; transform: scaleY(0.4); }
+  50%       { opacity: 1;   transform: scaleY(1); }
+}
+.signal-bars {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  pointer-events: none;
+  user-select: none;
+}
+.signal-bars span {
+  display: block;
+  width: 3px;
+  border-radius: 1px;
+  background: #f87171;
+  transform-origin: bottom;
+  animation: signal-bar 1s ease-in-out infinite;
+}
+.signal-bars span:nth-child(1) { height: 5px;  animation-delay: 0s; }
+.signal-bars span:nth-child(2) { height: 8px;  animation-delay: 0.2s; }
+.signal-bars span:nth-child(3) { height: 11px; animation-delay: 0.4s; }
+.signal-bars span:nth-child(4) { height: 8px;  animation-delay: 0.6s; }
+.signal-bars span:nth-child(5) { height: 5px;  animation-delay: 0.8s; }
