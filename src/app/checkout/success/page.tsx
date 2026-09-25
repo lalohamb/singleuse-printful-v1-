@@ -46,6 +46,7 @@ function CheckoutSuccessContent() {
       <div className="flex items-center justify-center gap-2 text-secondary-500 mt-6"><Mail size={18} /><span>A confirmation email has been sent to your inbox.</span></div>
       <div className="flex flex-wrap gap-4 justify-center mt-8">
         <Link href="/shop" className="btn-primary">Continue Shopping</Link>
+        {order && <Link href={`/track?order=${order.id.slice(-8).toUpperCase()}&email=${encodeURIComponent(order.email)}`} className="btn-outline">Track Order</Link>}
         <Link href="/" className="btn-outline">Back to Home</Link>
       </div>
     </div>

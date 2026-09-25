@@ -136,6 +136,7 @@ export default async function Footer() {
           <div>
             <h4 className="text-white font-semibold mb-4">Customer Care</h4>
             <ul className="space-y-3">
+              <li><Link href="/track" className="hover:text-white transition-colors">Track Order</Link></li>
               <li><Link href="/refund-policy" className="hover:text-white transition-colors">Refund &amp; Returns</Link></li>
               <li><Link href="/terms-of-service" className="hover:text-white transition-colors">Terms of Service</Link></li>
               <li><Link href="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link></li>

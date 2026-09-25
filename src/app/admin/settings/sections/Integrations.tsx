@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
-import { CreditCard, Printer, Send, Mail } from "lucide-react";
+import { CreditCard, Printer, Send, Mail, CheckCircle, XCircle, Loader2, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { useSettings } from "./useSettings";
 import { SaveBar } from "./SaveBar";
+import { supabase } from "@/lib/supabase";
 
 type Status = "checking" | "connected" | "warning" | "disconnected";
 
@@ -18,12 +19,42 @@ export default function Integrations() {
   const [stripeOk, setStripeOk] = useState<Status>("checking");
   const [mailerOk, setMailerOk] = useState<Status>("checking");
   const [resendOk, setResendOk] = useState<Status>("checking");
+  const [shopValidating, setShopValidating] = useState(false);
+  const [shopValidation, setShopValidation] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [syncedProductCount, setSyncedProductCount] = useState(0);
+  const [originalShopId, setOriginalShopId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/stripe-admin?action=balance").then((r) => setStripeOk(r.status === 200 ? "connected" : r.status === 401 ? "disconnected" : "warning")).catch(() => setStripeOk("warning"));
     fetch("/api/mailerlite?action=groups").then((r) => setMailerOk(r.status === 200 ? "connected" : r.status === 401 ? "disconnected" : "warning")).catch(() => setMailerOk("warning"));
     fetch("/api/resend?path=/domains").then((r) => setResendOk(r.status === 200 ? "connected" : r.status === 401 ? "disconnected" : "warning")).catch(() => setResendOk("warning"));
+    // Count synced products and store original shop ID
+    supabase.from("products").select("id", { count: "exact" }).not("printify_id", "is", null).eq("status", "active")
+      .then(({ count }) => setSyncedProductCount(count ?? 0));
+    supabase.from("settings").select("printify_shop_id").limit(1).maybeSingle()
+      .then(({ data }) => setOriginalShopId(data?.printify_shop_id ?? null));
   }, []);
+
+  const validateShopId = async () => {
+    const shopId = (form.printify_shop_id || "").trim();
+    if (!shopId) return;
+    setShopValidating(true); setShopValidation(null);
+    try {
+      const res = await fetch(`/api/printify-shops?shop_id=${shopId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setShopValidation({ ok: true, msg: `Shop found: "${data.title || shopId}"` });
+      } else {
+        setShopValidation({ ok: false, msg: "Shop ID not found in your Printify account" });
+      }
+    } catch {
+      setShopValidation({ ok: false, msg: "Could not reach Printify — check your API token" });
+    }
+    setShopValidating(false);
+  };
+
+  const isChanged = (form.printify_shop_id || "") !== (originalShopId || "");
+  const showSyncWarning = isChanged && syncedProductCount > 0;
 
   return (
     <div className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6 space-y-4">
@@ -35,10 +66,47 @@ export default function Integrations() {
         </div>
         <span className={`text-xs px-3 py-1 rounded-full ${form.printify_connected ? "bg-success-50 text-success-600" : "bg-secondary-100 text-secondary-500"}`}>{form.printify_connected ? "Connected" : "Not Connected"}</span>
       </div>
-      <div>
+      <div className="space-y-2">
         <label className="label-text">Printify Shop ID</label>
-        <input value={form.printify_shop_id || ""} onChange={(e) => set("printify_shop_id", e.target.value)} placeholder="e.g. 12345678" className="input-field" />
-        <p className="text-xs text-secondary-400 mt-1">Find this in your Printify dashboard URL or via the API.</p>
+        <div className="flex gap-2">
+          <input
+            value={form.printify_shop_id || ""}
+            onChange={(e) => { set("printify_shop_id", e.target.value); setShopValidation(null); }}
+            placeholder="e.g. 12345678"
+            className="input-field flex-1"
+          />
+          <button
+            onClick={validateShopId}
+            disabled={shopValidating || !(form.printify_shop_id || "").trim()}
+            className="btn-outline px-4 py-2 text-sm flex items-center gap-1.5 disabled:opacity-50"
+          >
+            {shopValidating ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+            {shopValidating ? "Checking..." : "Validate"}
+          </button>
+        </div>
+        <p className="text-xs text-secondary-400">Find this in your Printify dashboard URL or via the API.</p>
+
+        {/* Validation result */}
+        {shopValidation && (
+          <div className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg ${
+            shopValidation.ok ? "bg-success-50 text-success-700" : "bg-error-50 text-error-700"
+          }`}>
+            {shopValidation.ok ? <CheckCircle size={14} /> : <XCircle size={14} />}
+            {shopValidation.msg}
+          </div>
+        )}
+
+        {/* Warning when changing shop ID with existing synced products */}
+        {showSyncWarning && (
+          <div className="flex items-start gap-2 text-sm px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
+            <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
+            <span>
+              You have <strong>{syncedProductCount} active product{syncedProductCount !== 1 ? "s" : ""}</strong> synced from the current shop.
+              Changing the Shop ID means new orders will be submitted to a different Printify shop — those product IDs won&apos;t exist there and fulfillment will fail.
+              Run a full product sync after saving to update your catalog.
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Stripe — managed on its own page */}

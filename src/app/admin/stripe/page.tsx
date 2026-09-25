@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { RefreshCw, ExternalLink, DollarSign, TrendingUp, CreditCard, ArrowDownCircle, X, Loader2, Check, AlertCircle, Eye, EyeOff, Trash2 } from "lucide-react";
+import { RefreshCw, ExternalLink, DollarSign, TrendingUp, CreditCard, ArrowDownCircle, X, Loader2, Check, AlertCircle, Eye, EyeOff, Trash2, Settings, ChevronDown } from "lucide-react";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
 import { getErrorMessage } from "@/lib/errors";
 
@@ -362,6 +362,7 @@ function StripeDashboard() {
 
   useEffect(() => { fetchAll(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const [showSetup, setShowSetup] = useState(false);
   const [chargeSearch, setChargeSearch] = useState("");
   const [chargeStatus, setChargeStatus] = useState("all");
 
@@ -390,31 +391,58 @@ function StripeDashboard() {
 
   if (error) return (
     <div className="space-y-6">
-      <StripeSetup onActivated={(mode) => { setError(null); onModeSwitch(mode); }} />
       <div className="bg-error-50 border border-error-100 rounded-xl p-4 text-sm text-error-700">{error}</div>
+      <div className="bg-secondary-50 border border-secondary-200 rounded-xl p-5">
+        <h3 className="font-semibold text-secondary-900 mb-4">Connect Stripe</h3>
+        <StripeSetup onActivated={(mode) => { setError(null); onModeSwitch(mode); }} />
+      </div>
     </div>
   );
 
   return (
     <div className="space-y-8">
-      {/* Active mode banner + setup panel side by side */}
-      <div className="flex items-start justify-between gap-6">
-        <div className={`rounded-xl border p-4 self-start ${activeMode === "live" ? "bg-success-50 border-success-200" : "bg-amber-50 border-amber-200"}`}>
-          <p className="text-sm font-semibold text-secondary-900">Active mode: <span className={activeMode === "live" ? "text-success-700" : "text-amber-700"}>{activeMode === "live" ? "LIVE" : "TEST"}</span></p>
-          <p className="text-xs text-secondary-500 mt-0.5">{activeMode === "live" ? "Real payments are being processed." : "Test mode — no real charges."}</p>
+      {/* Top bar — mode badge + manage keys toggle + refresh */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className={`rounded-lg border px-3 py-1.5 text-sm font-semibold ${
+            activeMode === "live" ? "bg-success-50 border-success-200 text-success-700" : "bg-amber-50 border-amber-200 text-amber-700"
+          }`}>
+            {activeMode === "live" ? "● LIVE" : "● TEST"}
+          </div>
+          <p className="text-xs text-secondary-500 hidden sm:block">
+            {activeMode === "live" ? "Real payments are being processed." : "Test mode — no real charges."}
+          </p>
         </div>
-        <StripeSetup activeMode={activeMode} onActivated={onModeSwitch} />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowSetup((v) => !v)}
+            className={`flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-lg border transition-colors ${
+              showSetup ? "bg-secondary-900 text-white border-secondary-900" : "bg-white text-secondary-700 border-secondary-200 hover:border-secondary-400"
+            }`}
+          >
+            <Settings size={15} />
+            Manage Keys
+            <ChevronDown size={14} className={`transition-transform ${showSetup ? "rotate-180" : ""}`} />
+          </button>
+          <a href={activeMode === "live" ? "https://dashboard.stripe.com" : "https://dashboard.stripe.com/test/dashboard"} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-700 font-medium">
+            Stripe <ExternalLink size={14} />
+          </a>
+          <button onClick={() => fetchAll()} className="flex items-center gap-1.5 text-sm text-secondary-500 hover:text-secondary-900 transition-colors">
+            <RefreshCw size={15} />Refresh
+          </button>
+        </div>
       </div>
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <a href="https://dashboard.stripe.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 font-medium">
-          Open Stripe Dashboard <ExternalLink size={16} />
-        </a>
-        <button onClick={() => fetchAll()} className="flex items-center gap-2 text-sm text-secondary-500 hover:text-secondary-900 transition-colors">
-          <RefreshCw size={16} />Refresh
-        </button>
-      </div>
+      {/* Collapsible setup drawer */}
+      {showSetup && (
+        <div className="bg-secondary-50 border border-secondary-200 rounded-xl p-5 animate-fade-in">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-secondary-900">Connect Stripe</h3>
+            <button onClick={() => setShowSetup(false)} className="p-1 text-secondary-400 hover:text-secondary-700"><X size={18} /></button>
+          </div>
+          <StripeSetup activeMode={activeMode} onActivated={(mode) => { onModeSwitch(mode); setShowSetup(false); }} />
+        </div>
+      )}
 
       {/* Balance Cards */}
       {(() => {
