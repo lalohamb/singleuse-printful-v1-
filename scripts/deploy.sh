@@ -10,6 +10,7 @@ cd "$APP_DIR"
 
 # ── Pull latest code ──────────────────────────────────────────────────────────
 echo "📦 Pulling latest code..."
+git stash
 GIT_SSH_COMMAND='ssh -i /root/.ssh/github_deploy' git pull
 
 # ── Install + Build ───────────────────────────────────────────────────────────
