@@ -181,7 +181,7 @@ Deno.serve(async (req: Request) => {
         const { data: settingsData } = await supabase.from("settings").select("printify_shop_id").limit(1).maybeSingle();
         const printifyShopId = settingsData?.printify_shop_id || Deno.env.get("PRINTIFY_SHOP_ID");
 
-        if (printifyToken && printifyShopId && session.metadata?.items && event.livemode) {
+        if (printifyToken && printifyShopId && session.metadata?.items) {
           try {
             const items = JSON.parse(session.metadata.items);
             const shippingAddress = JSON.parse(session.metadata.shipping_address || "{}");
@@ -193,7 +193,7 @@ Deno.serve(async (req: Request) => {
                 product_id: item.printify_id || undefined,
                 variant_id: parseInt(item.variant_id) || undefined,
                 quantity: item.quantity,
-                ...(item.personalization_text ? { print_details: [{ print_on_side: "front", text: item.personalization_text }] } : {}),
+                ...(item.personalization_text || item.pt ? { print_details: [{ print_on_side: "front", text: item.personalization_text || item.pt }] } : {}),
               })),
               shipping_method: 1,
               send_shipping_notification: false,

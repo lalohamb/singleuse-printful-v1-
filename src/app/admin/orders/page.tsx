@@ -121,6 +121,10 @@ function Orders() {
                 <div><p className="font-medium">Cancellations</p><p className="text-secondary-500 text-xs">Setting status to <span className="px-1.5 py-0.5 rounded-full bg-error-50 text-error-600 text-[10px] font-medium">cancelled</span> will also attempt to cancel in Printify. Only possible before the order enters production.</p></div>
               </div>
               <div className="flex items-start gap-2">
+                <span className="text-lg leading-none mt-0.5">⚠️</span>
+                <div><p className="font-medium">Live order rule</p><p className="text-secondary-500 text-xs">For live orders, only use <strong>Cancel</strong> (before production) or <strong>Check Printify → Sync</strong> to recover a missed webhook. Do not manually change status — Printify webhooks keep it accurate automatically.</p></div>
+              </div>
+              <div className="flex items-start gap-2">
                 <span className="text-lg leading-none mt-0.5">🧪</span>
                 <div><p className="font-medium">Test orders</p><p className="text-secondary-500 text-xs">Orders placed in test mode show a <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-medium">Test</span> badge and can be deleted. Live orders cannot be deleted.</p></div>
               </div>
@@ -280,6 +284,12 @@ function OrderDetailModal({ order, onClose, onUpdateStatus }: { order: Order; on
         <div className="p-6 space-y-6">
           <div>
             <label className="label-text">Order Status <span className="text-xs font-normal text-secondary-400 ml-1">(updates your store only — does not push to Printify)</span></label>
+            {order.livemode && (
+              <div className="mb-2 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
+                <AlertTriangle size={13} className="flex-shrink-0 mt-0.5 text-amber-500" />
+                <span>For live orders, only use <strong>Cancel</strong> (before production) or <strong>Check Printify → Sync</strong> below to recover a missed update. Manually changing status here does not affect Printify.</span>
+              </div>
+            )}
             <select value={localStatus} onChange={(e) => handleStatusChange(e.target.value)} className="input-field">
               {[
                 { value: "pending",             label: "Pending" },
