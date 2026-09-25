@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Calendar, CheckCircle, Eye, Loader2, Mail, MapPin, Package, Phone, RefreshCw, Search, UserCircle, Users, X } from "lucide-react";
+import { Calendar, CheckCircle, Eye, Loader2, Mail, MapPin, Package, Phone, RefreshCw, Search, Trash2, UserCircle, Users, X } from "lucide-react";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
 import { formatPrice } from "@/lib/supabase";
 import { getErrorMessage } from "@/lib/errors";
@@ -53,9 +53,11 @@ function CustomerAdmin() {
   const [customers, setCustomers] = useState<AdminCustomer[]>([]);
   const [selected, setSelected] = useState<AdminCustomer | null>(null);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "confirmed" | "unconfirmed">("all");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [profileTableAvailable, setProfileTableAvailable] = useState(true);
 
   const fetchCustomers = async () => {
@@ -82,12 +84,34 @@ function CustomerAdmin() {
 
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
-    if (!needle) return customers;
-    return customers.filter((customer) =>
-      [customer.email, customer.full_name, customer.username, customer.phone, customer.id]
-        .some((value) => value.toLowerCase().includes(needle))
-    );
-  }, [customers, search]);
+    return customers
+      .filter((c) => {
+        if (statusFilter === "confirmed") return !!c.email_confirmed_at;
+        if (statusFilter === "unconfirmed") return !c.email_confirmed_at;
+        return true;
+      })
+      .filter((c) =>
+        !needle || [c.email, c.full_name, c.username, c.phone, c.id].some((v) => v.toLowerCase().includes(needle))
+      );
+  }, [customers, search, statusFilter]);
+
+  const deleteCustomer = async (customer: AdminCustomer) => {
+    setDeleting(customer.id);
+    try {
+      const res = await fetch("/api/admin/customers", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: customer.id }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      setCustomers((prev) => prev.filter((c) => c.id !== customer.id));
+      if (selected?.id === customer.id) setSelected(null);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   const stats = useMemo(() => ({
     totalCustomers: customers.length,
@@ -119,6 +143,15 @@ function CustomerAdmin() {
         <div className="relative flex-1 min-w-[220px]">
           <Search size={18} className="absolute left-3 top-2.5 text-secondary-400" />
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search customers by name, email, phone, or ID..." className="input-field pl-10 py-2" />
+        </div>
+        <div className="flex gap-1 bg-secondary-100 p-1 rounded-lg">
+          {(["all", "confirmed", "unconfirmed"] as const).map((f) => (
+            <button key={f} onClick={() => setStatusFilter(f)} className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+              statusFilter === f ? "bg-white text-secondary-900 shadow-sm" : "text-secondary-500 hover:text-secondary-700"
+            }`}>
+              {f === "all" ? `All (${customers.length})` : f === "confirmed" ? `Confirmed (${customers.filter(c => !!c.email_confirmed_at).length})` : `Unconfirmed (${customers.filter(c => !c.email_confirmed_at).length})`}
+            </button>
+          ))}
         </div>
         <button onClick={fetchCustomers} disabled={refreshing} className="flex items-center gap-2 text-sm text-secondary-500 hover:text-secondary-900 transition-colors">
           <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />
@@ -153,6 +186,7 @@ function CustomerAdmin() {
                     <td className="px-4 py-3">
                       <p className="font-medium text-secondary-900">{customer.full_name}</p>
                       <p className="text-xs text-secondary-500">{customer.username || "No username"}</p>
+                      {!customer.email_confirmed_at && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Unconfirmed</span>}
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell">
                       <p className="text-sm text-secondary-700">{customer.email}</p>
@@ -169,9 +203,14 @@ function CustomerAdmin() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button onClick={(event) => { event.stopPropagation(); setSelected(customer); }} className="p-2 text-secondary-500 hover:text-secondary-900 hover:bg-secondary-100 rounded-lg transition-colors" aria-label={`View ${customer.full_name}`}>
-                        <Eye size={16} />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button onClick={(e) => { e.stopPropagation(); setSelected(customer); }} className="p-2 text-secondary-500 hover:text-secondary-900 hover:bg-secondary-100 rounded-lg transition-colors" aria-label={`View ${customer.full_name}`}>
+                          <Eye size={16} />
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); deleteCustomer(customer); }} disabled={deleting === customer.id} className="p-2 text-error-400 hover:text-error-600 hover:bg-error-50 rounded-lg transition-colors disabled:opacity-40" aria-label={`Delete ${customer.full_name}`}>
+                          {deleting === customer.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -181,7 +220,7 @@ function CustomerAdmin() {
         </div>
       )}
 
-      {selected && <CustomerModal customer={selected} onClose={() => setSelected(null)} />}
+      {selected && <CustomerModal customer={selected} onClose={() => setSelected(null)} onDelete={deleteCustomer} />}
     </div>
   );
 }
@@ -198,7 +237,7 @@ function StatCard({ label, value, icon: Icon }: { label: string; value: string; 
   );
 }
 
-function CustomerModal({ customer, onClose }: { customer: AdminCustomer; onClose: () => void }) {
+function CustomerModal({ customer, onClose, onDelete }: { customer: AdminCustomer; onClose: () => void; onDelete: (c: AdminCustomer) => void }) {
   const preferences = customer.preferences;
   const preferenceRows = [
     ["Tee size", textValue(preferences.teeSize)],
@@ -217,8 +256,17 @@ function CustomerModal({ customer, onClose }: { customer: AdminCustomer; onClose
           <div>
             <h2 className="text-lg font-bold text-secondary-900">{customer.full_name}</h2>
             <p className="text-sm text-secondary-500">{customer.email}</p>
+            {!customer.email_confirmed_at && <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Unconfirmed</span>}
           </div>
-          <button onClick={onClose} className="p-2 text-secondary-400 hover:text-secondary-900"><X size={20} /></button>
+          <div className="flex items-center gap-2">
+            <a href={`/admin/orders?search=${encodeURIComponent(customer.email)}`} className="btn-outline py-1.5 text-xs flex items-center gap-1.5">
+              <Package size={13} />View Orders
+            </a>
+            <button onClick={() => { onDelete(customer); onClose(); }} className="btn-outline py-1.5 text-xs text-error-600 border-error-200 hover:bg-error-50 flex items-center gap-1.5">
+              <Trash2 size={13} />Delete
+            </button>
+            <button onClick={onClose} className="p-2 text-secondary-400 hover:text-secondary-900"><X size={20} /></button>
+          </div>
         </div>
 
         <div className="p-6 space-y-5">

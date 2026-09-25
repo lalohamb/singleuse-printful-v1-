@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requireAdmin } from "@/lib/require-admin";
 import { getErrorMessage } from "@/lib/errors";
@@ -95,4 +95,22 @@ export async function GET() {
   } catch (err: unknown) {
     return NextResponse.json({ error: getErrorMessage(err) }, { status: 500 });
   }
+}
+
+export async function DELETE(req: NextRequest) {
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
+  const { id } = await req.json();
+  if (!id || typeof id !== "string") return NextResponse.json({ error: "Missing id" }, { status: 400 });
+
+  const sb = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+
+  const { error } = await sb.auth.admin.deleteUser(id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
 }
