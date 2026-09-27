@@ -1,32 +1,54 @@
 #!/bin/bash
+# deploy.sh — Deploy for Body&Sleeves on a 1 vCPU / 2 GB Droplet.
+#
+# Build strategy: build ON the server, but stop PM2 first to free RAM.
+# A 1 vCPU / 2 GB machine cannot safely run npm run build AND serve traffic
+# simultaneously — the build peaks at 600-900 MB and will cause OOM.
+#
+# Stopping PM2 first frees ~165 MB and gives the build process the full
+# 2 GB to work with. Downtime window is ~30-60 seconds (build time).
+# This is acceptable for a low-traffic POD storefront.
+#
+# For zero-downtime deploys, use build-and-push.sh from your local machine.
+
 set -euo pipefail
 
 APP_DIR="/var/www/bodyandsleeves"
 PM2_NAME="bodyandsleeves"
+SKIP_BUILD="${1:-}"
 
 echo "🚀 Deploying $PM2_NAME..."
 
 cd "$APP_DIR"
 
-# ── Pull latest code ──────────────────────────────────────────────────────────
-echo "📦 Pulling latest code..."
-git stash
-GIT_SSH_COMMAND='ssh -i /root/.ssh/github_deploy' git pull
+if [[ "$SKIP_BUILD" != "--skip-build" ]]; then
+  # ── Pull latest code ──────────────────────────────────────────────────────
+  echo "📦 Pulling latest code..."
+  git stash
+  GIT_SSH_COMMAND='ssh -i /root/.ssh/github_deploy' git pull
 
-# ── Install + Build ───────────────────────────────────────────────────────────
-echo "🔧 Installing dependencies..."
-npm install --prefer-offline
+  # ── Stop PM2 BEFORE building to free RAM ─────────────────────────────────
+  # Build peaks at 600-900 MB. Running app uses 165 MB.
+  # Combined on a 2 GB Droplet = OOM during build.
+  # Stopping first gives the build the full machine.
+  echo "⏸️  Stopping app to free RAM for build (~30-60s downtime)..."
+  pm2 stop "$PM2_NAME" 2>/dev/null || true
 
-echo "🏗️  Building..."
-npm run build
+  # ── Install + Build ───────────────────────────────────────────────────────
+  echo "🔧 Installing dependencies..."
+  npm install --prefer-offline
 
-# ── Copy assets to standalone ─────────────────────────────────────────────────
+  echo "🏗️  Building... (app stopped, full RAM available)"
+  npm run build
+fi
+
+# ── Copy assets to standalone ─────────────────────────────────────────────
 echo "📋 Copying assets to standalone..."
 cp -r .next/static .next/standalone/.next/static
 cp -r public .next/standalone/public
 cp .env.local .next/standalone/.env.local
 
-# ── Regenerate ecosystem.config.js ───────────────────────────────────────────
+# ── Regenerate ecosystem.config.js ───────────────────────────────────────
 node - << 'JSEOF'
 const fs = require('fs');
 const raw = fs.readFileSync('/var/www/bodyandsleeves/.env.local', 'utf8');
@@ -38,18 +60,30 @@ raw.split('\n').forEach(l => {
 env.APP_ROOT = '/var/www/bodyandsleeves';
 env.PM2_APP_NAME = 'bodyandsleeves';
 env.PORT = '3000';
-const config = 'module.exports = { apps: [{ name: "bodyandsleeves", script: "server.js", interpreter: "node", cwd: "/var/www/bodyandsleeves/.next/standalone", env: ' + JSON.stringify(env) + ' }] };';
+const app = {
+  name: 'bodyandsleeves',
+  script: 'server.js',
+  interpreter: 'node',
+  cwd: '/var/www/bodyandsleeves/.next/standalone',
+  max_memory_restart: '400M',
+  node_args: '--max-old-space-size=512',
+  env,
+};
+const config = 'module.exports = { apps: [' + JSON.stringify(app) + '] };';
 fs.writeFileSync('/var/www/bodyandsleeves/ecosystem.config.js', config);
-console.log('ecosystem.config.js written');
+console.log('ecosystem.config.js written (max_memory_restart=400M, max-old-space-size=512)');
 JSEOF
 
-# ── Restart PM2 ───────────────────────────────────────────────────────────────
-echo "♻️  Restarting PM2..."
-pm2 delete "$PM2_NAME" 2>/dev/null || true
-pm2 start ecosystem.config.js
+# ── Start app ─────────────────────────────────────────────────────────────
+echo "▶️  Starting app..."
+if pm2 describe "$PM2_NAME" > /dev/null 2>&1; then
+  pm2 start ecosystem.config.js --update-env
+else
+  pm2 start ecosystem.config.js
+fi
 pm2 save
 
-# ── Deploy edge functions ─────────────────────────────────────────────────────
+# ── Deploy edge functions ─────────────────────────────────────────────────
 source_env() {
   grep "^${1}=" "$APP_DIR/.env.local" | cut -d'=' -f2- | tr -d '\r'
 }
@@ -66,7 +100,7 @@ else
   echo "⚠️  Skipping edge functions (SUPABASE_ACCESS_TOKEN or SUPABASE_PROJECT_REF not set)."
 fi
 
-# ── Reload Nginx ──────────────────────────────────────────────────────────────
+# ── Reload Nginx ──────────────────────────────────────────────────────────
 nginx -s reload
 
 echo ""

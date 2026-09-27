@@ -19,7 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function ShopPage() {
   const [productsRes, categoriesRes] = await Promise.all([
-    supabase.from("products").select("*").eq("status", "active").order("featured", { ascending: false }),
+    supabase.from("products").select("*").eq("status", "active").order("featured", { ascending: false }).limit(500),
     supabase.from("categories").select("*").order("name"),
   ]);
 

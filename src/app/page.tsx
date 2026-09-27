@@ -107,8 +107,9 @@ const TEMPLATE_PRODUCTS: Product[] = [
   { id: "template-8", printify_id: null, title: "Heritage Crewneck", description: "Everyday warmth with a premium silhouette built to stand out.", category_id: "template-hoodies", price: 7100, cost: 3000, image_url: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=900&q=80", images: ["https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=900&q=80"], status: "active", featured: false, is_new_arrival: false, is_trending: true, is_bestseller: false, is_on_sale: false, content_locked: false, is_personalizable: false, personalization_label: null, print_provider_id: null, blueprint_id: null, variants: [], shipping_info: {}, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
 ];
 
-// Always fetch fresh data from Supabase on every request.
-export const revalidate = 0;
+// FIX-08: ISR — regenerate at most once per minute instead of on every request.
+// Use /api/revalidate after admin saves to push changes immediately.
+export const revalidate = 60;
 
 export async function generateMetadata(): Promise<Metadata> {
   const [{ data: seo }, { data: settings }] = await Promise.all([
@@ -131,7 +132,7 @@ export default async function HomePage() {
     supabase.from("products").select("*").eq("status", "active").eq("is_new_arrival", true).order("created_at", { ascending: false }).limit(12),
     supabase.from("products").select("*").eq("status", "active").eq("is_trending", true).limit(12),
     supabase.from("categories").select("*").order("name"),
-    supabase.from("products").select("category_id, image_url").eq("status", "active").not("image_url", "is", null).not("category_id", "is", null),
+    supabase.from("products").select("category_id, image_url").eq("status", "active").not("image_url", "is", null).not("category_id", "is", null).limit(500),
   ]);
 
   const settings = settingsRes.data ?? TEMPLATE_SETTINGS;

@@ -1,7 +1,7 @@
 // ecosystem.config.js — PM2 configuration
 // Values are populated by scripts/install.sh or the stripe-switch API route.
 // Do NOT commit real credentials here — use .env.local instead.
-module.exports = { apps: [{ name: '<PM2_APP_NAME>', script: '.next/standalone/server.js', interpreter: 'node', cwd: '<APP_ROOT>', env: {
+module.exports = { apps: [{ name: '<PM2_APP_NAME>', script: '.next/standalone/server.js', interpreter: 'node', cwd: '<APP_ROOT>', max_memory_restart: '400M', node_args: '--max-old-space-size=512', env: {
   "APP_ROOT": "<APP_ROOT>",
   "PM2_APP_NAME": "<PM2_APP_NAME>",
   "NEXT_PUBLIC_SUPABASE_URL": "",

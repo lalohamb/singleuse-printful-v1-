@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@supabase/supabase-js";
+import { requireAdmin } from "@/lib/require-admin";
 
 export const runtime = "nodejs";
 
 export async function GET() {
+  const authError = await requireAdmin();
+  if (authError) return authError;
   const cookieStore = await cookies();
   const all = cookieStore.getAll();
   const projectRef = process.env.NEXT_PUBLIC_SUPABASE_URL?.split("//")[1]?.split(".")[0];

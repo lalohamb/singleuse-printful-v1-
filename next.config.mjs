@@ -5,12 +5,24 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   images: {
-    formats: ['image/avif', 'image/webp'],
+    // FIX-01: WebP only — AVIF removed (3-10x more memory/CPU per encode)
+    formats: ['image/webp'],
+    // FIX-04: Explicit allowlist — replaces open wildcard hostname: '**'
     remotePatterns: [
-      { protocol: 'https', hostname: '**' },
-      { protocol: 'http', hostname: '**' },
+      // Printify CDN (confirmed from production DB 2025-07-14)
+      { protocol: 'https', hostname: 'images-api.printify.com' },
+      { protocol: 'https', hostname: '*.cloudfront.net' },
+      // Supabase Storage
+      { protocol: 'https', hostname: 'bdazupyepobieyjzuamf.supabase.co' },
+      // Stock/template images
+      { protocol: 'https', hostname: 'images.pexels.com' },
+      { protocol: 'https', hostname: 'images.unsplash.com' },
     ],
-    minimumCacheTTL: 3600,
+    // FIX-05: 24h TTL — was 1h, reduces re-encode bursts after restarts
+    minimumCacheTTL: 86400,
+    // FIX-06: Constrained sizes — removes 2048/3840px variants, reduces cache misses
+    deviceSizes: [640, 828, 1080, 1200, 1920],
+    imageSizes: [64, 128, 256, 384],
   },
   async headers() {
     return [

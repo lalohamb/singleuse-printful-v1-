@@ -3,7 +3,7 @@ import { Mail } from "lucide-react";
 import NewsletterSignup from "@/components/NewsletterSignup";
 import Image from "next/image";
 import { createClient } from "@supabase/supabase-js";
-import { unstable_noStore as noStore } from "next/cache";
+import { unstable_noStore as noStore } from "next/cache"; // eslint-disable-line @typescript-eslint/no-unused-vars
 import { resolveStorageUrl } from "@/lib/storage";
 import type { StoreSettings } from "@/types";
 
@@ -88,7 +88,9 @@ const DEFAULT_SOCIAL: StoreSettings["social_links"] = {
 };
 
 export default async function Footer() {
-  noStore();
+  // FIX-08: noStore() removed — it forced every page including Footer to be
+  // fully dynamic, defeating ISR on homepage/shop. Footer data (store name,
+  // social links) rarely changes; revalidation via /api/revalidate is sufficient.
   const supabase = getSupabase();
   const { data } = await supabase.from("settings").select("store_name, social_links, logo_url, logo_size, footer_logo_url, footer_logo_size, footer_text, footer_bottom_message").limit(1).maybeSingle();
   const social: StoreSettings["social_links"] = data?.social_links ?? DEFAULT_SOCIAL;

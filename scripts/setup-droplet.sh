@@ -64,9 +64,18 @@ raw.split('\n').forEach(l => {
 env.APP_ROOT = '/var/www/bodyandsleeves';
 env.PM2_APP_NAME = 'bodyandsleeves';
 env.PORT = '3000';
-const config = 'module.exports = { apps: [{ name: "bodyandsleeves", script: "server.js", interpreter: "node", cwd: "/var/www/bodyandsleeves/.next/standalone", env: ' + JSON.stringify(env) + ' }] };';
+const app = {
+  name: 'bodyandsleeves',
+  script: 'server.js',
+  interpreter: 'node',
+  cwd: '/var/www/bodyandsleeves/.next/standalone',
+  max_memory_restart: '400M',
+  node_args: '--max-old-space-size=512',
+  env,
+};
+const config = 'module.exports = { apps: [' + JSON.stringify(app) + '] };';
 fs.writeFileSync('/var/www/bodyandsleeves/ecosystem.config.js', config);
-console.log('ecosystem.config.js written');
+console.log('ecosystem.config.js written (max_memory_restart=400M, max-old-space-size=512)');
 JSEOF
 
 # ── PM2 ───────────────────────────────────────────────────────────────────────
@@ -75,6 +84,14 @@ pm2 startup systemd -u root --hp /root
 pm2 save
 
 # ── Nginx ─────────────────────────────────────────────────────────────────────
+# Add rate-limit zone for /_next/image into the http {} block
+# (idempotent — only adds if not already present)
+NGINX_CONF=/etc/nginx/nginx.conf
+if ! grep -q 'zone=nextimage' "$NGINX_CONF"; then
+  sed -i '/http {/a \
+    # Rate-limit zone for Next.js image optimizer (OOM protection)\n    limit_req_zone $binary_remote_addr zone=nextimage:10m rate=5r/s;' "$NGINX_CONF"
+fi
+
 cat > /etc/nginx/sites-available/bodyandsleeves << EOF
 server {
     listen 80;
@@ -89,6 +106,23 @@ server {
     location /public/ {
         alias ${APP_DIR}/.next/standalone/public/;
         expires 1y;
+    }
+
+    # Rate-limit the Next.js image optimizer to prevent OOM from crawler bursts.
+    # Allows 5 req/s per IP with a burst of 20 before returning 429.
+    location /_next/image {
+        limit_req zone=nextimage burst=20 nodelay;
+        limit_req_status 429;
+
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
     }
 
     location / {

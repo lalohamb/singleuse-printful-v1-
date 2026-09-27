@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { requireAdmin } from "@/lib/require-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,8 @@ type ShippingProfile = {
 };
 
 export async function GET() {
+  const authError = await requireAdmin();
+  if (authError) return authError;
   // 1. Settings
   const { data: settings } = await supabase
     .from("settings")
