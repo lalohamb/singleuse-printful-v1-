@@ -360,7 +360,7 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
       content_locked: form.content_locked || textChanged,
       is_personalizable: form.is_personalizable,
       personalization_label: form.personalization_label || null,
-      images: form.image_url ? [form.image_url] : [], updated_at: new Date().toISOString(),
+      images: Array.from(new Set([...(product?.images ?? []), ...(form.image_url ? [form.image_url] : [])])).filter(Boolean), updated_at: new Date().toISOString(),
       ...(updatedVariants ? { variants: updatedVariants } : {}),
     };
     const result = product ? await supabase.from("products").update(payload).eq("id", product.id) : await supabase.from("products").insert({ ...payload, variants: [{ id: "S", label: "Small", color: "Default" }] });
@@ -459,7 +459,7 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
               </div>
             </div>
           )}
-          <div><label className="label-text">Image URL</label><div className="grid grid-cols-4 gap-2 mb-2">{Array.from(new Set([...(product?.images ?? []), ...(product?.image_url ? [product.image_url] : [])])).map((url, i) => (<button key={i} type="button" onClick={() => setForm({ ...form, image_url: url })} className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-colors ${form.image_url === url ? "border-gold-500" : "border-transparent"}`}><AppImage fill src={url} alt="" className="w-full h-full object-cover" />{form.image_url === url && <span className="absolute inset-0 flex items-center justify-center bg-black/30 text-white text-lg">✓</span>}</button>))}</div><input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} className="input-field" placeholder="https://..." /></div>
+          <div><label className="label-text">Image URL</label><div className="grid grid-cols-4 gap-2 mb-2">{Array.from(new Set([...(product?.images ?? []), ...(product?.image_url ? [product.image_url] : []), ...(form.image_url ? [form.image_url] : [])])).filter(Boolean).map((url, i) => (<button key={i} type="button" onClick={() => setForm({ ...form, image_url: url })} className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-colors ${form.image_url === url ? "border-gold-500" : "border-transparent"}`}><AppImage fill src={url} alt="" className="w-full h-full object-cover" />{form.image_url === url && <span className="absolute inset-0 flex items-center justify-center bg-black/30 text-white text-lg">✓</span>}</button>))}</div><input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} className="input-field" placeholder="https://..." /></div>
           <div><label className="label-text">Category</label><select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })} className="input-field"><option value="">Uncategorized</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
 
           <div>
