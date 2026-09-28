@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CheckCircle, Loader2 } from "lucide-react";
 import { SAMPLE_CUSTOMER } from "@/lib/account-data";
-import { supabase } from "@/lib/supabase";
 
 type Mode = "login" | "signup";
 
@@ -33,10 +32,12 @@ export function AccountAuthForm({ mode }: { mode: Mode }) {
     setStatus("loading");
     setError("");
 
-    const { error: signInError } = await supabase.auth.signInWithOtp({
-      email: form.email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/account`,
+    const res = await fetch("/api/auth/otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: form.email,
+        mode,
         data: isSignup ? {
           username: form.username,
           full_name: form.fullName,
@@ -52,11 +53,12 @@ export function AccountAuthForm({ mode }: { mode: Mode }) {
             country: form.country,
           },
         } : undefined,
-      },
+      }),
     });
 
-    if (signInError) {
-      setError(signInError.message);
+    const json = await res.json();
+    if (!res.ok) {
+      setError(json.error || "Something went wrong. Please try again.");
       setStatus("error");
       return;
     }

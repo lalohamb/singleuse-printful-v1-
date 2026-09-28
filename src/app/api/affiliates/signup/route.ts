@@ -4,6 +4,23 @@ import { getErrorMessage } from "@/lib/errors";
 
 export const runtime = "nodejs";
 
+const attempts = new Map<string, { count: number; windowStart: number }>();
+const WINDOW_MS = 60 * 60 * 1000;
+const MAX_PER_WINDOW = 3;
+
+function getIp(req: NextRequest): string {
+  return req.headers.get("x-forwarded-for")?.split(",")[0].trim() || req.headers.get("x-real-ip") || "unknown";
+}
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const entry = attempts.get(ip);
+  if (!entry || now - entry.windowStart > WINDOW_MS) { attempts.set(ip, { count: 1, windowStart: now }); return false; }
+  if (entry.count >= MAX_PER_WINDOW) return true;
+  entry.count++;
+  return false;
+}
+
 function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -17,6 +34,10 @@ function generateCode(name: string): string {
 }
 
 export async function POST(req: NextRequest) {
+  if (isRateLimited(getIp(req))) {
+    return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
+  }
+
   try {
     const { name, email, platform_url, follower_count, total_views, payout_method, payout_handle } = await req.json();
 

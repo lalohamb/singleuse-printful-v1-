@@ -89,7 +89,7 @@ pm2 save
 NGINX_CONF=/etc/nginx/nginx.conf
 if ! grep -q 'zone=nextimage' "$NGINX_CONF"; then
   sed -i '/http {/a \
-    # Rate-limit zone for Next.js image optimizer (OOM protection)\n    limit_req_zone $binary_remote_addr zone=nextimage:10m rate=5r/s;' "$NGINX_CONF"
+    # Rate-limit zones\n    limit_req_zone $binary_remote_addr zone=nextimage:10m rate=5r/s;\n    limit_req_zone $binary_remote_addr zone=authotp:10m rate=5r/m;' "$NGINX_CONF"
 fi
 
 cat > /etc/nginx/sites-available/bodyandsleeves << EOF
@@ -106,6 +106,19 @@ server {
     location /public/ {
         alias ${APP_DIR}/.next/standalone/public/;
         expires 1y;
+    }
+
+    # Rate-limit the OTP/magic-link endpoint: 5 requests per minute per IP.
+    location /api/auth/otp {
+        limit_req zone=authotp burst=3 nodelay;
+        limit_req_status 429;
+
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
     # Rate-limit the Next.js image optimizer to prevent OOM from crawler bursts.
