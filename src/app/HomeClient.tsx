@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Product, StoreSettings, Category } from "@/types";
 import ProductCard from "@/components/ProductCard";
@@ -28,8 +28,15 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
   const featureStrip: FeatureStripSettings = { ...DEFAULT_FEATURE_STRIP_SETTINGS, ...((settings?.feature_strip_settings || {}) as Partial<FeatureStripSettings>) };
   const newArrivalsSettings = { ...DEFAULT_NEW_ARRIVALS_SETTINGS, ...((settings?.new_arrivals_settings || {}) as Partial<NewArrivalsSettings>) };
   const brandValues = { ...DEFAULT_BRAND_VALUES_SETTINGS, ...((settings?.brand_values_settings || {}) as Partial<BrandValuesSettings>) };
+  const [paused, setPaused] = useState(false);
   const slideCount = newArrivals.length;
   const goSlide = (dir: number) => setSlide((s) => (s + dir + slideCount) % slideCount);
+
+  useEffect(() => {
+    if (slideCount < 2 || paused) return;
+    const timer = setInterval(() => setSlide((s) => (s + 1) % slideCount), 4000);
+    return () => clearInterval(timer);
+  }, [slideCount, paused]);
 
   return (
     <div>
@@ -132,7 +139,7 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
       </section>
 
       {slideCount > 0 && (
-        <section className="relative w-full overflow-hidden" style={{ minHeight: 600, backgroundColor: newArrivalsSettings.backgroundColor, color: newArrivalsSettings.textColor }}>
+        <section className="relative w-full overflow-hidden" style={{ minHeight: 600, backgroundColor: newArrivalsSettings.backgroundColor, color: newArrivalsSettings.textColor }} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
           {/* background image layer */}
           <div className="absolute inset-0 transition-opacity duration-700">
             <AppImage fill src={newArrivals[slide]?.image_url || ""} alt="" className="w-full h-full object-cover opacity-20 blur-sm scale-105" />
@@ -174,14 +181,19 @@ export default function HomeClient({ settings, featured, newArrivals, trending, 
 
             {/* right — product image */}
             <div className="relative w-full lg:w-[480px] flex-shrink-0 flex items-end justify-center pt-8 lg:pt-0" style={{ minHeight: 500 }}>
-              <AppImage
-                key={slide}
-                src={newArrivals[slide]?.image_url || ""}
-                alt={newArrivals[slide]?.title}
-                width={520}
-                height={520}
-                className="relative z-10 max-h-[520px] w-auto object-contain drop-shadow-2xl animate-slide-up"
-              />
+              <Link href={`/product/${newArrivals[slide]?.id}`} className="relative z-10 group block">
+                <AppImage
+                  key={slide}
+                  src={newArrivals[slide]?.image_url || ""}
+                  alt={newArrivals[slide]?.title}
+                  width={520}
+                  height={520}
+                  className="max-h-[520px] w-auto object-contain drop-shadow-2xl animate-slide-up transition-transform duration-300 group-hover:scale-105"
+                />
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <span className="bg-black/60 text-white text-sm font-semibold px-5 py-2.5 rounded-full backdrop-blur-sm">View Product</span>
+                </div>
+              </Link>
             </div>
           </div>
         </section>
