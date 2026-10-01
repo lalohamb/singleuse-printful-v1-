@@ -45,8 +45,8 @@ export async function POST(req: NextRequest) {
       await deleteAll(sb, "products");
       await deleteAll(sb, "email_events");
       const { error } = await sb.from("settings").update({
-        printify_connected: false,
-        printify_shop_id: null,
+        printful_connected: false,
+        printful_store_id: null,
         stripe_connected: false,
         updated_at: new Date().toISOString(),
       }).gte("updated_at", "1970-01-01");
@@ -123,8 +123,8 @@ export async function POST(req: NextRequest) {
         orders_paused: false,
         shipping_free_threshold: 75,
         default_shipping_cost: 6.99,
-        printify_connected: false,
-        printify_shop_id: null,
+        printful_connected: false,
+        printful_store_id: null,
         stripe_connected: false,
         promo_banner_active: false,
         promo_banner_title: null,

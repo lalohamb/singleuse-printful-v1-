@@ -1,3 +1,22 @@
+// StoreVariant — storefront-owned variant with stable UUID.
+// This is the canonical variant identity used in cart, checkout, and orders.
+// provider_* fields are for fulfillment resolution only — never for storefront identity.
+export interface StoreVariant {
+  id: string;                        // store UUID — stable across syncs
+  product_id: string;
+  provider: string;                  // e.g. 'printful'
+  printful_variant_id: string | null; // provider mapping — used only at fulfillment
+  label: string;
+  color: string | null;
+  size: string | null;
+  retail_price: number;
+  image_url: string | null;
+  available: boolean;
+}
+
+// ProductVariant — LEGACY shape from products.variants JSONB.
+// DO NOT USE FOR NEW CODE. Use StoreVariant instead.
+// Kept for backward compatibility during transition.
 export interface ProductVariant {
   id: string;
   label: string;
@@ -7,17 +26,95 @@ export interface ProductVariant {
   image_url?: string | null;
 }
 
+export type PublicationStatus = "active" | "draft" | "archived";
+
+// ── Phase 4 design/mockup types ───────────────────────────────────────────────
+
+export interface Design {
+  id: string;                    // stable store UUID
+  name: string;
+  slug: string | null;
+  description: string | null;
+  artwork_url: string;           // public URL in Supabase Storage
+  storage_path: string;          // path within store-images bucket
+  file_name: string | null;
+  file_type: string | null;
+  file_size: number | null;
+  width: number | null;
+  height: number | null;
+  status: "active" | "archived";
+  tags: string[];
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductDesign {
+  id: string;
+  product_id: string;
+  design_id: string;
+  provider: string;
+  placement: string;
+  technique: string | null;
+  printfile_id: string | null;
+  is_primary: boolean;
+  needs_regeneration: boolean;
+  configuration: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductImage {
+  id: string;
+  product_id: string;
+  product_variant_id: string | null;
+  source: "printful_mockup" | "manual" | "provider";
+  storage_path: string | null;
+  image_url: string;
+  alt_text: string | null;
+  is_primary: boolean;
+  display_order: number;
+  mockup_task_key: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MockupTask {
+  id: string;
+  product_id: string;
+  product_design_id: string | null;
+  provider: string;
+  provider_task_key: string;
+  status: "pending" | "processing" | "completed" | "failed";
+  error_message: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
 export interface Product {
   id: string;
-  printify_id: string | null;
+  // Phase 3 catalog fields (store-owned)
+  slug: string | null;
+  short_description: string | null;
+  meta_title: string | null;
+  meta_description: string | null;
+  compare_at_price: number | null;
+  brand: string | null;
+  product_type: string | null;
+  published_at: string | null;
+  display_order: number;
+  // Core
+  printful_id: string | null;          // Printful STORE/SYNC product ID (e.g. 476330305)
+  printful_catalog_id: number | null;   // Printful CATALOG product ID (e.g. 903) — required for mockup generation
+  catalog_source?: "printful_sync" | "catalog_builder" | "manual" | null; // product origin
   title: string;
   description: string | null;
   category_id: string | null;
-  price: number;
-  cost: number;
+  price: number;               // base/display retail price (store-owned)
+  cost: number;                // provider cost (admin only)
   image_url: string | null;
   images: string[];
-  status: string;
+  status: PublicationStatus;
   featured: boolean;
   is_new_arrival: boolean;
   is_trending: boolean;
@@ -26,9 +123,7 @@ export interface Product {
   content_locked: boolean;
   is_personalizable: boolean;
   personalization_label: string | null;
-  print_provider_id: string | null;
-  blueprint_id: string | null;
-  variants: ProductVariant[];
+  variants: ProductVariant[];  // LEGACY JSONB — do not use for new code
   shipping_info: Record<string, unknown>;
   created_at: string;
   updated_at: string;
@@ -46,16 +141,16 @@ export interface Category {
 }
 
 export interface CartItem {
-  product_id: string;
+  product_id: string;       // store product UUID
+  variant_id: string;       // store variant UUID (product_variants.id)
   title: string;
+  variant_label: string;
+  color: string | null;
+  size: string | null;
   price: number;
   image_url: string;
   quantity: number;
-  variant_id: string;
-  variant_label: string;
-  printify_id: string | null;
-  blueprint_id: string | null;
-  print_provider_id: string | null;
+  printful_id: string | null; // product-level Printful sync ID (display/tracing only)
   personalization_text?: string;
 }
 
@@ -116,8 +211,8 @@ export interface StoreSettings {
   orders_paused: boolean;
   shipping_free_threshold: number;
   default_shipping_cost: number;
-  printify_connected: boolean;
-  printify_shop_id: string | null;
+  printful_connected: boolean;
+  printful_store_id: string | null;
   stripe_connected: boolean;
   music_url: string | null;
   music_enabled: boolean;
@@ -148,7 +243,7 @@ export interface ShippingAddress {
 
 export interface Order {
   id: string;
-  printify_order_id: string | null;
+  printful_order_id: string | null;
   stripe_session_id: string | null;
   stripe_payment_intent_id: string | null;
   email: string;

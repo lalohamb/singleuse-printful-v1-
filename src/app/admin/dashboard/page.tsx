@@ -58,7 +58,7 @@ function Dashboard() {
       supabase.from("products").select("*").order("created_at", { ascending: false }),
       supabase.from("settings").select("id, orders_paused").limit(1).maybeSingle(),
       supabase.from("orders").select("id, total, status", { count: "exact" }).neq("status", "cancelled").neq("status", "pending"),
-      supabase.from("orders").select("id", { count: "exact" }).eq("status", "paid").is("printify_order_id", null),
+      supabase.from("orders").select("id", { count: "exact" }).eq("status", "paid").is("printful_order_id", null),
       supabase.from("orders").select("id", { count: "exact" }).eq("fulfillment_status", "in-production"),
       supabase.from("customer_profiles").select("id", { count: "exact" }),
       supabase.from("orders").select("items").in("status", ["paid","fulfilled","shipped","delivered"]),

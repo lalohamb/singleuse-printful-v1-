@@ -44,7 +44,7 @@ export default async function ServicesPage() {
       icon: Package,
       title: "Bulk & Wholesale",
       tagline: "Outfit your team, crew, or event.",
-      description: "Need 10, 50, or 500 pieces? We offer bulk pricing for teams, organizations, events, and resellers. Every order is still printed on demand through Printify — meaning no inventory risk and consistent quality at scale.",
+      description: "Need 10, 50, or 500 pieces? We offer bulk pricing for teams, organizations, events, and resellers. Every order is still printed on demand through Printful — meaning no inventory risk and consistent quality at scale.",
       bullets: ["Discounted pricing at 10+ units", "Mix sizes and styles in one order", "Perfect for events, uniforms & merch drops", "White-label options available"],
       cta: { label: "Request a Bulk Quote", href: `${emailHref.replace(/\?.*$/, "")}?subject=Bulk%20Order%20Quote` },
       accent: "bg-warning-50 border-warning-100",
@@ -139,7 +139,7 @@ export default async function ServicesPage() {
                 {[
                   "No inventory or warehousing costs",
                   "Your own domain, brand, and checkout",
-                  "Stripe payments + Printify fulfillment",
+                  "Stripe payments + Printful fulfillment",
                   "Admin panel to manage products, orders & email",
                   "Deployed on your own server — you own everything",
                 ].map((item) => (
@@ -159,12 +159,12 @@ export default async function ServicesPage() {
                   Get Your Store Built <ExternalLink size={16} />
                 </a>
              {/*    <a
-                  href="https://printify.com"
+                  href="https://printful.com"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-outline border-white/20 text-white hover:bg-white/10 inline-flex items-center gap-2 text-sm"
                 >
-                  Learn About Printify <ExternalLink size={15} />
+                  Learn About Printful <ExternalLink size={15} />
                 </a> */}
               </div>
             </div>

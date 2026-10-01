@@ -7,7 +7,7 @@ import type { Order } from "@/types";
 import { getErrorMessage } from "@/lib/errors";
 import AppImage from "@/components/AppImage";
 
-type PrintifyOrderData = {
+type PrintfulOrderData = {
   status?: string;
   shipments?: { number?: string | null; url?: string | null }[];
 };
@@ -65,27 +65,8 @@ function Orders() {
   const updateStatus = async (id: string, status: string): Promise<boolean> => {
     if (status === "cancelled") {
       const order = orders.find((o) => o.id === id);
-      if (order?.printify_order_id) {
-        try {
-          const { data: settings } = await supabase.from("settings").select("printify_shop_id").limit(1).maybeSingle();
-          const shopId = settings?.printify_shop_id;
-          if (!shopId) { alert("No Printify Shop ID set — cannot cancel in Printify."); return false; }
-          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-          const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-          const res = await fetch(`${supabaseUrl}/functions/v1/printify-proxy/orders/cancel`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "apikey": anonKey, "Authorization": `Bearer ${anonKey}` },
-            body: JSON.stringify({ shop_id: shopId, printify_order_id: order.printify_order_id }),
-          });
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            alert(`Printify rejected the cancellation: ${err.message || "Order may already be in production."}\n\nDB status was NOT changed.`);
-            return false;
-          }
-        } catch (e: unknown) {
-          alert(`Could not reach Printify: ${getErrorMessage(e)}\n\nDB status was NOT changed.`);
-          return false;
-        }
+      if (order?.printful_order_id) {
+        // Printful cancellation is handled via webhook — just update DB
       }
     }
     await supabase.from("orders").update({ status, updated_at: new Date().toISOString() }).eq("id", id);
@@ -110,19 +91,19 @@ function Orders() {
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-lg leading-none mt-0.5">📦</span>
-                <div><p className="font-medium">Sent to Printify</p><p className="text-secondary-500 text-xs">Paid orders are automatically submitted to Printify for printing &amp; fulfillment. A Printify Order ID is assigned.</p></div>
+                <div><p className="font-medium">Sent to Printful</p><p className="text-secondary-500 text-xs">Paid orders are automatically submitted to Printful for printing &amp; fulfillment. A Printful Order ID is assigned.</p></div>
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-lg leading-none mt-0.5">🔄</span>
-                <div><p className="font-medium">Check Printify status</p><p className="text-secondary-500 text-xs">Open any order with a Printify ID → click <strong>Check Printify</strong> to fetch live fulfillment status, then <strong>Sync to Order</strong> to update tracking &amp; status here.</p></div>
+                <div><p className="font-medium">Fulfillment updates</p><p className="text-secondary-500 text-xs">Printful webhooks automatically update tracking and fulfillment status here when your order ships.</p></div>
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-lg leading-none mt-0.5">🚫</span>
-                <div><p className="font-medium">Cancellations</p><p className="text-secondary-500 text-xs">Setting status to <span className="px-1.5 py-0.5 rounded-full bg-error-50 text-error-600 text-[10px] font-medium">cancelled</span> will also attempt to cancel in Printify. Only possible before the order enters production.</p></div>
+                <div><p className="font-medium">Cancellations</p><p className="text-secondary-500 text-xs">Setting status to <span className="px-1.5 py-0.5 rounded-full bg-error-50 text-error-600 text-[10px] font-medium">cancelled</span> updates your store DB. Cancel in Printful Dashboard before the order enters production.</p></div>
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-lg leading-none mt-0.5">⚠️</span>
-                <div><p className="font-medium">Live order rule</p><p className="text-secondary-500 text-xs">For live orders, only use <strong>Cancel</strong> (before production) or <strong>Check Printify → Sync</strong> to recover a missed webhook. Do not manually change status — Printify webhooks keep it accurate automatically.</p></div>
+                <div><p className="font-medium">Live order rule</p><p className="text-secondary-500 text-xs">For live orders, do not manually change status — Printful webhooks keep it accurate automatically.</p></div>
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-lg leading-none mt-0.5">🧪</span>
@@ -130,7 +111,7 @@ function Orders() {
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-lg leading-none mt-0.5">📊</span>
-                <div><p className="font-medium">Status is local</p><p className="text-secondary-500 text-xs">Changing status here updates your store DB only. Use <strong>Check Printify</strong> + <strong>Sync to Order</strong> to keep statuses accurate.</p></div>
+                <div><p className="font-medium">Status is local</p><p className="text-secondary-500 text-xs">Changing status here updates your store DB only. Printful webhooks keep statuses accurate automatically.</p></div>
               </div>
             </div>
           </div>
@@ -207,7 +188,7 @@ function Orders() {
 function OrderDetailModal({ order, onClose, onUpdateStatus }: { order: Order; onClose: () => void; onUpdateStatus: (id: string, status: string) => Promise<boolean> }) {
   const addr = order.shipping_address;
   const [localStatus, setLocalStatus] = useState(order.status);
-  const [printifyData, setPrintifyData] = useState<PrintifyOrderData | null>(null);
+  const [printfulData, setPrintfulData] = useState<PrintfulOrderData | null>(null);
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
   const [synced, setSynced] = useState(false);
@@ -221,22 +202,19 @@ function OrderDetailModal({ order, onClose, onUpdateStatus }: { order: Order; on
     if (!ok) setLocalStatus(order.status); // revert if aborted
   };
 
-  const checkPrintify = async () => {
-    if (!order.printify_order_id) return;
+  const checkPrintful = async () => {
+    if (!order.printful_order_id) return;
     setChecking(true); setCheckError(null); setSynced(false);
     try {
-      const { data: settings } = await supabase.from("settings").select("printify_shop_id").limit(1).maybeSingle();
-      const shopId = settings?.printify_shop_id;
-      if (!shopId) throw new Error("No Printify Shop ID set in Settings.");
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
       const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
       const res = await fetch(
-        `${supabaseUrl}/functions/v1/printify-proxy/orders/${order.printify_order_id}?shop_id=${shopId}`,
+        `${supabaseUrl}/functions/v1/printful-proxy/orders/${order.printful_order_id}`,
         { headers: { Authorization: `Bearer ${anonKey}` } }
       );
-      if (!res.ok) throw new Error(`Printify returned ${res.status}`);
+      if (!res.ok) throw new Error(`Printful returned ${res.status}`);
       const data = await res.json();
-      setPrintifyData(data);
+      setPrintfulData(data.result ?? data);
     } catch (e: unknown) {
       setCheckError(getErrorMessage(e));
     }
@@ -244,28 +222,23 @@ function OrderDetailModal({ order, onClose, onUpdateStatus }: { order: Order; on
   };
 
   const syncStatus = async () => {
-    if (!printifyData) return;
-    // Map Printify status to our order status
+    if (!printfulData) return;
     const statusMap: Record<string, string> = {
-      "pending":              "paid",
-      "on-hold":              "paid",
-      "payment-not-received": "pending",
-      "in-production":        "fulfilled",
-      "fulfilled":            "fulfilled",
-      "partially-fulfilled":  "fulfilled",
-      "shipped":              "shipped",
-      "delivered":            "delivered",
-      "canceled":             "cancelled",
-      "cancelled":            "cancelled",
+      "pending":             "paid",
+      "in-production":       "fulfilled",
+      "fulfilled":           "fulfilled",
+      "partially-fulfilled": "fulfilled",
+      "shipped":             "shipped",
+      "delivered":           "delivered",
+      "canceled":            "cancelled",
+      "cancelled":           "cancelled",
     };
-    const printifyStatus = printifyData.status ?? "";
-    const newStatus = statusMap[printifyStatus] ?? localStatus;
-    const shipment = printifyData.shipments?.[0];
-    // Write directly to DB — no need to go through updateStatus which would
-    // try to cancel in Printify again when status is "cancelled".
+    const printfulStatus = printfulData.status ?? "";
+    const newStatus = statusMap[printfulStatus] ?? localStatus;
+    const shipment = printfulData.shipments?.[0];
     await supabase.from("orders").update({
       status: newStatus,
-      fulfillment_status: printifyStatus,
+      fulfillment_status: printfulStatus,
       tracking_number: shipment?.number || order.tracking_number,
       tracking_url: shipment?.url || order.tracking_url,
       updated_at: new Date().toISOString(),
@@ -283,11 +256,11 @@ function OrderDetailModal({ order, onClose, onUpdateStatus }: { order: Order; on
         </div>
         <div className="p-6 space-y-6">
           <div>
-            <label className="label-text">Order Status <span className="text-xs font-normal text-secondary-400 ml-1">(updates your store only — does not push to Printify)</span></label>
+            <label className="label-text">Order Status <span className="text-xs font-normal text-secondary-400 ml-1">(updates your store only)</span></label>
             {order.livemode && (
               <div className="mb-2 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
                 <AlertTriangle size={13} className="flex-shrink-0 mt-0.5 text-amber-500" />
-                <span>For live orders, only use <strong>Cancel</strong> (before production) or <strong>Check Printify → Sync</strong> below to recover a missed update. Manually changing status here does not affect Printify.</span>
+                <span>For live orders, do not manually change status — Printful webhooks keep it accurate automatically.</span>
               </div>
             )}
             <select value={localStatus} onChange={(e) => handleStatusChange(e.target.value)} className="input-field">
@@ -301,7 +274,7 @@ function OrderDetailModal({ order, onClose, onUpdateStatus }: { order: Order; on
                 { value: "cancelled",           label: "Cancelled" },
               ].map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
             </select>
-            <p className="text-xs text-secondary-400 mt-1">Setting to <strong>cancelled</strong> will also attempt to cancel in Printify. Use <strong>Check Printify</strong> below to pull the latest fulfillment status.</p>
+            <p className="text-xs text-secondary-400 mt-1">Setting to <strong>cancelled</strong> updates your store DB. Cancel in Printful Dashboard before the order enters production.</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-secondary-50 rounded-lg p-4"><h3 className="text-sm font-semibold text-secondary-900 mb-2">Customer</h3><p className="text-sm text-secondary-600">{order.shipping_name}</p><p className="text-sm text-secondary-600">{order.email}</p></div>
@@ -331,52 +304,27 @@ function OrderDetailModal({ order, onClose, onUpdateStatus }: { order: Order; on
             <div className="flex justify-between text-sm"><span className="text-secondary-600">Shipping</span><span className="font-medium">{Number(order.shipping_cost) === 0 ? "Free" : formatPrice(Number(order.shipping_cost))}</span></div>
             <div className="flex justify-between text-base font-bold border-t border-secondary-200 pt-2"><span>Total</span><span>{formatPrice(Number(order.total))}</span></div>
           </div>
-          {order.printify_order_id && (
+          {order.printful_order_id && (
             <div className="bg-primary-50 rounded-lg p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-secondary-900 flex items-center gap-2"><Truck size={18} className="text-primary-600" />Fulfillment</h3>
-                <button onClick={checkPrintify} disabled={checking} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-primary-200 text-primary-700 hover:bg-primary-100 transition-colors disabled:opacity-50">
-                  <RefreshCw size={13} className={checking ? "animate-spin" : ""} />{checking ? "Checking…" : "Check Printify"}
+                <button onClick={checkPrintful} disabled={checking} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-primary-200 text-primary-700 hover:bg-primary-100 transition-colors disabled:opacity-50">
+                  <RefreshCw size={13} className={checking ? "animate-spin" : ""} />{checking ? "Checking…" : "Check Printful"}
                 </button>
               </div>
-              <p className="text-sm text-secondary-600">Printify Order: {order.printify_order_id}</p>
+              <p className="text-sm text-secondary-600">Printful Order: {order.printful_order_id}</p>
               {order.fulfillment_status && <p className="text-sm text-secondary-600">Stored Status: <span className="font-medium">{order.fulfillment_status}</span></p>}
               {order.tracking_number && <p className="text-sm text-secondary-600">Tracking: {order.tracking_number}</p>}
               {order.tracking_url && <a href={order.tracking_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary-600 hover:underline">Track Package</a>}
               {checkError && <p className="text-xs text-error-600 flex items-center gap-1"><AlertTriangle size={13} />{checkError}</p>}
-              {printifyData && (
+              {printfulData && (
                 <div className="border-t border-primary-100 pt-3 space-y-2">
-                  <p className="text-xs font-semibold text-secondary-700 uppercase tracking-wide">Live from Printify</p>
+                  <p className="text-xs font-semibold text-secondary-700 uppercase tracking-wide">Live from Printful</p>
                   <div className="flex items-center justify-between">
                     <div className="space-y-1">
-                      <p className="text-sm text-secondary-700">Status: <span className="font-semibold">{printifyData.status}</span>
-                        {printifyData.status === "on-hold" && (
-                          <span className="ml-2 text-xs text-warning-600 bg-warning-50 px-1.5 py-0.5 rounded">awaiting payment confirmation</span>
-                        )}
-                        {printifyData.status === "payment-not-received" && (
-                          <span className="ml-2 text-xs text-error-600 bg-error-50 px-1.5 py-0.5 rounded">payment failed</span>
-                        )}
-                        {printifyData.status === "pending" && (
-                          <span className="ml-2 text-xs text-secondary-500 bg-secondary-100 px-1.5 py-0.5 rounded">queued for production</span>
-                        )}
-                        {printifyData.status === "in-production" && (
-                          <span className="ml-2 text-xs text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded">being printed</span>
-                        )}
-                        {printifyData.status === "partially-fulfilled" && (
-                          <span className="ml-2 text-xs text-warning-600 bg-warning-50 px-1.5 py-0.5 rounded">partially shipped</span>
-                        )}
-                        {printifyData.status === "shipped" && (
-                          <span className="ml-2 text-xs text-success-600 bg-success-50 px-1.5 py-0.5 rounded">on its way</span>
-                        )}
-                        {printifyData.status === "delivered" && (
-                          <span className="ml-2 text-xs text-success-700 bg-success-100 px-1.5 py-0.5 rounded">delivered</span>
-                        )}
-                        {(printifyData.status === "canceled" || printifyData.status === "cancelled") && (
-                          <span className="ml-2 text-xs text-error-600 bg-error-50 px-1.5 py-0.5 rounded">cancelled</span>
-                        )}
-                      </p>
-                      {printifyData.shipments?.[0] && (
-                        <p className="text-sm text-secondary-600">Tracking: {printifyData.shipments[0].number}</p>
+                      <p className="text-sm text-secondary-700">Status: <span className="font-semibold">{printfulData.status}</span></p>
+                      {printfulData.shipments?.[0] && (
+                        <p className="text-sm text-secondary-600">Tracking: {printfulData.shipments[0].number}</p>
                       )}
                     </div>
                     {!synced
@@ -388,7 +336,7 @@ function OrderDetailModal({ order, onClose, onUpdateStatus }: { order: Order; on
               )}
             </div>
           )}
-          {!order.printify_order_id && (order.tracking_number || order.fulfillment_status) && (
+          {!order.printful_order_id && (order.tracking_number || order.fulfillment_status) && (
             <div className="bg-primary-50 rounded-lg p-4">
               <h3 className="text-sm font-semibold text-secondary-900 mb-2 flex items-center gap-2"><Truck size={18} className="text-primary-600" />Fulfillment</h3>
               {order.fulfillment_status && <p className="text-sm text-secondary-600">Status: {order.fulfillment_status}</p>}

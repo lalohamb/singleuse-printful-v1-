@@ -6,14 +6,17 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft, Minus, Plus, ShoppingBag, Check, Truck, RefreshCw, Pencil, X, ZoomIn } from "lucide-react";
 import { formatPrice } from "@/lib/supabase";
 import { useCart } from "@/lib/cart";
-import type { Product, ProductVariant } from "@/types";
+import type { Product, StoreVariant } from "@/types";
 import ProductCard from "@/components/ProductCard";
 
-export default function ProductDetailClient({ product, related, freeShippingThreshold = 75, productBadges }: {
+export default function ProductDetailClient({ product, variants, related, freeShippingThreshold = 75, productBadges, primaryImageUrl, normalizedImages }: {
   product: Product;
+  variants: StoreVariant[];
   related: Product[];
   freeShippingThreshold?: number;
   productBadges?: { text: string; active: boolean }[];
+  primaryImageUrl?: string;
+  normalizedImages?: { image_url: string; is_primary: boolean; display_order: number }[];
 }) {
   const defaultBadges = [
     { text: `Free shipping on orders over $${freeShippingThreshold}`, active: true },
@@ -23,22 +26,30 @@ export default function ProductDetailClient({ product, related, freeShippingThre
   const badges = productBadges ?? defaultBadges;
   const router = useRouter();
   const { addToCart } = useCart();
-  const variants = Array.isArray(product.variants) ? product.variants : [];
-  const images = Array.isArray(product.images) && product.images.length > 0 ? product.images : [product.image_url || ""];
+  // Use normalized product_images as primary source for gallery.
+  // Falls back to legacy product.images array, then single image_url.
+  const normalizedGallery = normalizedImages && normalizedImages.length > 0
+    ? normalizedImages.sort((a, b) => a.display_order - b.display_order).map((i) => i.image_url)
+    : null;
+  const images = normalizedGallery
+    ?? (Array.isArray(product.images) && product.images.length > 0 ? product.images : null)
+    ?? (product.image_url ? [product.image_url] : [""]);
+  // Use normalized primary image if available; it takes priority over legacy images
+  const resolvedPrimaryImage = primaryImageUrl || images[0] || product.image_url || "";
 
-  // Unique colors in variant order, and a color -> image lookup (populated by
-  // the Printify sync). Hide the color picker when there's no real choice.
   const colors = useMemo(() => {
     const seen = new Set<string>();
     const out: string[] = [];
-    for (const v of variants) { if (v.color && !seen.has(v.color)) { seen.add(v.color); out.push(v.color); } }
+    for (const v of variants) {
+      if (v.color && !seen.has(v.color)) { seen.add(v.color); out.push(v.color); }
+    }
     return out;
   }, [variants]);
+
   const colorImage = (c: string) => variants.find((v) => v.color === c && v.image_url)?.image_url || null;
   const hasColorChoice = colors.length > 1 || (colors.length === 1 && colors[0] !== "Default");
 
   const [selectedColor, setSelectedColor] = useState<string>(variants[0]?.color || "");
-  // Sizes/styles available for the currently selected color.
   const SIZE_ORDER = ["XS","S","M","L","XL","2XL","3XL","4XL","5XL"];
   const sizes = useMemo(() => {
     const seen = new Set<string>();
@@ -58,8 +69,9 @@ export default function ProductDetailClient({ product, related, freeShippingThre
     });
   }, [variants, selectedColor]);
 
-  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(variants[0] || null);
-  const [mainImage, setMainImage] = useState<string>(colorImage(variants[0]?.color || "") || images[0] || product.image_url || "");
+  const [selectedVariant, setSelectedVariant] = useState<StoreVariant | null>(variants[0] || null);
+  // Normalized primary image (from product_images) takes priority over variant preview URLs
+  const [mainImage, setMainImage] = useState<string>(resolvedPrimaryImage || colorImage(variants[0]?.color || "") || images[0] || product.image_url || "");
   const [quantity, setQuantity] = useState(1);
   const [personalizationText, setPersonalizationText] = useState("");
   const [added, setAdded] = useState(false);
@@ -74,19 +86,9 @@ export default function ProductDetailClient({ product, related, freeShippingThre
   const openLightbox = (img: string) => { setLightboxImg(img); setLightboxOpen(true); setZoom(1); setPan({ x: 0, y: 0 }); };
   const closeLightbox = () => { setLightboxOpen(false); setZoom(1); setPan({ x: 0, y: 0 }); };
 
-  const onWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    setZoom((z) => Math.min(5, Math.max(1, z - e.deltaY * 0.001)));
-  };
-  const onMouseDown = (e: React.MouseEvent) => {
-    if (zoom <= 1) return;
-    setDragging(true);
-    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
-  };
-  const onMouseMove = (e: React.MouseEvent) => {
-    if (!dragging) return;
-    setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
-  };
+  const onWheel = (e: React.WheelEvent) => { e.preventDefault(); setZoom((z) => Math.min(5, Math.max(1, z - e.deltaY * 0.001))); };
+  const onMouseDown = (e: React.MouseEvent) => { if (zoom <= 1) return; setDragging(true); setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y }); };
+  const onMouseMove = (e: React.MouseEvent) => { if (!dragging) return; setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y }); };
   const onMouseUp = () => setDragging(false);
 
   const pickColor = (c: string) => {
@@ -117,15 +119,11 @@ export default function ProductDetailClient({ product, related, freeShippingThre
         <div>
           <div className="aspect-[3/4] rounded-2xl overflow-hidden bg-secondary-900 mb-3 relative cursor-zoom-in shadow-2xl" onClick={() => openLightbox(mainImage || product.image_url || "")}>
             <Image src={mainImage || product.image_url || "/product-placeholder.svg"} alt={product.title} fill sizes="(max-width: 1024px) 100vw, 50vw" className="object-cover transition-opacity duration-300" priority />
-            <div className="absolute top-3 right-3 bg-black/50 rounded-full p-1.5 text-white pointer-events-none">
-              <ZoomIn size={16} />
-            </div>
+            <div className="absolute top-3 right-3 bg-black/50 rounded-full p-1.5 text-white pointer-events-none"><ZoomIn size={16} /></div>
             <div className="kente-bar absolute bottom-0 left-0 right-0 h-1" />
             {product.is_personalizable && personalizationText.trim() && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <span className="bg-black/50 text-white text-xl font-bold px-5 py-3 rounded-xl tracking-wide text-center max-w-[80%] break-words backdrop-blur-sm">
-                  {personalizationText}
-                </span>
+                <span className="bg-black/50 text-white text-xl font-bold px-5 py-3 rounded-xl tracking-wide text-center max-w-[80%] break-words backdrop-blur-sm">{personalizationText}</span>
               </div>
             )}
           </div>
@@ -143,7 +141,7 @@ export default function ProductDetailClient({ product, related, freeShippingThre
           {product.featured && <span className="inline-block bg-gold-500 text-secondary-900 text-xs font-bold px-3 py-1 rounded-full mb-4 tracking-wide uppercase">Featured</span>}
           <p className="text-gold-500 text-xs font-medium tracking-[0.2em] uppercase mb-2">Body &amp; Sleeves</p>
           <h1 className="text-3xl lg:text-4xl font-display font-bold text-secondary-900 leading-tight">{product.title}</h1>
-          <p className="text-2xl font-bold text-gold-500 mt-3">{formatPrice(selectedVariant?.price ?? product.price)}</p>
+          <p className="text-2xl font-bold text-gold-500 mt-3">{formatPrice(selectedVariant?.retail_price ?? product.price)}</p>
           {hasColorChoice && (
             <div className="mt-8">
               <label className="label-text">Color: <span className="font-normal text-secondary-500">{selectedColor}</span></label>
@@ -153,7 +151,7 @@ export default function ProductDetailClient({ product, related, freeShippingThre
                   const active = selectedColor === c;
                   return (
                     <button key={c} onClick={() => pickColor(c)} title={c} aria-label={c} className={`relative rounded-lg border-2 transition-all ${active ? "border-secondary-900" : "border-secondary-200 hover:border-secondary-400"} ${img ? "w-14 h-14 overflow-hidden" : "px-3 py-2 text-sm font-medium"}`}>
-                    {img ? <Image src={img} alt={c} fill sizes="56px" className="object-cover" /> : c}
+                      {img ? <Image src={img} alt={c} fill sizes="56px" className="object-cover" /> : c}
                     </button>
                   );
                 })}
@@ -167,9 +165,9 @@ export default function ProductDetailClient({ product, related, freeShippingThre
                 {sizes.map((s) => {
                   const v = variants.find((x) => x.color === selectedColor && (x.size || x.label) === s.label);
                   const active = (selectedVariant?.size || selectedVariant?.label) === s.label;
-                  const basePrice = variants.find((x) => x.color === selectedColor)?.price;
-                  const vPrice = v?.price ?? 0;
-                  const showPrice = v?.price !== undefined && v.price !== basePrice;
+                  const basePrice = variants.find((x) => x.color === selectedColor)?.retail_price;
+                  const vPrice = v?.retail_price ?? 0;
+                  const showPrice = v?.retail_price !== undefined && v.retail_price !== basePrice;
                   return (
                     <button key={s.id + s.label} onClick={() => pickSize(s.label)} className={`px-4 py-2.5 border rounded-lg font-medium text-sm transition-all ${active ? "border-secondary-900 bg-secondary-900 text-white" : "border-secondary-200 text-secondary-700 hover:border-secondary-400"}`}>
                       {s.label}{showPrice && <span className="ml-1.5 opacity-75 text-xs">{formatPrice(vPrice)}</span>}
@@ -182,14 +180,7 @@ export default function ProductDetailClient({ product, related, freeShippingThre
           {product.is_personalizable && (
             <div className="mt-6">
               <label className="label-text flex items-center gap-1.5"><Pencil size={14} />{product.personalization_label || "Personalization"} <span className="text-error-500">*</span></label>
-              <input
-                type="text"
-                value={personalizationText}
-                onChange={(e) => setPersonalizationText(e.target.value)}
-                placeholder="Enter your custom text..."
-                maxLength={100}
-                className="input-field mt-1"
-              />
+              <input type="text" value={personalizationText} onChange={(e) => setPersonalizationText(e.target.value)} placeholder="Enter your custom text..." maxLength={100} className="input-field mt-1" />
               <p className="text-xs text-secondary-400 mt-1">{personalizationText.length}/100 characters</p>
             </div>
           )}
@@ -221,19 +212,8 @@ export default function ProductDetailClient({ product, related, freeShippingThre
       {lightboxOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90" onClick={closeLightbox}>
           <button className="absolute top-4 right-4 text-white/70 hover:text-white p-2 z-10" onClick={closeLightbox}><X size={28} /></button>
-          {zoom > 1 && (
-            <button className="absolute top-4 left-4 text-white/70 hover:text-white p-2 z-10 text-sm" onClick={(e) => { e.stopPropagation(); setZoom(1); setPan({ x: 0, y: 0 }); }}>Reset</button>
-          )}
-          <div
-            className="relative w-full h-full overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-            onWheel={onWheel}
-            onMouseDown={onMouseDown}
-            onMouseMove={onMouseMove}
-            onMouseUp={onMouseUp}
-            onMouseLeave={onMouseUp}
-            style={{ cursor: zoom > 1 ? (dragging ? "grabbing" : "grab") : "default" }}
-          >
+          {zoom > 1 && <button className="absolute top-4 left-4 text-white/70 hover:text-white p-2 z-10 text-sm" onClick={(e) => { e.stopPropagation(); setZoom(1); setPan({ x: 0, y: 0 }); }}>Reset</button>}
+          <div className="relative w-full h-full overflow-hidden" onClick={(e) => e.stopPropagation()} onWheel={onWheel} onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp} style={{ cursor: zoom > 1 ? (dragging ? "grabbing" : "grab") : "default" }}>
             <div style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: "center", transition: dragging ? "none" : "transform 0.1s ease", width: "100%", height: "100%", position: "relative" }}>
               <Image src={lightboxImg} alt={product.title} fill sizes="100vw" className="object-contain" draggable={false} />
             </div>

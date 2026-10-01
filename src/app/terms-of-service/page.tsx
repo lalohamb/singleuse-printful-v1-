@@ -18,7 +18,7 @@ const FALLBACK = `Welcome to Your Store ("we," "us," "our"). By accessing or pur
 By using this website and placing an order, you confirm that you are at least 18 years of age (or have parental consent), are authorized to use the payment method provided, and that all information you provide is accurate and complete.
 
 2. Products
-All products are made to order through our print-on-demand partner, Printify. Product images are for illustration purposes — actual colors may vary slightly. We reserve the right to discontinue any product at any time.
+All products are made to order through our print-on-demand partner, Printful. Product images are for illustration purposes — actual colors may vary slightly. We reserve the right to discontinue any product at any time.
 
 3. Pricing
 All prices are listed in US Dollars (USD). We reserve the right to change prices at any time. The price charged will be the price displayed at the time of your order.

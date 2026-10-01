@@ -9,11 +9,12 @@ const nextConfig = {
     formats: ['image/webp'],
     // FIX-04: Explicit allowlist — replaces open wildcard hostname: '**'
     remotePatterns: [
-      // Printify CDN (confirmed from production DB 2025-07-14)
-      { protocol: 'https', hostname: 'images-api.printify.com' },
-      { protocol: 'https', hostname: '*.cloudfront.net' },
+      // Printful CDN
+      { protocol: 'https', hostname: 'files.cdn.printful.com' },
+      { protocol: 'https', hostname: 'ucarecdn.com' },
       // Supabase Storage
       { protocol: 'https', hostname: 'bdazupyepobieyjzuamf.supabase.co' },
+      { protocol: 'https', hostname: 'xuojbqklykhbawgnnisf.supabase.co' },
       // Stock/template images
       { protocol: 'https', hostname: 'images.pexels.com' },
       { protocol: 'https', hostname: 'images.unsplash.com' },
@@ -42,7 +43,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https:",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://api.resend.com https://api.mailerlite.com https://api.printify.com",
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://api.resend.com https://api.mailerlite.com https://api.printful.com",
               "media-src 'self' https://*.supabase.co",
               "frame-src https://js.stripe.com https://hooks.stripe.com https://www.youtube.com",
               "object-src 'none'",

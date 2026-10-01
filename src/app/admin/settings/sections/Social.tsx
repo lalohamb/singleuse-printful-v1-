@@ -38,7 +38,7 @@ export default function Social() {
               {key === "email" && (
                 <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-secondary-700 space-y-1.5">
                   <p className="font-semibold text-secondary-900">📧 Domain email required</p>
-                  <p>This address must come from a <strong>verified custom domain</strong> — e.g. <code className="bg-white px-1 rounded text-xs">orders@yourdomain.com</code>. Free addresses are rejected by MailerLite, Resend, and Printify.</p>
+                  <p>This address must come from a <strong>verified custom domain</strong> — e.g. <code className="bg-white px-1 rounded text-xs">orders@yourdomain.com</code>. Free addresses are rejected by MailerLite, Resend, and Printful.</p>
                 </div>
               )}
             </div>

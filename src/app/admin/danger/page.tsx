@@ -18,8 +18,8 @@ const OPTIONS: ResetOption[] = [
   {
     type: "soft",
     title: "Soft Reset",
-    description: "Clears all orders, products, and email events. Resets Printify & Stripe connection flags. All settings, categories, and admin accounts are preserved.",
-    clears: ["Orders", "Products", "Email events", "Printify / Stripe connection flags"],
+    description: "Clears all orders, products, and email events. Resets Printful & Stripe connection flags. All settings, categories, and admin accounts are preserved.",
+    clears: ["Orders", "Products", "Email events", "Printful / Stripe connection flags"],
     keeps: ["Settings & branding", "Categories", "SEO settings", "Policies", "Admins"],
     confirmText: "SOFT RESET",
     buttonLabel: "Soft Reset",

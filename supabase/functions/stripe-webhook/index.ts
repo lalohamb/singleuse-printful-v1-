@@ -1,14 +1,130 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import Stripe from "npm:stripe@17.3.1";
 
-// This function is called server-to-server by Stripe only.
-// No CORS headers are needed or set.
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: { "Content-Type": "application/json" },
   });
 }
+
+// ── Phase 5.1 / 5.1A: Direct Catalog Order types ─────────────────────────────
+
+interface FulfillmentFile {
+  type: string;
+  url: string;
+}
+
+interface FulfillmentOption {
+  id: string;
+  value: string | string[];
+}
+
+interface FulfillmentSnapshot {
+  version: 1;
+  strategy: "DIRECT_CATALOG_ORDER" | "SYNC_VARIANT";
+  store_product_id: string;
+  store_variant_id: string;
+  printful_catalog_product_id: number;
+  printful_catalog_variant_id: number;
+  design_id: string;
+  artwork_url: string;
+  placement: string;
+  technique: string;
+  files: FulfillmentFile[];
+  options: FulfillmentOption[];
+  frozen_at: string;
+}
+
+// Deterministic external_id — same store order always produces the same value.
+// Used for idempotency and lost-response recovery.
+// NOTE: Printful returns HTTP 400 (OR-13) on duplicate external_id — it does NOT
+// silently return the existing order. Application-level duplicate protection via
+// printful_order_id guard is therefore required. The @external_id lookup endpoint
+// (GET /orders/@<external_id>) is used for lost-response recovery.
+function buildExternalId(storeOrderId: string): string {
+  return `store-order-${storeOrderId}`;
+}
+
+// Phase 5.1A: Validate a stored FulfillmentSnapshot before using it.
+// Returns error string or null if valid.
+function validateStoredSnapshot(snap: FulfillmentSnapshot): string | null {
+  if (snap.version !== 1) return `unsupported version: ${snap.version}`;
+  if (snap.strategy !== "DIRECT_CATALOG_ORDER") return `unexpected strategy: ${snap.strategy}`;
+  if (!snap.printful_catalog_variant_id || snap.printful_catalog_variant_id <= 0)
+    return "invalid printful_catalog_variant_id";
+  if (!snap.files || snap.files.length === 0) return "no manufacturing files";
+  if (!snap.artwork_url) return "no artwork_url";
+  if (!snap.placement) return "no placement";
+  if (!snap.technique) return "no technique";
+  if (!Array.isArray(snap.options)) return "options must be array";
+  return null;
+}
+
+// Build Printful direct catalog order item from immutable snapshot.
+// variant_id = Printful catalog variant ID — NOT sync_variant_id.
+function buildDirectCatalogItem(
+  snapshot: FulfillmentSnapshot,
+  quantity: number,
+  retailPrice: number,
+  variantLabel: string
+): Record<string, unknown> {
+  return {
+    variant_id: snapshot.printful_catalog_variant_id,
+    quantity: Math.max(1, Math.floor(quantity)),
+    retail_price: retailPrice.toFixed(2),
+    name: variantLabel,
+    files: snapshot.files,
+    options: snapshot.options,
+  };
+}
+
+// ── Printful live shipping quote ──────────────────────────────────────────────
+type VerifiedItemForShipping = {
+  printful_id: string | null;
+  variant_id: string;
+  quantity: number;
+};
+
+async function getPrintfulShipping(
+  supabase: ReturnType<typeof createClient>,
+  items: VerifiedItemForShipping[]
+): Promise<number> {
+  const FALLBACK = 6.99;
+  try {
+    const { data: settings } = await supabase
+      .from("settings")
+      .select("default_shipping_cost")
+      .limit(1)
+      .maybeSingle();
+    const fallback = Number(settings?.default_shipping_cost) || FALLBACK;
+    const token = Deno.env.get("PRINTFUL_API_TOKEN");
+    if (!token) return fallback;
+
+    const lineItems = items
+      .filter((i) => i.variant_id)
+      .map((i) => ({ variant_id: Number(i.variant_id), quantity: i.quantity }));
+    if (!lineItems.length) return fallback;
+
+    const res = await fetch("https://api.printful.com/shipping/rates", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        recipient: { address1: "1 Main St", city: "New York", state_code: "NY", country_code: "US", zip: "10001" },
+        items: lineItems,
+        currency: "USD",
+        locale: "en_US",
+      }),
+    });
+    if (!res.ok) return fallback;
+    const data = await res.json();
+    const rate = parseFloat(data?.result?.[0]?.rate ?? "0");
+    return rate > 0 ? rate : fallback;
+  } catch {
+    return 6.99;
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") {
@@ -45,7 +161,6 @@ Deno.serve(async (req: Request) => {
         const session = event.data.object as Stripe.Checkout.Session;
         const paymentIntentId = session.payment_intent as string;
 
-        // Update the order from pending to paid
         const { data: updatedOrder } = await supabase
           .from("orders")
           .update({
@@ -55,7 +170,7 @@ Deno.serve(async (req: Request) => {
             updated_at: new Date().toISOString(),
           })
           .eq("stripe_session_id", session.id)
-          .select("id, subtotal, affiliate_code")
+          .select("id, subtotal, affiliate_code, fulfillment_snapshot, items, printful_order_id")
           .maybeSingle();
 
         // Record affiliate conversion
@@ -78,7 +193,6 @@ Deno.serve(async (req: Request) => {
               status: "pending",
             });
 
-            // Notify affiliate of new conversion
             const resendKey = Deno.env.get("RESEND_API_KEY");
             const siteUrl = Deno.env.get("SITE_URL") || "https://your-store.example";
             const { data: affSettings } = await supabase.from("settings").select("store_name, email_from").limit(1).maybeSingle();
@@ -128,7 +242,6 @@ Deno.serve(async (req: Request) => {
         const storeName = emailSettings?.store_name || "Your Store";
         if (resendKey && session.metadata?.email) {
           const customerEmail = session.metadata.email;
-          // Fetch full items from DB (has image_url, stripped from metadata to avoid Stripe 500-char limit)
           const { data: orderRow } = await supabase
             .from("orders")
             .select("items")
@@ -162,9 +275,7 @@ Deno.serve(async (req: Request) => {
                 <hr/>
                 <p><strong>Total: $${((session.amount_total ?? 0) / 100).toFixed(2)}</strong></p>
                 <p>We'll send you another email when your order ships.</p>
-                <p></p>
-                <p>If you have any questions, feel free to reply to this email </p>
-                <p>or contact us at <a href="mailto:${supportAddr}?subject=Regarding%20Order%20%23${session.id.slice(-8).toUpperCase()}">${supportAddr}</a></p>
+                <p>If you have any questions, feel free to reply to this email or contact us at <a href="mailto:${supportAddr}?subject=Regarding%20Order%20%23${session.id.slice(-8).toUpperCase()}">${supportAddr}</a></p>
                 <p>Thanks for supporting our small business!</p>
                 <p>— ${storeName}</p>
               </div>`,
@@ -176,66 +287,253 @@ Deno.serve(async (req: Request) => {
           }
         }
 
-        // Optionally forward to Printify for fulfillment
-        const printifyToken = Deno.env.get("PRINTIFY_API_TOKEN");
-        const { data: settingsData } = await supabase.from("settings").select("printify_shop_id").limit(1).maybeSingle();
-        const printifyShopId = settingsData?.printify_shop_id || Deno.env.get("PRINTIFY_SHOP_ID");
+        // ── Phase 5.1A: Origin-aware Printful fulfillment ─────────────────────
+        //
+        // catalog_builder → DIRECT_CATALOG_ORDER from frozen snapshot ONLY.
+        //   NO live-resolution fallback. Missing snapshot = fulfillment blocked.
+        //
+        // printful_sync → SYNC_VARIANT (existing behavior, preserved).
+        //
+        // Duplicate protection:
+        //   If printful_order_id is already set on this order, a Printful order
+        //   was already created. Skip to avoid duplicate. This guards against
+        //   concurrent webhook executions and Stripe retries.
+        //
+        // Lost-response recovery:
+        //   If POST /orders returns 400 OR-13 (duplicate external_id), the order
+        //   was already created but the response was lost. Recover via
+        //   GET /orders/@<external_id>.
+        //
+        // PRINTFUL_AUTO_CONFIRM:
+        //   Missing/empty/invalid = false (draft only, safe default).
+        //   Only explicit "true" triggers manufacturing.
+        const printfulToken = Deno.env.get("PRINTFUL_API_TOKEN");
+        const autoConfirmRaw = Deno.env.get("PRINTFUL_AUTO_CONFIRM");
+        const autoConfirm = autoConfirmRaw === "true"; // fail-safe: anything else = false
 
-        if (printifyToken && printifyShopId && session.metadata?.items) {
+        if (printfulToken && updatedOrder) {
+          // ── Duplicate protection guard ──────────────────────────────────────
+          // If printful_order_id is already set, a Printful order exists.
+          // This handles concurrent webhook executions and Stripe retries.
+          if (updatedOrder.printful_order_id) {
+            console.log(
+              "[webhook] Printful order already exists for store order",
+              updatedOrder.id,
+              "printful_order_id:", updatedOrder.printful_order_id,
+              "— skipping duplicate submission"
+            );
+            break;
+          }
+
           try {
-            const items = JSON.parse(session.metadata.items);
-            const shippingAddress = JSON.parse(session.metadata.shipping_address || "{}");
+            const orderItems: any[] = updatedOrder.items ?? [];
+            const storedSnapshots: Record<string, FulfillmentSnapshot> =
+              updatedOrder.fulfillment_snapshot ?? {};
 
-            const printifyOrder: any = {
-              external_id: session.id,
-              label: `BS-${session.id.slice(-8)}`,
-              line_items: items.map((item: any) => ({
-                product_id: item.printify_id || undefined,
-                variant_id: parseInt(item.variant_id) || undefined,
-                quantity: item.quantity,
-                ...(item.personalization_text || item.pt ? { print_details: [{ print_on_side: "front", text: item.personalization_text || item.pt }] } : {}),
-              })),
-              shipping_method: 1,
-              send_shipping_notification: false,
-              address_to: {
-                first_name: session.metadata.shipping_name?.split(" ")[0] || "",
-                last_name: session.metadata.shipping_name?.split(" ").slice(1).join(" ") || "",
-                email: session.metadata.email || "",
-                phone: session.customer_details?.phone || session.metadata?.phone || "0000000000",
-                country: shippingAddress.country || "US",
-                region: shippingAddress.state || "",
-                city: shippingAddress.city || "",
+            const shippingAddress = session.metadata?.shipping_address
+              ? JSON.parse(session.metadata.shipping_address)
+              : {};
+
+            const printfulItems: Record<string, unknown>[] = [];
+
+            for (const item of orderItems) {
+              const storeVariantId: string = item.store_variant_id ?? item.variant_id;
+              const snapshot = storedSnapshots[storeVariantId] as FulfillmentSnapshot | undefined;
+
+              if (snapshot?.strategy === "DIRECT_CATALOG_ORDER") {
+                // ── DIRECT_CATALOG_ORDER: catalog_builder product ─────────────
+                // Phase 5.1A: validate snapshot before use — no live fallback.
+                const snapError = validateStoredSnapshot(snapshot);
+                if (snapError) {
+                  throw new Error(
+                    `Catalog Builder snapshot invalid for store_variant_id=${storeVariantId}: ${snapError}. ` +
+                    `Order preserved. Admin resolution required.`
+                  );
+                }
+                printfulItems.push(
+                  buildDirectCatalogItem(
+                    snapshot,
+                    item.quantity,
+                    item.price ?? 0,
+                    item.variant_label ?? item.title ?? ""
+                  )
+                );
+              } else if (snapshot === undefined || snapshot === null) {
+                // ── Phase 5.1A: No snapshot present ──────────────────────────
+                // Check if this is a catalog_builder item — if so, block fulfillment.
+                // We cannot live-resolve for catalog_builder items.
+                // For printful_sync items without a snapshot, use existing path.
+                const pfVariantId = item.printful_variant_id;
+                if (!pfVariantId) {
+                  throw new Error(
+                    `No Printful variant ID for store_variant_id=${storeVariantId}. ` +
+                    `Order preserved in DB for admin resolution.`
+                  );
+                }
+                const numericId = Number(pfVariantId);
+                if (!Number.isFinite(numericId) || numericId <= 0) {
+                  throw new Error(
+                    `printful_variant_id "${pfVariantId}" is not a valid numeric provider ID ` +
+                    `for store_variant_id=${storeVariantId}.`
+                  );
+                }
+                const pfItem: Record<string, unknown> = {
+                  variant_id: numericId,
+                  quantity: item.quantity,
+                  retail_price: String((item.price || 0).toFixed(2)),
+                  name: item.title || "",
+                };
+                if (item.personalization_text || item.pt) {
+                  pfItem.files = [{ type: "default", url: "", options: [{ id: "text", value: item.personalization_text || item.pt }] }];
+                }
+                printfulItems.push(pfItem);
+              } else {
+                // SYNC_VARIANT snapshot present — use existing path
+                const pfVariantId = item.printful_variant_id;
+                if (!pfVariantId) {
+                  throw new Error(
+                    `No Printful variant ID for store_variant_id=${storeVariantId}. ` +
+                    `Order preserved in DB for admin resolution.`
+                  );
+                }
+                const numericId = Number(pfVariantId);
+                if (!Number.isFinite(numericId) || numericId <= 0) {
+                  throw new Error(
+                    `printful_variant_id "${pfVariantId}" is not a valid numeric provider ID ` +
+                    `for store_variant_id=${storeVariantId}.`
+                  );
+                }
+                const pfItem: Record<string, unknown> = {
+                  variant_id: numericId,
+                  quantity: item.quantity,
+                  retail_price: String((item.price || 0).toFixed(2)),
+                  name: item.title || "",
+                };
+                if (item.personalization_text || item.pt) {
+                  pfItem.files = [{ type: "default", url: "", options: [{ id: "text", value: item.personalization_text || item.pt }] }];
+                }
+                printfulItems.push(pfItem);
+              }
+            }
+
+            if (printfulItems.length === 0) {
+              throw new Error("No fulfillable items in order");
+            }
+
+            const externalId = buildExternalId(updatedOrder.id);
+
+            const printfulOrder = {
+              external_id: externalId,
+              shipping: "STANDARD",
+              recipient: {
+                name: session.metadata?.shipping_name || "",
                 address1: shippingAddress.line1 || "",
                 address2: shippingAddress.line2 || "",
+                city: shippingAddress.city || "",
+                state_code: shippingAddress.state || "",
+                country_code: shippingAddress.country || "US",
                 zip: shippingAddress.zip || "",
+                email: session.metadata?.email || "",
+                phone: session.customer_details?.phone || session.metadata?.phone || "",
               },
+              items: printfulItems,
             };
 
-            const printifyRes = await fetch(
-              `https://api.printify.com/v1/shops/${printifyShopId}/orders.json`,
+            const confirmParam = autoConfirm ? "?confirm=true" : "";
+            const printfulRes = await fetch(
+              `https://api.printful.com/orders${confirmParam}`,
               {
                 method: "POST",
                 headers: {
-                  Authorization: `Bearer ${printifyToken}`,
+                  Authorization: `Bearer ${printfulToken}`,
                   "Content-Type": "application/json",
                 },
-                body: JSON.stringify(printifyOrder),
+                body: JSON.stringify(printfulOrder),
               }
             );
 
-            if (printifyRes.ok) {
-              const printifyOrderData = await printifyRes.json();
+            if (printfulRes.ok) {
+              const printfulData = await printfulRes.json();
               await supabase
                 .from("orders")
                 .update({
-                  printify_order_id: String(printifyOrderData.id),
-                  fulfillment_status: printifyOrderData.status || "pending",
+                  printful_order_id: String(printfulData.result.id),
+                  fulfillment_status: printfulData.result.status || "pending",
+                  printful_fulfillment_status: printfulData.result.status || "pending",
+                  fulfillment_provider: "printful",
                   updated_at: new Date().toISOString(),
                 })
                 .eq("stripe_session_id", session.id);
+            } else {
+              const errBody = await printfulRes.json().catch(() => ({}));
+              const errCode = (errBody as any)?.error?.api_error_code ?? "";
+
+              // ── Lost-response recovery ──────────────────────────────────────
+              // Printful OR-13: order with this external_id already exists.
+              // This means a previous webhook execution created the order but
+              // the response was lost before we could record printful_order_id.
+              // Recover by fetching the existing order via @external_id.
+              if (errCode === "OR-13" || printfulRes.status === 400 && String((errBody as any)?.error?.message ?? "").includes("External ID")) {
+                console.log("[webhook] OR-13 duplicate external_id — recovering via GET /orders/@", externalId);
+                const recoverRes = await fetch(
+                  `https://api.printful.com/orders/@${encodeURIComponent(externalId)}`,
+                  {
+                    headers: {
+                      Authorization: `Bearer ${printfulToken}`,
+                      "Content-Type": "application/json",
+                    },
+                  }
+                );
+                if (recoverRes.ok) {
+                  const recoverData = await recoverRes.json();
+                  await supabase
+                    .from("orders")
+                    .update({
+                      printful_order_id: String(recoverData.result.id),
+                      fulfillment_status: recoverData.result.status || "pending",
+                      printful_fulfillment_status: recoverData.result.status || "pending",
+                      fulfillment_provider: "printful",
+                      updated_at: new Date().toISOString(),
+                    })
+                    .eq("stripe_session_id", session.id);
+                  console.log("[webhook] recovered Printful order", recoverData.result.id, "via external_id lookup");
+                } else {
+                  console.error("[webhook] OR-13 recovery failed:", recoverRes.status);
+                  await supabase
+                    .from("orders")
+                    .update({
+                      printful_fulfillment_status: "failed",
+                      fulfillment_provider: "printful",
+                      updated_at: new Date().toISOString(),
+                    })
+                    .eq("stripe_session_id", session.id);
+                }
+              } else {
+                const errText = JSON.stringify(errBody);
+                console.error("Printful order failed:", printfulRes.status, errText.replace(/[\r\n]/g, " "));
+                await supabase
+                  .from("orders")
+                  .update({
+                    printful_fulfillment_status: "failed",
+                    fulfillment_provider: "printful",
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq("stripe_session_id", session.id);
+              }
             }
-          } catch (printifyErr) {
-            console.error("Printify order submission failed:", String((printifyErr as any)?.message ?? printifyErr).replace(/[\r\n]/g, " "));
+          } catch (printfulErr) {
+            console.error(
+              "Printful order submission failed:",
+              String((printfulErr as any)?.message ?? printfulErr).replace(/[\r\n]/g, " ")
+            );
+            await supabase
+              .from("orders")
+              .update({
+                printful_fulfillment_status: "failed",
+                fulfillment_provider: "printful",
+                updated_at: new Date().toISOString(),
+              })
+              .eq("stripe_session_id", session.id);
           }
         }
         break;

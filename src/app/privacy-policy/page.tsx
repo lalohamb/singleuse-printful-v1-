@@ -29,7 +29,7 @@ All payment processing is handled securely by Stripe. We do not store your credi
 
 Sharing Your Information
 We do not sell or rent your personal information. We share data only with:
-- Printify (our print-on-demand fulfillment partner) to produce and ship your orders
+- Printful (our print-on-demand fulfillment partner) to produce and ship your orders
 - Stripe for payment processing
 - Shipping carriers to deliver your orders
 

@@ -6,11 +6,9 @@ import { supabase } from "@/lib/supabase";
 
 interface Diagnostic {
   mode: "live" | "partial" | "fallback";
-  printifyConnected: boolean;
-  shopId: string | null;
+  printfulConnected: boolean;
   products: {
     total: number;
-    withBlueprint: number;
     withShippingInfo: number;
     missingShippingInfo: Array<{ id: string; title: string }>;
   };
@@ -21,7 +19,7 @@ interface Diagnostic {
 function ModeBadge({ mode }: { mode: Diagnostic["mode"] }) {
   if (mode === "live") return (
     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-success-50 text-success-700">
-      <CheckCircle size={14} />Live Printify Rates
+      <CheckCircle size={14} />Live Printful Rates
     </span>
   );
   if (mode === "partial") return (
@@ -213,9 +211,9 @@ function ShippingPanel() {
             <div className={`rounded-lg p-4 border ${diag.mode === "live" ? "bg-success-50 border-success-100" : diag.mode === "partial" ? "bg-warning-50 border-warning-100" : "bg-error-50 border-error-100"}`}>
               <ModeBadge mode={diag.mode} />
               <p className="text-sm mt-2 text-secondary-700">
-                {diag.mode === "live" && `All ${diag.products.total} active products have Printify shipping profiles stored. Customers see real rates at checkout.`}
+                {diag.mode === "live" && `All ${diag.products.total} active products have Printful live rates active. Customers see real rates at checkout.`}
                 {diag.mode === "partial" && `${diag.products.withShippingInfo} of ${diag.products.total} products have shipping profiles. The rest will use the $6.99 fallback.`}
-                {diag.mode === "fallback" && "No products have shipping profiles stored yet. Run a product sync to pull them from Printify."}
+                {diag.mode === "fallback" && "No Printful connection yet. Sync products from the Products panel to connect."}
               </p>
               {diag.sampleRate !== null && (
                 <p className="text-xs text-secondary-500 mt-1">
@@ -228,31 +226,31 @@ function ShippingPanel() {
             <div className="space-y-3">
               {[
                 {
-                  label: "Printify connected",
-                  ok: diag.printifyConnected,
-                  detail: diag.printifyConnected
+                  label: "Printful connected",
+                  ok: diag.printfulConnected,
+                  detail: diag.printfulConnected
                     ? "Shop is marked as connected in settings."
-                    : "Run a product sync from the Products panel to connect Printify.",
+                    : "Run a product sync from the Products panel to connect Printful.",
                 },
                 {
-                  label: "Shop ID configured",
-                  ok: !!diag.shopId,
-                  detail: diag.shopId
-                    ? `Shop ID: ${diag.shopId}`
-                    : "Set your Printify Shop ID in Settings → Integrations.",
+                  label: "Printful connected",
+                  ok: diag.printfulConnected,
+                  detail: diag.printfulConnected
+                    ? "Printful API token is active."
+                    : "Run a product sync from the Products panel to connect Printful.",
                 },
                 {
-                  label: `Blueprint data (${diag.products.withBlueprint}/${diag.products.total} products)`,
-                  ok: diag.products.withBlueprint === diag.products.total && diag.products.total > 0,
-                  detail: diag.products.withBlueprint === diag.products.total
-                    ? "All products have blueprint and provider IDs."
-                    : "Some products are missing blueprint data — sync from the Products panel.",
+                  label: `Products synced (${diag.products.total})`,
+                  ok: diag.products.total > 0,
+                  detail: diag.products.total > 0
+                    ? `${diag.products.total} active products synced from Printful.`
+                    : "No products synced yet — run Sync Printful from the Products panel.",
                 },
                 {
                   label: `Shipping profiles stored (${diag.products.withShippingInfo}/${diag.products.total} products)`,
                   ok: diag.products.withShippingInfo === diag.products.total && diag.products.total > 0,
                   detail: diag.products.withShippingInfo === diag.products.total
-                    ? "All products have Printify shipping rate profiles stored locally."
+                    ? "Printful live shipping rates are active for all products."
                     : `${diag.products.total - diag.products.withShippingInfo} product(s) missing shipping profiles — run a sync to fetch them.`,
                 },
               ].map(({ label, ok, detail }) => (
@@ -280,7 +278,7 @@ function ShippingPanel() {
                   ))}
                 </ul>
                 <p className="text-xs text-secondary-400 mt-2">
-                  Go to <strong>Products → Sync from Printify</strong> to pull shipping profiles for these items.
+                  Go to <strong>Products → Sync Printful</strong> to pull these products from Printful.
                 </p>
               </div>
             )}
@@ -293,10 +291,10 @@ function ShippingPanel() {
         <h2 className="text-lg font-semibold text-secondary-900 flex items-center gap-2 mb-4">
           <Package size={20} className="text-primary-500" />Shipping Rates by Product
         </h2>
-        <p className="text-sm text-secondary-500 mb-4">Stored rates from the last Printify sync. Used as fallback when the live API is unavailable.</p>
+        <p className="text-sm text-secondary-500 mb-4">Printful uses live rates at checkout — no static profiles needed.</p>
         <div className="bg-secondary-50 border border-secondary-100 rounded-lg p-4 text-xs text-secondary-600 space-y-1.5 mb-4">
-          <p>• Products fulfilled by multiple Printify print providers will show <strong>more than one US rate</strong> — each provider has its own cost. This is expected.</p>
-          <p>• The collapsed view shows the <strong>lowest stored US rate</strong> as an estimate. At checkout, Printify's live API returns the exact rate for the actual provider fulfilling the order.</p>
+          <p>• Printful returns live rates per cart at checkout.</p>
+          <p>• The rate shown is the cheapest option from Printful's live API.</p>
           <p>• Non-US rows (CA, AU, REST_OF_THE_WORLD) are stored from the sync but <strong>not used</strong> — this store ships to the US only.</p>
         </div>
         <ProductRatesTable />
@@ -307,7 +305,7 @@ function ShippingPanel() {
         <h2 className="text-lg font-semibold text-secondary-900 flex items-center gap-2 mb-2">
           <Truck size={20} className="text-primary-500" />Fallback Shipping Rate
         </h2>
-        <p className="text-sm text-secondary-500 mb-4">Used when a product has no Printify shipping profile stored. Keeps checkout from being blocked.</p>
+        <p className="text-sm text-secondary-500 mb-4">Used when Printful's live API is unavailable. Keeps checkout from being blocked.</p>
         <div className="space-y-4">
           <div>
             <label className="label-text">Fallback rate (per order)</label>
@@ -350,18 +348,18 @@ function ShippingPanel() {
         </div>
       </section>
 
-      {/* Printify notice */}
+      {/* Printful notice */}
       <div className="bg-primary-50 border border-primary-100 rounded-xl p-5 flex gap-4">
         <Info size={22} className="text-primary-500 flex-shrink-0 mt-0.5" />
         <div className="space-y-1">
-          <p className="font-semibold text-secondary-900">Shipping is managed by Printify</p>
+          <p className="font-semibold text-secondary-900">Shipping is managed by Printful</p>
           <p className="text-sm text-secondary-600">
-            Rates, carriers, and delivery windows are configured in your Printify account.
-            At checkout, this store calls Printify&apos;s live Calculate Shipping API with the customer&apos;s exact cart to get the real fulfillment cost.
+            Rates, carriers, and delivery windows are configured in your Printful account.
+            At checkout, this store calls Printful's live shipping rates API with the customer's exact cart.
             If that call fails, it falls back to the static profiles stored during the last product sync.
           </p>
-          <a href="https://printify.com/app/store/shipping" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 underline mt-1">
-            Open Printify Shipping Settings <ExternalLink size={13} />
+          <a href="https://www.printful.com/dashboard/shipping" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 underline mt-1">
+            Open Printful Shipping Settings <ExternalLink size={13} />
           </a>
         </div>
       </div>
@@ -373,9 +371,9 @@ function ShippingPanel() {
         </h2>
         <ol className="space-y-4 text-sm text-secondary-700">
           {[
-            { icon: RefreshCw, title: "Product sync stores shipping profiles as fallback", desc: "When you sync products from Printify, the shipping rate profile for each product's blueprint and print provider is stored in the database as a fallback." },
-            { icon: Globe, title: "Live rate fetched at checkout", desc: "When a customer checks out, the server calls Printify's Calculate Shipping API with the exact cart items to get the real fulfillment cost. No client-side calculation." },
-            { icon: Package, title: "Exact rate passed to Stripe", desc: "Printify's response is used directly as the shipping amount in the Stripe Checkout Session. If the live call fails, the stored fallback profiles are used instead." },
+            { icon: RefreshCw, title: "Product sync stores shipping profiles as fallback", desc: "When you sync products from Printful, products are stored locally for fast browsing." },
+            { icon: Globe, title: "Live rate fetched at checkout", desc: "When a customer checks out, the server calls Printful's live shipping rates API with the exact cart items. No client-side calculation." },
+            { icon: Package, title: "Exact rate passed to Stripe", desc: "Printful's response is used directly as the shipping amount in the Stripe Checkout Session. Falls back to the default shipping cost on error." },
           ].map(({ icon: Icon, title, desc }, i) => (
             <li key={i} className="flex gap-4">
               <div className="w-8 h-8 rounded-full bg-primary-50 flex items-center justify-center flex-shrink-0 text-primary-600 font-bold text-sm">{i + 1}</div>
@@ -388,9 +386,9 @@ function ShippingPanel() {
         </ol>
       </section>
 
-      {/* What to configure in Printify */}
+      {/* What to configure in Printful */}
       <section className="bg-white rounded-xl border border-secondary-100 shadow-sm p-6">
-        <h2 className="text-lg font-semibold text-secondary-900 mb-4">What to Configure in Printify</h2>
+        <h2 className="text-lg font-semibold text-secondary-900 mb-4">What to Configure in Printful</h2>
         <div className="space-y-3 text-sm">
           {[
             { label: "Shipping profiles", desc: "Set rates per region for each product type. Re-sync products after any changes." },
@@ -403,7 +401,7 @@ function ShippingPanel() {
                 <p className="font-medium text-secondary-800">{label}</p>
                 <p className="text-secondary-500 text-xs mt-0.5">{desc}</p>
               </div>
-              <a href="https://printify.com/app/store/shipping" target="_blank" rel="noreferrer" className="flex-shrink-0 text-primary-600 hover:text-primary-700 flex items-center gap-1 text-xs font-medium underline">
+              <a href="https://www.printful.com/dashboard/shipping" target="_blank" rel="noreferrer" className="flex-shrink-0 text-primary-600 hover:text-primary-700 flex items-center gap-1 text-xs font-medium underline">
                 Configure <ExternalLink size={11} />
               </a>
             </div>
@@ -415,8 +413,8 @@ function ShippingPanel() {
       <div className="rounded-lg border border-secondary-200 bg-secondary-50 p-4 text-xs text-secondary-500 flex gap-2">
         <Info size={14} className="flex-shrink-0 mt-0.5 text-secondary-400" />
         <p>
-          If Printify&apos;s live shipping API is unavailable, checkout falls back to the static profiles stored during the last sync, or <strong>$6.99</strong> if no profiles exist.
-          After changing shipping rates in Printify, the live API will reflect them immediately — no sync needed.
+          If Printful's live shipping API is unavailable, checkout falls back to the default shipping cost (configurable below).
+          After changing shipping rates in Printful, the live API will reflect them immediately — no sync needed.
         </p>
       </div>
 

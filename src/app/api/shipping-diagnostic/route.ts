@@ -20,69 +20,29 @@ export async function GET() {
   // 1. Settings
   const { data: settings } = await supabase
     .from("settings")
-    .select("printify_connected, printify_shop_id")
+    .select("printful_connected, printful_store_id")
     .limit(1)
     .maybeSingle();
 
-  const shopId = settings?.printify_shop_id ?? null;
-  const printifyConnected = !!settings?.printify_connected;
+  const printfulConnected = !!settings?.printful_connected;
 
-  // 2. Product coverage — blueprint_id, print_provider_id, and shipping_info
+  // 2. Product coverage
   const { data: products } = await supabase
     .from("products")
-    .select("id, title, blueprint_id, print_provider_id, shipping_info")
+    .select("id, title, shipping_info")
     .eq("status", "active");
 
   const total = products?.length ?? 0;
+  const withShippingInfo = 0; // Printful uses live rates — no static profiles
+  const missingShippingInfo: { id: string; title: string }[] = [];
 
-  const withBlueprint = products?.filter(
-    (p) => p.blueprint_id && p.print_provider_id
-  ).length ?? 0;
-
-  const withShippingInfo = products?.filter(
-    (p) => Array.isArray(p.shipping_info?.profiles) && p.shipping_info.profiles.length > 0
-  ).length ?? 0;
-
-  const missingShippingInfo = products
-    ?.filter((p) => !Array.isArray(p.shipping_info?.profiles) || p.shipping_info.profiles.length === 0)
-    .map((p) => ({ id: p.id, title: p.title })) ?? [];
-
-  // 3. Sample rate — pick a product with shipping_info and calculate a US rate
-  let sampleRate: number | null = null;
-  let sampleProduct: string | null = null;
-
-  const sampleP = products?.find((p) => Array.isArray(p.shipping_info?.profiles) && p.shipping_info.profiles.length > 0);
-  if (sampleP) {
-    const profile =
-      sampleP.shipping_info.profiles.find((profile: ShippingProfile) =>
-        Array.isArray(profile.countries) &&
-        (profile.countries.includes("US") || profile.countries.includes("*"))
-      ) ??
-      sampleP.shipping_info.profiles.find((profile: ShippingProfile) =>
-        Array.isArray(profile.countries) && profile.countries.includes("REST_OF_THE_WORLD")
-      ) ??
-      sampleP.shipping_info.profiles[0];
-
-    if (profile) {
-      sampleRate = (Number(profile.first_item?.cost) || 0) / 100;
-      sampleProduct = sampleP.title;
-    }
-  }
-
-  // 4. Mode
-  const mode: "live" | "partial" | "fallback" =
-    withShippingInfo === total && total > 0
-      ? "live"
-      : withShippingInfo > 0
-      ? "partial"
-      : "fallback";
+  const mode: "live" | "partial" | "fallback" = printfulConnected ? "live" : "fallback";
 
   return NextResponse.json({
     mode,
-    printifyConnected,
-    shopId,
-    products: { total, withBlueprint, withShippingInfo, missingShippingInfo },
-    sampleRate,
-    sampleProduct,
+    printfulConnected,
+    products: { total, withShippingInfo, missingShippingInfo },
+    sampleRate: null,
+    sampleProduct: null,
   });
 }

@@ -5,7 +5,15 @@ import { SlidersHorizontal, X } from "lucide-react";
 import type { Product, Category } from "@/types";
 import ProductCard from "@/components/ProductCard";
 
-export default function ShopClient({ products, categories }: { products: Product[]; categories: Category[] }) {
+export default function ShopClient({
+  products,
+  categories,
+  primaryImagesByProductId = {},
+}: {
+  products: Product[];
+  categories: Category[];
+  primaryImagesByProductId?: Record<string, string>;
+}) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [showFilters, setShowFilters] = useState(false);
@@ -94,7 +102,13 @@ export default function ShopClient({ products, categories }: { products: Product
             <div className="text-center py-20"><p className="text-secondary-500 text-lg">No products found in this category.</p></div>
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
-              {filtered.map((p) => <ProductCard key={p.id} product={p} />)}
+              {filtered.map((p) => (
+                <ProductCard
+                  key={p.id}
+                  product={p}
+                  primaryImageUrl={primaryImagesByProductId[p.id]}
+                />
+              ))}
             </div>
           )}
         </div>

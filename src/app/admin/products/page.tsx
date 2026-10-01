@@ -94,18 +94,21 @@ function Products() {
     fetchData();
   };
 
-  const handleSyncPrintify = async () => {
+  const handleSyncPrintful = async () => {
     setSyncing(true); setSyncMsg(null);
     try {
-      const { data: settingsData } = await supabase.from("settings").select("printify_shop_id").limit(1).maybeSingle();
-      const shopId = settingsData?.printify_shop_id || process.env.NEXT_PUBLIC_PRINTIFY_SHOP_ID;
-      if (!shopId) { setSyncMsg("No Printify Shop ID set. Add it in Admin → Settings."); setSyncing(false); return; }
+      const { data: settingsData } = await supabase.from("settings").select("printful_store_id").limit(1).maybeSingle();
+      const storeId = settingsData?.printful_store_id || process.env.NEXT_PUBLIC_PRINTFUL_STORE_ID;
+      if (!storeId) { setSyncMsg("No Printful Store ID set. Add it in Admin → Settings."); setSyncing(false); return; }
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
       const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-      const res = await fetch(`${supabaseUrl}/functions/v1/printify-proxy/sync?shop_id=${shopId}`, { method: "POST", headers: { Authorization: `Bearer ${anonKey}`, "Content-Type": "application/json" } });
+      const res = await fetch(`${supabaseUrl}/functions/v1/printful-proxy/sync?store_id=${storeId}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${anonKey}`, "Content-Type": "application/json" },
+      });
       if (!res.ok) { const err = await res.json().catch(() => ({ error: "Sync failed" })); throw new Error(err.error || "Sync failed"); }
       const data = await res.json();
-      setSyncMsg(`Synced ${data.synced || 0} products from Printify${data.deleted ? ` · ${data.deleted} removed` : ""}.`);
+      setSyncMsg(`Synced ${data.synced || 0} products from Printful${data.archived ? ` · ${data.archived} archived` : ""}.`);
       fetch("/api/revalidate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths: ["/", "/shop"] }) });
       fetchData();
     } catch (err) { setSyncMsg(err instanceof Error ? err.message : "Sync failed"); }
@@ -116,12 +119,12 @@ function Products() {
     <div className="space-y-6">
       
       {syncMsg && <div className="bg-primary-50 border border-primary-100 text-primary-700 rounded-lg p-3 text-sm">{syncMsg}</div>}
-      {!webhookInfoDismissed && products.some((p) => p.printify_id) && (
+      {!webhookInfoDismissed && products.some((p) => p.printful_id) && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start justify-between gap-3">
           <div className="flex items-start gap-2 text-sm text-amber-800">
             <AlertTriangle size={16} className="flex-shrink-0 mt-0.5 text-amber-500" />
             <span>
-              <strong>Printify sync flow:</strong> Products are automatically pulled from your connected Printify store — no need to click &quot;Publish&quot; in Printify. That button is misleading and redundant here. Just make sure the product is <em>visible</em> in your Printify store, then click <strong>Sync Printify</strong> below to pull it in and set status as <span className="text-xs px-2 py-0.5 rounded-full bg-success-50 text-success-600 font-medium">active</span><span className="ml-1 text-[10px] text-secondary-400">via Printify</span>.
+              <strong>Printful sync:</strong> Click <strong>Sync Printful</strong> to pull products from your connected Printful store. Products will be set as <span className="text-xs px-2 py-0.5 rounded-full bg-success-50 text-success-600 font-medium">active</span><span className="ml-1 text-[10px] text-secondary-400">via Printful</span>.
             </span>
           </div>
           <button onClick={() => setWebhookInfoDismissed(true)} className="flex-shrink-0 text-amber-500 hover:text-amber-700"><X size={16} /></button>
@@ -130,7 +133,7 @@ function Products() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="relative flex-1 max-w-xs"><Search size={18} className="absolute left-3 top-2.5 text-secondary-400" /><input type="text" placeholder="Search products..." value={search} onChange={(e) => setSearch(e.target.value)} className="input-field pl-10 py-2" /></div>
         <div className="flex items-center gap-3">
-          <button onClick={handleSyncPrintify} disabled={syncing} className="btn-outline py-2">{syncing ? <Loader2 size={18} className="mr-2 animate-spin" /> : <RefreshCw size={18} className="mr-2" />}Sync Printify</button>
+          <button onClick={handleSyncPrintful} disabled={syncing} className="btn-outline py-2">{syncing ? <Loader2 size={18} className="mr-2 animate-spin" /> : <RefreshCw size={18} className="mr-2" />}Sync Printful</button>
           <button onClick={() => { setEditing(null); setShowModal(true); }} className="btn-primary py-2"><Plus size={18} className="mr-2" />Add Product</button>
         </div>
       </div>
@@ -138,9 +141,9 @@ function Products() {
       <div className="flex gap-1 bg-secondary-100 p-1 rounded-lg w-fit">
         <button onClick={() => setTab("active")} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === "active" ? "bg-white text-secondary-900 shadow-sm" : "text-secondary-500 hover:text-secondary-700"}`}>
           Active <span className="ml-1.5 text-xs bg-success-100 text-success-700 px-1.5 py-0.5 rounded-full">{activeFiltered.length}</span>
-          {activeFiltered.filter(p => !p.printify_id).length > 0 && (
-            <span className="ml-1 text-xs bg-gold-500/20 text-gold-600 px-1.5 py-0.5 rounded-full" title="Includes manually added products not linked to Printify">
-              {activeFiltered.filter(p => !p.printify_id).length} manual
+          {activeFiltered.filter(p => !p.printful_id).length > 0 && (
+            <span className="ml-1 text-xs bg-gold-500/20 text-gold-600 px-1.5 py-0.5 rounded-full" title="Includes manually added products not linked to Printful">
+              {activeFiltered.filter(p => !p.printful_id).length} manual
             </span>
           )}
         </button>
@@ -188,18 +191,18 @@ function Products() {
                     {activeFiltered.map((p) => (
                       <tr key={p.id} className={`hover:bg-secondary-50 transition-colors ${selectedIds.has(p.id) ? "bg-primary-50/50" : ""}`}>
                         <td className="px-4 py-3"><input type="checkbox" aria-label={`Select ${p.title}`} checked={selectedIds.has(p.id)} onChange={() => toggleRow(p.id)} className="w-4 h-4 rounded" /></td>
-                        <td className="px-4 py-3"><div className="flex items-center gap-3"><AppImage src={p.image_url || ""} alt={p.title} width={48} height={48} className="w-12 h-12 rounded-lg object-cover bg-secondary-100 flex-shrink-0" /><div className="min-w-0 max-w-[240px]"><p className="font-medium text-secondary-900 truncate flex items-center gap-1">{p.content_locked && <Lock size={12} className="text-warning-500 flex-shrink-0" aria-label="Content locked" />}{p.title}</p>{p.printify_id && <p className="text-xs text-secondary-400 truncate">Printify: {p.printify_id}</p>}</div></div></td>
+                        <td className="px-4 py-3"><div className="flex items-center gap-3"><AppImage src={p.image_url || ""} alt={p.title} width={48} height={48} className="w-12 h-12 rounded-lg object-cover bg-secondary-100 flex-shrink-0" /><div className="min-w-0 max-w-[240px]"><p className="font-medium text-secondary-900 truncate flex items-center gap-1">{p.content_locked && <Lock size={12} className="text-warning-500 flex-shrink-0" aria-label="Content locked" />}{p.title}</p>{p.printful_id && <p className="text-xs text-secondary-400 truncate">Printful: {p.printful_id}</p>}</div></div></td>
                         <td className="px-4 py-3 text-sm text-secondary-600 hidden md:table-cell">{categories.find((c) => c.id === p.category_id)?.name || "Uncategorized"}</td>
                         <td className="px-4 py-3 font-medium text-secondary-900">{formatPrice(p.price)}</td>
                         <td className="px-4 py-3 hidden lg:table-cell">
   <span className={`text-xs px-2 py-1 rounded-full ${p.status === "active" ? "bg-success-50 text-success-600" : p.status === "draft" ? "bg-warning-50 text-warning-600" : "bg-secondary-100 text-secondary-500"}`}>
     {p.status}
   </span>
-  {p.status === "active" && p.printify_id && (
-    <span title="Active via Printify sync — published through webhook handshake or visible=true on Printify" className="ml-1.5 text-[10px] text-secondary-400 cursor-help">via Printify</span>
+  {p.status === "active" && p.printful_id && (
+    <span title="Active via Printful sync" className="ml-1.5 text-[10px] text-secondary-400 cursor-help">via Printful</span>
   )}
-  {p.status === "active" && !p.printify_id && (
-    <span title="Manually added product — not linked to Printify" className="ml-1.5 text-[10px] text-gold-500 cursor-help">via Manual</span>
+  {p.status === "active" && !p.printful_id && (
+    <span title="Manually added product — not linked to Printful" className="ml-1.5 text-[10px] text-gold-500 cursor-help">via Manual</span>
   )}
 </td>
                         <td className="px-4 py-3 hidden lg:table-cell"><div className="flex flex-wrap gap-1">{ACTIVE_FLAGS.filter((f) => f.key !== "featured" && (p as unknown as Record<string, boolean>)[f.key as string]).map((f) => <span key={f.key as string} className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${f.badgeClass}`}>{f.badge}</span>)}</div></td>
@@ -225,8 +228,7 @@ function Products() {
                 <tr>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700">Product</th>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700">Status</th>
-                  <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700 hidden md:table-cell">Printify ID</th>
-                  <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700 hidden lg:table-cell">Blueprint</th>
+                  <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700 hidden md:table-cell">Printful ID</th>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-secondary-700 hidden lg:table-cell">Shipping</th>
                   <th className="text-right px-4 py-3 text-sm font-semibold text-secondary-700">Action</th>
                 </tr>
@@ -251,14 +253,9 @@ function Products() {
                       }`}>{p.status}</span>
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell">
-                      {p.printify_id
-                        ? <span className="text-xs font-mono text-secondary-500">{p.printify_id}</span>
+                      {p.printful_id
+                        ? <span className="text-xs font-mono text-secondary-500">{p.printful_id}</span>
                         : <span className="text-xs text-secondary-300 italic">Not synced</span>}
-                    </td>
-                    <td className="px-4 py-3 hidden lg:table-cell">
-                      {p.blueprint_id && p.print_provider_id
-                        ? <span className="inline-flex items-center gap-1 text-xs text-success-600"><CheckCircle size={12} />Blueprint {p.blueprint_id}</span>
-                        : <span className="inline-flex items-center gap-1 text-xs text-warning-600"><AlertTriangle size={12} />Missing</span>}
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
                       {Array.isArray(p.shipping_info?.profiles) && p.shipping_info.profiles.length > 0
@@ -296,8 +293,14 @@ function Products() {
 function ProductModal({ product, categories, onClose, onSave }: { product: Product | null; categories: Category[]; onClose: () => void; onSave: () => void }) {
   const [form, setForm] = useState({
     title: product?.title || "", description: product?.description || "",
+    short_description: product?.short_description || "",
     price: product?.price?.toString() || "", cost: product?.cost?.toString() || "0",
+    compare_at_price: product?.compare_at_price?.toString() || "",
     image_url: product?.image_url || "", category_id: product?.category_id || "",
+    brand: product?.brand || "", product_type: product?.product_type || "",
+    slug: product?.slug || "",
+    meta_title: product?.meta_title || "", meta_description: product?.meta_description || "",
+    status: (product?.status || "draft") as import("@/types").PublicationStatus,
     featured: product?.featured || false,
     is_new_arrival: product?.is_new_arrival || false, is_trending: product?.is_trending || false,
     is_bestseller: product?.is_bestseller || false, is_on_sale: product?.is_on_sale || false,
@@ -340,7 +343,7 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
 
   const handleSave = async () => {
     setSaving(true); setError(null);
-    // Editing a synced product's text/image locks it so a Printify re-sync
+    // Editing a synced product's text/image locks it so a Printful re-sync
     // won't overwrite the curated content. New products aren't locked.
     const textChanged = !!product && (
       form.title !== (product.title || "") ||
@@ -352,8 +355,14 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
       : undefined;
     const payload = {
       title: form.title, description: form.description,
+      short_description: form.short_description || null,
       price: parseFloat(form.price) || 0, cost: parseFloat(form.cost) || 0,
+      compare_at_price: parseFloat(form.compare_at_price) || null,
       image_url: form.image_url, category_id: form.category_id || null,
+      brand: form.brand || null, product_type: form.product_type || null,
+      slug: form.slug || null,
+      meta_title: form.meta_title || null, meta_description: form.meta_description || null,
+      status: form.status,
       featured: form.featured,
       is_new_arrival: form.is_new_arrival, is_trending: form.is_trending,
       is_bestseller: form.is_bestseller, is_on_sale: form.is_on_sale,
@@ -362,6 +371,8 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
       personalization_label: form.personalization_label || null,
       images: Array.from(new Set([...(product?.images ?? []), ...(form.image_url ? [form.image_url] : [])])).filter(Boolean), updated_at: new Date().toISOString(),
       ...(updatedVariants ? { variants: updatedVariants } : {}),
+      // Set published_at on first publish
+      ...(form.status === "active" && !product?.published_at ? { published_at: new Date().toISOString() } : {}),
     };
     const result = product ? await supabase.from("products").update(payload).eq("id", product.id) : await supabase.from("products").insert({ ...payload, variants: [{ id: "S", label: "Small", color: "Default" }] });
     if (result.error) { setError(result.error.message); setSaving(false); } else { fetch("/api/revalidate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths: ["/", "/shop"] }) }); onSave(); }
@@ -429,6 +440,14 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
             <div><label className="label-text">Base Price ($)</label><input type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="input-field" placeholder="32.00" /></div>
             <div><label className="label-text">Cost ($)</label><input type="number" step="0.01" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} className="input-field" placeholder="12.50" /></div>
           </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><label className="label-text">Compare-at Price ($) <span className="text-secondary-400 font-normal text-xs">optional</span></label><input type="number" step="0.01" value={form.compare_at_price} onChange={(e) => setForm({ ...form, compare_at_price: e.target.value })} className="input-field" placeholder="" /></div>
+            <div><label className="label-text">Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as import("@/types").PublicationStatus })} className="input-field"><option value="draft">Draft</option><option value="active">Active</option><option value="archived">Archived</option></select></div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><label className="label-text">Brand <span className="text-secondary-400 font-normal text-xs">optional</span></label><input value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} className="input-field" placeholder="e.g. Body &amp; Sleeves" /></div>
+            <div><label className="label-text">Product Type <span className="text-secondary-400 font-normal text-xs">optional</span></label><input value={form.product_type} onChange={(e) => setForm({ ...form, product_type: e.target.value })} className="input-field" placeholder="e.g. hoodie, tshirt" /></div>
+          </div>
           {uniqueSizes.length > 1 && (
             <div>
               <label className="label-text">Variant Prices by Size</label>
@@ -482,8 +501,8 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
               <span className="flex items-center gap-2">
                 <Lock size={14} className={form.content_locked ? "text-warning-500" : "text-secondary-400"} />
                 {form.content_locked
-                  ? "Content locked — title, description & image preserved on Printify re-sync."
-                  : "Content unlocked — Printify re-sync will overwrite title, description & image."}
+                  ? "Content locked — title, description & image preserved on Printful re-sync."
+                  : "Content unlocked — Printful re-sync will overwrite title, description & image."}
               </span>
               <button type="button" onClick={() => setForm({ ...form, content_locked: !form.content_locked })} className="underline font-medium flex-shrink-0">
                 {form.content_locked ? "Unlock" : "Lock"}
@@ -492,7 +511,7 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
           ) : (
             <div className="bg-secondary-50 border border-secondary-100 text-secondary-500 rounded-lg p-3 text-sm flex items-center gap-2">
               <Lock size={14} className="text-secondary-400" />
-              New products are not linked to Printify — no sync lock needed.
+              New products are not linked to Printful — no sync lock needed.
             </div>
           )}
           <div className="border-t border-secondary-100 pt-4">
@@ -507,6 +526,15 @@ function ProductModal({ product, categories, onClose, onSave }: { product: Produ
                 <p className="text-xs text-secondary-400 mt-1">This label appears above the text input on the product page.</p>
               </div>
             )}
+          </div>
+          <div className="border-t border-secondary-100 pt-4 space-y-3">
+            <p className="text-xs font-semibold text-secondary-500 uppercase tracking-wide">SEO &amp; URL</p>
+            <div>
+              <label className="label-text">URL Slug <span className="text-secondary-400 font-normal text-xs">— changing this breaks existing links</span></label>
+              <input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") })} className="input-field font-mono text-sm" placeholder="auto-generated-from-title" />
+            </div>
+            <div><label className="label-text">Meta Title <span className="text-secondary-400 font-normal text-xs">fallback: title</span></label><input value={form.meta_title} onChange={(e) => setForm({ ...form, meta_title: e.target.value })} className="input-field" maxLength={70} placeholder={form.title} /></div>
+            <div><label className="label-text">Meta Description <span className="text-secondary-400 font-normal text-xs">fallback: description</span></label><textarea value={form.meta_description} onChange={(e) => setForm({ ...form, meta_description: e.target.value })} className="input-field" rows={2} maxLength={160} placeholder="" /></div>
           </div>
           {error && <div className="bg-error-50 border border-error-100 text-error-700 rounded-lg p-3 text-sm">{error}</div>}
         </div>

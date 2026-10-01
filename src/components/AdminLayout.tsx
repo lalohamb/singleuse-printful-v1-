@@ -2,7 +2,7 @@
 import { type ReactNode, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingBag, LogOut, Menu, FolderTree, ExternalLink, Mail, CreditCard, Send, Search, Truck, Image, FileText, AlertTriangle, Palette, Home, Users, PanelBottom, Plug, Share2, Megaphone, Store, Sparkles, BarChart3, Heart, BookOpen, MessageCircle, Link2, DollarSign, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag, LogOut, Menu, FolderTree, ExternalLink, Mail, CreditCard, Send, Search, Truck, Image, FileText, AlertTriangle, Palette, Home, Users, PanelBottom, Plug, Share2, Megaphone, Store, Sparkles, BarChart3, Heart, BookOpen, MessageCircle, Link2, DollarSign, ShieldCheck, Wand2 } from "lucide-react";
 import { useAdminAuth } from "@/lib/admin-auth";
 import { supabase } from "@/lib/supabase";
 import { resolveStorageUrl } from "@/lib/storage";
@@ -11,8 +11,9 @@ import AppImage from "@/components/AppImage";
 const navItems = [
   { path: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { path: "/admin/products", label: "Products", icon: Package },
+  { path: "/admin/catalog-builder", label: "Catalog Builder", icon: Wand2 },
   { path: "/admin/categories", label: "Categories", icon: FolderTree },
-  { path: "/admin/orders", label: "Orders - Printify", icon: ShoppingBag },
+  { path: "/admin/orders", label: "Orders - Printful", icon: ShoppingBag },
   { path: "/admin/customers", label: "Customers", icon: Users },
   { path: "/admin/affiliates", label: "Affiliates", icon: Link2 },
   { path: "/admin/affiliates/payouts", label: "Affiliate Payouts", icon: DollarSign },
@@ -143,7 +144,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             })}
           </div>
           <a href="/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-secondary-400 hover:bg-secondary-800 hover:text-white transition-colors"><ExternalLink size={18} />View Store</a>
-          <a href="https://bulk-pod-product-creator.com/?blog_post=how_to_create_POD_products_via_the_printify_API" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-secondary-400 hover:bg-secondary-800 hover:text-white transition-colors"><ExternalLink size={18} />Bulk Product</a>
+          <a href="https://bulk-pod-product-creator.com/?blog_post=how_to_create_POD_products_via_the_printful_API" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-secondary-400 hover:bg-secondary-800 hover:text-white transition-colors"><ExternalLink size={18} />Bulk Product</a>
         </nav>
         <div className="p-4 border-t border-secondary-700 flex-shrink-0">
           <div className="flex items-center gap-3 mb-3">
@@ -161,7 +162,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         <header className="bg-white border-b border-secondary-100 sticky top-0 z-30 flex-shrink-0">
           <div className="flex items-center gap-3">
             <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 text-secondary-700"><Menu size={24} /></button>
-            <h1 className={`text-lg font-semibold ${pathname === "/admin/danger" ? "text-red-600" : "text-secondary-900"}`}>{navItems.find((n) => pathname === n.path)?.label || settingsItems.find((n) => pathname === n.path)?.label || "Admin"}</h1>
+            <h1 className={`text-lg font-semibold ${pathname === "/admin/danger" ? "text-red-600" : "text-secondary-900"}`}>{navItems.find((n) => pathname.startsWith(n.path))?.label || settingsItems.find((n) => pathname === n.path)?.label || "Admin"}</h1>
             {pathname === "/admin/dashboard" && ordersPaused !== null && (
               <span className={`text-sm font-semibold ${ordersPaused ? "text-red-500" : "text-green-500"}`}>
                 {ordersPaused ? "orders paused" : "orders open"}
