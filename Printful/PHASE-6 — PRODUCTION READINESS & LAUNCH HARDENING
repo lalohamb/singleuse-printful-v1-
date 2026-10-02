@@ -1,0 +1,1404 @@
+# PHASE 6 — PRODUCTION READINESS & LAUNCH HARDENING
+
+## ROLE
+
+Act as a senior ecommerce production-readiness, payments, fulfillment,
+reliability, and security engineer.
+
+You are working inside an EXISTING Next.js + Supabase + Stripe + Printful
+POD storefront.
+
+The commerce architecture is already built.
+
+DO NOT redesign it.
+
+DO NOT replace working architecture simply because another architecture
+might also work.
+
+Your task is:
+
+PHASE 6 — PRODUCTION READINESS & LAUNCH HARDENING
+
+The objective is to determine whether this application can safely accept
+REAL customer orders and prepare it for ONE controlled real production
+order.
+
+This phase is NOT authorization to manufacture a real order.
+
+--------------------------------------------------
+CURRENT VERIFIED BASELINE
+--------------------------------------------------
+
+Phase 5.2 completed successfully.
+
+Verified:
+
+PHASE 5.2 CONTROLLED END-TO-END ORDER VERIFICATION: COMPLETE
+STRIPE → PRINTFUL END-TO-END LIVE TEST: PASS
+WEBHOOK IDEMPOTENCY LIVE TEST: PASS
+CHECKOUT → ORDER RECOVERY SAFETY: PASS
+READY FOR PRODUCTION-READINESS HARDENING: YES
+
+Regression baseline:
+
+TypeScript: PASS
+Tests:      470/470 PASS
+Build:      PASS
+
+The following real TEST-mode chain has already been proven:
+
+Storefront
+  ↓
+Store Variant UUID
+  ↓
+Server-authoritative pricing
+  ↓
+Immutable fulfillment snapshot
+  ↓
+Stripe TEST Checkout
+  ↓
+Stripe TEST payment
+  ↓
+Real signed Stripe webhook
+  ↓
+Local paid order
+  ↓
+DIRECT_CATALOG_ORDER
+  ↓
+Real Printful draft
+  ↓
+Idempotency verification
+  ↓
+Draft canceled
+
+DO NOT repeat Phase 5.2 merely to prove this architecture again unless a
+Phase 6 change materially affects the transaction path.
+
+--------------------------------------------------
+ARCHITECTURE THAT MUST REMAIN
+--------------------------------------------------
+
+For:
+
+catalog_source = catalog_builder
+
+fulfillment strategy remains:
+
+DIRECT_CATALOG_ORDER
+
+Catalog Builder products:
+
+products.printful_id = NULL
+
+Fulfillment uses:
+
+Store Variant UUID
+   ↓
+Frozen fulfillment snapshot
+   ↓
+Printful Catalog Variant ID
++ manufacturing artwork
++ placement
++ technique
++ provider options
+   ↓
+Printful Orders API
+
+DO NOT create Printful Sync Products or Sync Variants for Catalog Builder
+products.
+
+Legacy:
+
+catalog_source = printful_sync
+
+must continue to use its existing compatible behavior.
+
+--------------------------------------------------
+PHASE 5.2 VERIFIED FIXES
+--------------------------------------------------
+
+Preserve both fixes discovered during Phase 5.2.
+
+1. PRINTFUL EXTERNAL ID
+
+Printful external_id has a 32-character limit.
+
+Current implementation:
+
+so-<29 UUID characters with dashes removed>
+
+Example:
+
+so-35f1853d68d7448191c2ca36e81bb
+
+DO NOT revert to:
+
+store-order-<full UUID>
+
+2. CHECKOUT/ORDER RECOVERY
+
+If Stripe Checkout Session creation succeeds but local order insertion
+fails, checkout.session.completed can reconstruct a paid local order from
+Stripe session metadata.
+
+Recovered orders use:
+
+status = paid
+fulfillment_status = needs_admin_review
+
+Do NOT silently lose paid orders.
+
+Do NOT reconstruct an immutable manufacturing snapshot from current
+product state if the original snapshot does not exist.
+
+--------------------------------------------------
+CORE SAFETY RULE
+--------------------------------------------------
+
+During Phase 6:
+
+PRINTFUL_AUTO_CONFIRM MUST REMAIN FALSE.
+
+Do not manufacture anything.
+
+Do not enable automatic Printful confirmation.
+
+Do not perform the first real production order during this phase.
+
+Phase 6 prepares the system for that test.
+
+--------------------------------------------------
+PRIMARY OBJECTIVE
+--------------------------------------------------
+
+Audit and harden the complete production lifecycle:
+
+Customer
+   ↓
+Storefront
+   ↓
+Cart
+   ↓
+Checkout
+   ↓
+Payment
+   ↓
+Order
+   ↓
+Fulfillment
+   ↓
+Failure handling
+   ↓
+Admin visibility
+   ↓
+Cancellation/refund
+   ↓
+Provider status
+   ↓
+Customer communication
+
+At the end of Phase 6 we need a defensible answer to:
+
+"Can we safely conduct ONE controlled real-money, real-manufacturing
+production order?"
+
+--------------------------------------------------
+PART A — FULL REPOSITORY INSPECTION
+--------------------------------------------------
+
+STEP 1 — INSPECT BEFORE MODIFYING
+
+Inspect the actual current repository.
+
+Identify all code related to:
+
+- checkout
+- cart
+- orders
+- Stripe
+- Stripe webhook
+- Printful
+- fulfillment
+- order status
+- refunds
+- cancellation
+- customer email
+- shipping
+- taxes
+- admin order management
+- logging
+- error handling
+- environment configuration
+- product artwork
+- fulfillment snapshots
+
+Do not assume features exist because they would normally exist in an
+ecommerce application.
+
+Produce an initial:
+
+PRODUCTION READINESS GAP ANALYSIS
+
+Classify each item:
+
+READY
+PARTIAL
+MISSING
+BLOCKER
+NOT REQUIRED FOR INITIAL LAUNCH
+
+Do not implement speculative features before determining whether they are
+actually needed.
+
+--------------------------------------------------
+PART B — ORDER STATE MODEL
+--------------------------------------------------
+
+STEP 2 — AUDIT ORDER STATES
+
+Determine the actual states currently supported.
+
+Separate:
+
+PAYMENT STATE
+
+from:
+
+FULFILLMENT STATE
+
+from:
+
+PROVIDER STATE
+
+Do not collapse these concepts.
+
+Example conceptual model:
+
+payment:
+pending
+paid
+failed
+refunded
+partially_refunded
+
+fulfillment:
+pending
+needs_admin_review
+submitted
+draft
+confirmed
+in_production
+shipped
+delivered
+failed
+canceled
+
+These names are examples.
+
+Use existing repository terminology where reasonable.
+
+Do not create unnecessary state complexity.
+
+STEP 3 — STATE TRANSITION AUDIT
+
+Document permitted transitions.
+
+Example:
+
+pending
+  ↓
+paid
+  ↓
+fulfillment pending
+  ↓
+Printful draft
+  ↓
+manual review
+  ↓
+confirmed
+  ↓
+production
+  ↓
+shipped
+
+Also analyze failure paths:
+
+payment failed
+
+payment succeeded / fulfillment failed
+
+payment succeeded / missing snapshot
+
+Printful unavailable
+
+Printful rejects item
+
+Printful order canceled
+
+customer refund
+
+provider cancellation
+
+duplicate webhook
+
+provider status update failure
+
+Determine whether any current state can become silently stuck.
+
+--------------------------------------------------
+PART C — ADMIN ORDER OPERATIONS
+--------------------------------------------------
+
+STEP 4 — AUDIT ADMIN ORDER VISIBILITY
+
+An administrator must be able to identify:
+
+Order UUID
+customer email
+payment state
+Stripe session/payment reference
+order total
+items
+store variant
+fulfillment strategy
+snapshot state
+Printful order ID
+Printful fulfillment state
+provider error
+needs_admin_review state
+created time
+updated time
+
+Determine what already exists.
+
+Do not rebuild an admin dashboard unnecessarily.
+
+STEP 5 — NEEDS_ADMIN_REVIEW
+
+The crash-recovery path now produces:
+
+fulfillment_status = needs_admin_review
+
+Verify administrators can actually FIND these orders.
+
+If not, add the smallest safe mechanism required.
+
+At minimum there must be a reliable way to identify:
+
+needs_admin_review
+
+orders.
+
+STEP 6 — FAILED FULFILLMENT
+
+Verify an administrator can identify orders where:
+
+payment = paid
+
+but:
+
+fulfillment = failed
+
+This condition must never disappear into logs only.
+
+If necessary, implement minimal admin visibility.
+
+--------------------------------------------------
+PART D — PRINTFUL SUBMISSION STATE
+--------------------------------------------------
+
+STEP 7 — AUDIT PROVIDER SUBMISSION
+
+Inspect how the application transitions from:
+
+paid
+→ Printful submission
+→ Printful draft
+
+Verify:
+
+- deterministic external_id
+- printful_order_id persistence
+- duplicate protection
+- OR-13 recovery
+- provider errors recorded
+- fulfillment status updated
+- paid state preserved when fulfillment fails
+
+STEP 8 — CONCURRENCY
+
+Review the current duplicate protection.
+
+Phase 5.2 verified one provider order during replay.
+
+Do not overclaim mathematically exact-once semantics.
+
+Determine whether protection is:
+
+application guard
++
+Printful external_id uniqueness
++
+OR-13 recovery
+
+If so, describe it accurately as duplicate-resistant/provider-unique with
+recovery.
+
+If an inexpensive database-level improvement materially strengthens this
+without redesigning the system, implement it.
+
+Otherwise document the current guarantee accurately.
+
+--------------------------------------------------
+PART E — PRINTFUL CONFIRMATION POLICY
+--------------------------------------------------
+
+STEP 9 — KEEP AUTO-CONFIRM OFF
+
+Required:
+
+PRINTFUL_AUTO_CONFIRM=false
+
+for initial production launch.
+
+The first real production orders should NOT immediately enter
+manufacturing from the payment webhook.
+
+Expected initial workflow:
+
+Customer pays
+   ↓
+Local paid order
+   ↓
+Printful DRAFT
+   ↓
+Admin review
+   ↓
+Manual confirmation
+   ↓
+Production
+
+STEP 10 — MANUAL CONFIRMATION
+
+Determine whether the current system provides a safe way for an
+administrator to confirm a Printful draft.
+
+If already present:
+
+audit it.
+
+If absent:
+
+implement the smallest safe admin operation required for controlled
+production confirmation.
+
+Requirements:
+
+- admin-only
+- explicit action
+- order must be paid
+- Printful order ID must exist
+- provider status must be draft
+- immutable snapshot must exist for normal Catalog Builder orders
+- confirmation must require deliberate action
+- confirmation must not occur on ordinary page load
+- duplicate clicks must not create another provider order
+- record confirmation result
+
+Do NOT execute the action against a real production order during Phase 6.
+
+--------------------------------------------------
+PART F — CANCELLATION
+--------------------------------------------------
+
+STEP 11 — AUDIT CANCELLATION
+
+Determine what happens when an order needs to be canceled:
+
+before Printful submission
+
+after Printful draft
+
+after Printful confirmation
+
+after production begins
+
+Do not assume Printful permits cancellation at every state.
+
+Document provider limitations.
+
+STEP 12 — LOCAL/PROVIDER CONSISTENCY
+
+If a Printful draft is canceled, local state should not continue implying
+active fulfillment.
+
+Determine whether reconciliation exists.
+
+Implement the minimum safe state handling if missing.
+
+--------------------------------------------------
+PART G — REFUNDS
+--------------------------------------------------
+
+STEP 13 — AUDIT STRIPE REFUND SUPPORT
+
+Determine whether the application currently supports:
+
+full refund
+
+partial refund
+
+no refund functionality
+
+Do not implement refunds until the existing architecture is understood.
+
+STEP 14 — PAYMENT VS FULFILLMENT
+
+A refund must not automatically imply that a Printful order can still be
+canceled.
+
+Treat these independently:
+
+Stripe refund
+Printful cancellation
+
+Develop/document safe behavior for combinations such as:
+
+refund before Printful confirmation
+
+refund after Printful confirmation
+
+refund after production
+
+refund after shipment
+
+For initial launch, an admin-assisted workflow is acceptable if clearly
+visible and safe.
+
+We do NOT need enterprise automation merely to launch.
+
+--------------------------------------------------
+PART H — SHIPPING
+--------------------------------------------------
+
+STEP 15 — AUDIT SHIPPING CHARGES
+
+Phase 5.2 charged:
+
+Store product:
+$34.99
+
+Customer shipping:
+$4.95
+
+Total:
+$39.94
+
+Printful shipping:
+$4.95
+
+Verify where the storefront shipping price comes from.
+
+Determine whether it is:
+
+hardcoded
+configured
+calculated
+queried from Printful
+or another mechanism.
+
+Identify risk of customer shipping charge diverging materially from
+provider shipping cost.
+
+STEP 16 — SHIPPING POLICY
+
+Determine the minimum viable production policy.
+
+Examples:
+
+fixed US shipping
+provider-derived shipping
+free shipping incorporated into product price
+
+Do not change pricing strategy unless required for correctness.
+
+Document the current implementation.
+
+--------------------------------------------------
+PART I — TAX
+--------------------------------------------------
+
+STEP 17 — AUDIT TAX HANDLING
+
+Phase 5.2 showed:
+
+customer charged:
+$39.94
+
+Printful fulfillment tax:
+$0.44
+
+Do not assume Printful's tax obligation and the storefront's sales-tax
+obligation are the same thing.
+
+Inspect current Stripe/store tax implementation.
+
+Determine:
+
+- whether customer sales tax is being calculated
+- whether Stripe Tax is enabled
+- whether tax is currently zero
+- whether tax configuration is intentionally absent
+- whether launch requires business/tax configuration outside the codebase
+
+Do not invent tax rules.
+
+Do not provide legal/tax conclusions.
+
+Identify technical configuration and operational dependencies.
+
+If tax configuration requires business decisions, mark:
+
+BUSINESS CONFIGURATION REQUIRED
+
+rather than fabricating implementation assumptions.
+
+--------------------------------------------------
+PART J — CUSTOMER EMAIL
+--------------------------------------------------
+
+STEP 18 — AUDIT ORDER EMAILS
+
+Determine whether customer receives:
+
+payment/order confirmation
+
+fulfillment failure notification
+
+shipping notification
+
+cancellation notification
+
+refund notification
+
+Do not require all of these for the first controlled production test.
+
+For initial production readiness, at minimum ensure the operator has a
+reliable order record even if customer email automation is incomplete.
+
+Classify missing email features as:
+
+LAUNCH BLOCKER
+
+or:
+
+POST-LAUNCH ENHANCEMENT
+
+with justification.
+
+--------------------------------------------------
+PART K — PRINTFUL STATUS SYNCHRONIZATION
+--------------------------------------------------
+
+STEP 19 — INSPECT PROVIDER STATUS UPDATES
+
+Determine whether Printful webhooks/status synchronization currently
+exist.
+
+Need eventual awareness of states such as:
+
+draft
+pending
+in production
+shipped
+failed
+canceled
+
+Use actual Printful API/webhook terminology.
+
+STEP 20 — MINIMUM LAUNCH REQUIREMENT
+
+For the FIRST controlled real production order, manual provider status
+inspection may be acceptable.
+
+For customer launch, determine whether automatic provider status
+synchronization is required.
+
+If required, implement only the minimum reliable mechanism.
+
+Do not build a large logistics platform.
+
+--------------------------------------------------
+PART L — ARTWORK PRODUCTION QUALITY
+--------------------------------------------------
+
+STEP 21 — REPLACE TEST ARTWORK ASSUMPTION
+
+Phase 5.2 explicitly found:
+
+existing artwork was accepted by Printful
+
+BUT
+
+acceptance does not prove production print quality.
+
+The test artwork originated from earlier embroidery/mockup testing.
+
+Before any real manufacturing order:
+
+verify the intended production artwork for the chosen real test product.
+
+STEP 22 — ARTWORK VALIDATION
+
+Determine:
+
+pixel dimensions
+print area
+effective DPI
+transparency where applicable
+aspect ratio
+placement
+technique
+
+Use Printful's current requirements for the actual product/placement.
+
+Do not simply apply a generic DPI number to every product.
+
+If production artwork does not meet requirements:
+
+BLOCK real manufacturing.
+
+Do not modify artwork automatically unless explicitly required.
+
+--------------------------------------------------
+PART M — PRODUCTION STRIPE CONFIGURATION
+--------------------------------------------------
+
+IMPORTANT:
+
+DO NOT switch the application to live Stripe mode during this phase unless
+explicitly instructed after the readiness audit.
+
+STEP 23 — AUDIT LIVE CONFIGURATION CAPABILITY
+
+Verify the application can separately store/configure:
+
+Stripe TEST secret
+Stripe TEST webhook secret
+
+Stripe LIVE secret
+Stripe LIVE webhook secret
+
+and switch modes deliberately.
+
+STEP 24 — PREVENT MIXED ENVIRONMENTS
+
+Verify it is impossible or detectably invalid to accidentally combine:
+
+sk_live_ + test webhook
+
+or:
+
+sk_test_ + live webhook
+
+or other mixed configuration.
+
+Add validation if necessary.
+
+Never print complete keys.
+
+STEP 25 — WEBHOOK REGISTRATION CHECKLIST
+
+Prepare exact deployment checklist for:
+
+LIVE Stripe webhook endpoint
+
+Expected deployed endpoint currently follows the application's
+stripe-webhook edge function.
+
+Document required event subscriptions based on ACTUAL code.
+
+Do not subscribe to dozens of events that the application doesn't use.
+
+--------------------------------------------------
+PART N — PRODUCTION PRINTFUL CONFIGURATION
+--------------------------------------------------
+
+STEP 26 — VERIFY PROVIDER ACCOUNT
+
+Confirm current Printful token/account/store configuration used by the
+application.
+
+Do not expose token.
+
+Verify Catalog Builder direct fulfillment does not depend on a Sync
+Product.
+
+STEP 27 — AUTO-CONFIRM
+
+Production initial state must be:
+
+PRINTFUL_AUTO_CONFIRM=false
+
+This is intentional.
+
+The first real order must stop at:
+
+Printful DRAFT
+
+for human review.
+
+--------------------------------------------------
+PART O — ENVIRONMENT CONFIGURATION AUDIT
+--------------------------------------------------
+
+STEP 28 — CREATE ENVIRONMENT MATRIX
+
+Create a sanitized matrix such as:
+
+VARIABLE / CONFIG              TEST      PRODUCTION
+---------------------------------------------------
+Stripe secret                  SET       ?
+Stripe webhook secret          SET       ?
+Stripe mode                    test      ?
+Printful token                 SET       ?
+Printful auto confirm          false     false
+Supabase URL                   SET       SET
+Supabase service credentials   SET       SET
+Store URL                      SET       SET
+Email provider                 ?         ?
+etc.
+
+Do not include secret values.
+
+Use:
+
+SET
+MISSING
+NOT REQUIRED
+NEEDS REVIEW
+
+STEP 29 — FAIL-CLOSED REVIEW
+
+For critical missing production configuration, verify application behavior
+fails closed rather than:
+
+charging incorrectly
+submitting fulfillment incorrectly
+exposing secrets
+silently dropping orders
+
+--------------------------------------------------
+PART P — OBSERVABILITY
+--------------------------------------------------
+
+STEP 30 — AUDIT LOGGING
+
+Determine whether operators can diagnose:
+
+Stripe webhook failure
+missing local order recovery
+Printful rejection
+OR-13 recovery
+missing snapshot
+invalid snapshot
+provider timeout
+Printful draft creation
+Printful confirmation
+refund failure
+cancellation failure
+
+Do not log:
+
+secret keys
+tokens
+full payment credentials
+
+STEP 31 — ADMIN ATTENTION CONDITIONS
+
+Define conditions requiring human attention.
+
+At minimum consider:
+
+paid + needs_admin_review
+
+paid + fulfillment failed
+
+Printful ID missing after expected submission
+
+provider status failed
+
+refund/cancellation mismatch
+
+The application needs a reliable method to surface these.
+
+A simple admin queue/filter is acceptable.
+
+--------------------------------------------------
+PART Q — DATABASE INTEGRITY
+--------------------------------------------------
+
+STEP 32 — AUDIT CONSTRAINTS
+
+Inspect important uniqueness/foreign-key constraints.
+
+Pay particular attention to:
+
+stripe_session_id
+
+Printful external_id representation if stored
+
+store variant UUID
+
+product/provider mapping
+
+orders.printful_order_id
+
+Determine whether duplicate Stripe session order creation is prevented at
+the DB layer.
+
+If stripe_session_id is not UNIQUE and making it unique is safe with
+existing data:
+
+add an appropriate migration.
+
+Before adding it:
+
+scan existing rows for duplicates.
+
+Do not blindly create a unique constraint against dirty data.
+
+STEP 33 — RECOVERY IDEMPOTENCY
+
+Verify concurrent webhook deliveries cannot create multiple recovered
+orders for the same Stripe session.
+
+Preferred invariant:
+
+ONE Stripe Checkout Session
+        ↓
+AT MOST ONE local order
+
+Enforce at the strongest practical layer.
+
+--------------------------------------------------
+PART R — SECURITY REVIEW
+--------------------------------------------------
+
+STEP 34 — REVERIFY
+
+Confirm:
+
+Stripe secret server-only
+Stripe webhook secret server-only
+Printful token server-only
+Supabase service role server-only
+server-authoritative price
+trusted artwork
+Stripe signature verification
+admin routes protected
+manual fulfillment confirmation protected
+refund operations protected
+cancellation operations protected
+
+STEP 35 — CLIENT TRUST BOUNDARY
+
+Browser may provide:
+
+product UUID
+variant UUID
+quantity
+shipping/customer inputs
+
+Browser must NOT be authoritative for:
+
+retail price
+Printful catalog variant
+manufacturing artwork
+Printful order ID
+payment state
+fulfillment state
+admin actions
+
+--------------------------------------------------
+PART S — TEST CLEANUP
+--------------------------------------------------
+
+STEP 36 — REVIEW PHASE 5.2 TEST DATA
+
+Phase 5.2 report showed substantial test data:
+
+orders before: 15
+orders after: 41
+Stripe TEST sessions: 41
+all livemode=false
+
+Do not blindly delete test records.
+
+Determine whether they are clearly distinguishable from production data.
+
+If necessary, add a safe mechanism such as:
+
+livemode flag
+test marker
+admin filtering
+
+Production reporting must not accidentally count test orders as real
+sales.
+
+Do not destroy useful audit evidence without a reason.
+
+--------------------------------------------------
+PART T — REGRESSION TESTS
+--------------------------------------------------
+
+STEP 37 — TEST NEW SAFETY BEHAVIOR
+
+Add tests only for meaningful Phase 6 changes.
+
+Potential coverage:
+
+recovered order uniqueness
+
+needs_admin_review visibility
+
+manual Printful confirmation authorization
+
+confirmation preconditions
+
+cancellation state
+
+refund state
+
+live/test Stripe configuration validation
+
+test-order filtering
+
+failure visibility
+
+Do not write fake tests solely to increase the count.
+
+STEP 38 — FULL REGRESSION
+
+Run:
+
+npx tsc --noEmit
+npx vitest run
+npm run build
+
+and lint if configured.
+
+Required:
+
+TypeScript: PASS
+Tests: >= 470
+All tests: PASS
+Build: PASS
+
+--------------------------------------------------
+PART U — CONTROLLED PRODUCTION TEST PLAN
+--------------------------------------------------
+
+STEP 39 — DO NOT EXECUTE YET
+
+Create the plan for the first real production test.
+
+Do NOT perform it during Phase 6.
+
+The later controlled test should be:
+
+Real production-quality product
+        ↓
+Real storefront
+        ↓
+Real payment
+        ↓
+Real signed LIVE Stripe webhook
+        ↓
+Local paid order
+        ↓
+Immutable snapshot
+        ↓
+Printful DRAFT
+        ↓
+STOP
+        ↓
+Admin manually verifies:
+  product
+  variant
+  quantity
+  artwork
+  placement
+  technique
+  recipient
+  retail amount
+  fulfillment cost
+        ↓
+Explicit manual confirmation
+        ↓
+Printful production
+        ↓
+Shipping
+        ↓
+Physical delivery
+        ↓
+Inspect actual product
+
+The first production order must remain manually gated.
+
+--------------------------------------------------
+PART V — GO/NO-GO GATES
+--------------------------------------------------
+
+Before recommending the controlled real production test, all CRITICAL
+items must pass.
+
+Required gates:
+
+[ ] Paid order cannot silently disappear
+
+[ ] Recovered paid order is visible to admin
+
+[ ] One Stripe session cannot create duplicate local orders
+
+[ ] Printful duplicate protection remains intact
+
+[ ] Catalog Builder uses DIRECT_CATALOG_ORDER
+
+[ ] Catalog Builder printful_id remains NULL
+
+[ ] No Sync Product/Variant required
+
+[ ] PRINTFUL_AUTO_CONFIRM=false
+
+[ ] Manual Printful confirmation path is safe
+
+[ ] Failed fulfillment visible to admin
+
+[ ] Production-quality artwork verified for test item
+
+[ ] Stripe live configuration procedure verified
+
+[ ] Live webhook registration procedure verified
+
+[ ] Test/live configuration cannot be accidentally mixed
+
+[ ] Critical secrets remain server-side
+
+[ ] Refund/cancellation operational procedure documented
+
+[ ] Shipping configuration reviewed
+
+[ ] Tax configuration status explicitly identified
+
+[ ] Test orders distinguishable from production
+
+[ ] TypeScript PASS
+
+[ ] All tests PASS
+
+[ ] Production build PASS
+
+--------------------------------------------------
+IMPORTANT SCOPE RULE
+--------------------------------------------------
+
+Do not turn every missing ecommerce convenience into a launch blocker.
+
+Separate findings into:
+
+CRITICAL BEFORE FIRST REAL ORDER
+
+REQUIRED BEFORE PUBLIC LAUNCH
+
+POST-LAUNCH ENHANCEMENT
+
+Examples of features that may be post-launch depending on existing
+implementation:
+
+advanced analytics
+automated marketing
+complex promotions
+customer self-service returns
+advanced inventory reporting
+multi-provider fulfillment
+complex shipping optimization
+advanced email journeys
+
+Our goal is a SAFE INITIAL STORE, not an enterprise ecommerce platform.
+
+--------------------------------------------------
+REQUIRED REPORT
+--------------------------------------------------
+
+Create:
+
+PHASE-6-PRODUCTION-READINESS-AND-LAUNCH-HARDENING-REPORT.md
+
+Do not overwrite Phase 5.2 or earlier reports.
+
+--------------------------------------------------
+REPORT STRUCTURE
+--------------------------------------------------
+
+1. Executive Summary
+
+2. Phase 5.2 Verified Baseline
+
+3. Initial Production Readiness Gap Analysis
+
+4. Payment State Model
+
+5. Fulfillment State Model
+
+6. Order Recovery
+
+7. Database Idempotency
+
+8. Admin Order Visibility
+
+9. needs_admin_review Workflow
+
+10. Failed Fulfillment Visibility
+
+11. Printful Submission Safety
+
+12. Printful Manual Confirmation
+
+13. Cancellation Handling
+
+14. Refund Handling
+
+15. Shipping Review
+
+16. Tax Configuration Review
+
+17. Customer Communications
+
+18. Printful Status Synchronization
+
+19. Production Artwork Validation
+
+20. Stripe Production Configuration
+
+21. Stripe Webhook Production Configuration
+
+22. Printful Production Configuration
+
+23. Environment Matrix
+
+24. Logging & Observability
+
+25. Security Review
+
+26. Test Data / Production Data Separation
+
+27. Database Changes
+
+28. Code Changes
+
+29. Automated Tests
+
+30. Build Verification
+
+31. Remaining Risks
+
+32. Controlled First Production Order Plan
+
+33. Production Readiness Matrix
+
+34. Final Decision
+
+--------------------------------------------------
+REQUIRED PRODUCTION READINESS MATRIX
+--------------------------------------------------
+
+Include:
+
+| Gate | Result | Severity | Notes |
+|---|---|---|---|
+| Paid order recovery | PASS/FAIL | Critical | |
+| Recovered order admin visibility | PASS/FAIL | Critical | |
+| Stripe session uniqueness | PASS/FAIL | Critical | |
+| Printful duplicate protection | PASS/FAIL | Critical | |
+| Immutable snapshot | PASS/FAIL | Critical | |
+| Direct Catalog fulfillment | PASS/FAIL | Critical | |
+| Auto-confirm disabled | PASS/FAIL | Critical | |
+| Manual fulfillment confirmation | PASS/FAIL | Critical | |
+| Fulfillment failure visibility | PASS/FAIL | Critical | |
+| Production artwork | PASS/FAIL | Critical | |
+| Stripe live configuration readiness | PASS/FAIL | Critical | |
+| Live webhook readiness | PASS/FAIL | Critical | |
+| Environment isolation | PASS/FAIL | Critical | |
+| Secret protection | PASS/FAIL | Critical | |
+| Cancellation procedure | PASS/FAIL | High | |
+| Refund procedure | PASS/FAIL | High | |
+| Shipping configuration | PASS/FAIL | High | |
+| Tax configuration status | PASS/FAIL/REQUIRES BUSINESS CONFIG | High | |
+| Customer confirmation | PASS/FAIL/DEFERRED | Medium | |
+| Provider status tracking | PASS/FAIL/MANUAL | Medium | |
+| Test data separation | PASS/FAIL | High | |
+| TypeScript | PASS/FAIL | Critical | |
+| Automated tests | PASS/FAIL | Critical | |
+| Production build | PASS/FAIL | Critical | |
+
+--------------------------------------------------
+FINAL STATUS
+--------------------------------------------------
+
+End with exactly one:
+
+PHASE 6 PRODUCTION READINESS & LAUNCH HARDENING: COMPLETE
+
+or:
+
+PHASE 6 PRODUCTION READINESS & LAUNCH HARDENING: INCOMPLETE
+
+Then exactly one:
+
+CORE COMMERCE SAFETY GATE: PASS
+CORE COMMERCE SAFETY GATE: FAIL
+
+Then exactly one:
+
+PRODUCTION CONFIGURATION GATE: PASS
+PRODUCTION CONFIGURATION GATE: CONDITIONAL
+PRODUCTION CONFIGURATION GATE: FAIL
+
+Then exactly one:
+
+FIRST CONTROLLED REAL ORDER: APPROVED
+FIRST CONTROLLED REAL ORDER: NOT APPROVED
+
+Then exactly one:
+
+PUBLIC CUSTOMER LAUNCH: READY
+PUBLIC CUSTOMER LAUNCH: NOT READY
+
+--------------------------------------------------
+STOP CONDITION
+--------------------------------------------------
+
+Phase 6 does NOT authorize:
+
+PRINTFUL_AUTO_CONFIRM=true
+
+or an actual production order.
+
+If Phase 6 passes, stop and produce the report.
+
+The next phase will be the separately authorized:
+
+PHASE 7 — CONTROLLED FIRST REAL PRODUCTION ORDER
+
+That phase will be the first time we intentionally allow a real order to
+progress from:
+
+real payment
+→ Printful draft
+→ manual verification
+→ explicit production confirmation.
+
+Until then:
+
+PRINTFUL_AUTO_CONFIRM=false

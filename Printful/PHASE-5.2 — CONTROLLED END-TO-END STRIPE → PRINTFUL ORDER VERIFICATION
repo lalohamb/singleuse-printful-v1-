@@ -1,0 +1,1929 @@
+# PHASE 5.2 — CONTROLLED END-TO-END STRIPE → PRINTFUL ORDER VERIFICATION
+
+## ROLE
+
+Act as a senior commerce integration and production-readiness engineer specializing in:
+
+- Next.js 15
+- TypeScript
+- Supabase/PostgreSQL
+- Supabase Edge Functions
+- Stripe Checkout
+- Stripe webhooks
+- Printful Orders API
+- payment/fulfillment state machines
+- webhook idempotency
+- production reliability
+- POD fulfillment
+
+You are working inside an EXISTING application whose Catalog Builder, direct Printful fulfillment bridge, and fulfillment safety controls have already been implemented and tested.
+
+Your task is:
+
+> PHASE 5.2 — CONTROLLED END-TO-END STRIPE → PRINTFUL ORDER VERIFICATION
+
+This is primarily a LIVE INTEGRATION VERIFICATION PHASE.
+
+Do NOT redesign the Catalog Builder.
+
+Do NOT redesign the fulfillment architecture.
+
+Do NOT create Printful Sync Products.
+
+Do NOT confirm a Printful production order.
+
+---
+
+# PRIMARY OBJECTIVE
+
+Prove this complete deployed workflow:
+
+```text
+US Catalog Builder Product
+        ↓
+Public Storefront
+        ↓
+Store Variant UUID
+        ↓
+Cart
+        ↓
+Server-Side Price Resolution
+        ↓
+Immutable Fulfillment Snapshot
+        ↓
+Stripe TEST Checkout Session
+        ↓
+Stripe TEST Payment
+        ↓
+Real Signed Stripe Webhook
+        ↓
+Local Paid Order
+        ↓
+Stored Immutable Snapshot
+        ↓
+DIRECT_CATALOG_ORDER
+        ↓
+Real Printful DRAFT Order
+        ↓
+Verify Exact Manufacturing Item
+        ↓
+CANCEL Printful Draft
+```
+
+This must be proven as one connected application workflow.
+
+Do not substitute isolated API calls for the end-to-end test.
+
+---
+
+# CRITICAL SAFETY RULE
+
+Printful production MUST NOT be triggered.
+
+The environment must satisfy:
+
+```text
+PRINTFUL_AUTO_CONFIRM != "true"
+```
+
+Prefer explicitly:
+
+```text
+PRINTFUL_AUTO_CONFIRM=false
+```
+
+Before beginning the Stripe payment test, verify the deployed webhook actually sees the intended value.
+
+Do not rely solely on local `.env` files.
+
+---
+
+# VERIFIED BASELINE
+
+Phase 5.1A completed with:
+
+```text
+PHASE 5.1A FULFILLMENT SAFETY HARDENING: COMPLETE
+
+IMMUTABLE FULFILLMENT SAFETY GATE: PASS
+
+US CATALOG BUILDER TEST PRODUCT: READY
+
+READY FOR CONTROLLED END-TO-END STRIPE ORDER TEST: YES
+```
+
+Regression baseline:
+
+```text
+TypeScript: PASS
+Tests:      470/470 PASS
+Build:      PASS
+```
+
+Do not break this baseline.
+
+---
+
+# VERIFIED ARCHITECTURE
+
+For:
+
+```text
+catalog_source = catalog_builder
+```
+
+the fulfillment strategy is permanently:
+
+```text
+DIRECT_CATALOG_ORDER
+```
+
+The manufacturing path is:
+
+```text
+Store Variant UUID
+        ↓
+Immutable Fulfillment Snapshot
+        ↓
+Printful Catalog Variant
+        +
+Artwork
+        +
+Placement
+        +
+Technique
+        +
+Provider Options
+        ↓
+Printful Orders API
+```
+
+Catalog Builder products must remain:
+
+```text
+products.printful_id = NULL
+```
+
+Do not create:
+
+```text
+Printful Sync Product
+Printful Sync Variant
+```
+
+for them.
+
+---
+
+# VERIFIED US TEST PRODUCT
+
+Use the Phase 5.1A test product unless current provider availability has changed.
+
+```text
+Product:
+Phase 5.1A US Test Tee
+
+Blank:
+Bella+Canvas 3001 Unisex Staple T-Shirt
+
+Store Product UUID:
+5487d86f-1496-4a42-a64e-b4dc8babdefd
+
+Store Variant UUID:
+6869ca2f-25cc-4a47-a674-e57ab9391c64
+
+Printful Catalog Product:
+71
+
+Printful Catalog Variant:
+4016
+
+Variant:
+Black / S
+
+Technique:
+DTG
+
+Placement:
+front
+
+Retail Price:
+$34.99
+
+catalog_source:
+catalog_builder
+
+printful_id:
+NULL
+```
+
+Phase 5.1A verified this variant as US available.
+
+Before testing, re-check current availability because provider availability can change.
+
+---
+
+# IMPORTANT ARTWORK QUALITY DISTINCTION
+
+The existing artwork used for this test originated from earlier embroidery/mockup testing.
+
+Phase 5.1A identified a possible DTG DPI/print-quality concern.
+
+For Phase 5.2:
+
+- fulfillment API correctness may still be tested with the existing safe test artwork,
+- but DO NOT interpret Printful accepting the file as proof of production-quality artwork,
+- do not confirm production,
+- document any Printful file-quality warnings.
+
+Production artwork quality is a separate gate before a real manufactured order.
+
+---
+
+# PHASE 5.2 SUCCESS DEFINITION
+
+Phase 5.2 passes only if a REAL Stripe TEST payment causes the REAL deployed application webhook to create the correct REAL Printful DRAFT order.
+
+The following does NOT count:
+
+```text
+manual POST directly to Printful
+mocked Stripe event only
+unit-test-only proof
+manual database insertion pretending payment occurred
+calling webhook internals directly
+```
+
+The intended chain must actually execute.
+
+---
+
+# PART A — PRE-FLIGHT INSPECTION
+
+## STEP 1 — INSPECT CURRENT REPOSITORY
+
+Inspect actual current code for:
+
+```text
+cart
+checkout API / Edge Function
+stripe-checkout
+stripe-webhook
+orders
+order_items
+fulfillment_snapshot
+Printful order construction
+Printful external_id
+Printful order recovery
+PRINTFUL_AUTO_CONFIRM
+Stripe environment configuration
+```
+
+Do not rely solely on previous reports.
+
+---
+
+# STEP 2 — VERIFY TEST MODE
+
+Before doing anything involving payment, verify Stripe is in TEST MODE.
+
+Confirm from server-side configuration without exposing secret values.
+
+Record only:
+
+```text
+Stripe mode: TEST
+```
+
+Do not print secret keys.
+
+If live Stripe credentials are detected:
+
+```text
+STOP
+```
+
+Do not perform Phase 5.2.
+
+---
+
+# STEP 3 — VERIFY PRINTFUL AUTO-CONFIRM
+
+Verify the deployed webhook environment resolves:
+
+```text
+PRINTFUL_AUTO_CONFIRM=false
+```
+
+or equivalent fail-safe behavior.
+
+The test may proceed only if:
+
+```text
+Printful order confirmation = DISABLED
+```
+
+If auto-confirm is enabled:
+
+```text
+STOP
+```
+
+---
+
+# STEP 4 — VERIFY TEST PRODUCT
+
+Query the live database.
+
+Verify:
+
+```text
+product UUID
+variant UUID
+catalog_source
+printful_id
+printful_catalog_id
+printful_variant_id
+status
+retail price
+design
+artwork
+placement
+technique
+```
+
+Expected architecture:
+
+```text
+catalog_source = catalog_builder
+printful_id = NULL
+printful_catalog_id = 71
+printful_variant_id = 4016
+```
+
+---
+
+# STEP 5 — RECHECK PRINTFUL AVAILABILITY
+
+Using the current Printful API, verify catalog variant:
+
+```text
+4016
+```
+
+remains available for US fulfillment.
+
+If unavailable:
+
+DO NOT silently substitute another provider variant under the same store variant UUID.
+
+Select/create another controlled Catalog Builder test variant through the proper application workflow and document the change.
+
+---
+
+# PART B — BEFORE-STATE CAPTURE
+
+## STEP 6 — CAPTURE DATABASE STATE
+
+Before checkout, record counts/state relevant to the test:
+
+```text
+orders
+order_items
+```
+
+Also record whether any existing order already uses the intended test identifier.
+
+---
+
+# STEP 7 — CAPTURE PRINTFUL STATE
+
+Establish a deterministic test identifier.
+
+Example:
+
+```text
+phase52-e2e-<controlled-unique-id>
+```
+
+Do not use a random value that cannot later be correlated with the local order.
+
+Verify no existing active Printful order already conflicts with the intended test identity.
+
+---
+
+# PART C — CHECKOUT/ORDER ATOMICITY OBSERVATION
+
+## STEP 8 — INSPECT CURRENT CREATION ORDER
+
+Phase 5.1A identified the current sequence approximately as:
+
+```text
+Resolve Snapshot
+       ↓
+Create Stripe Checkout Session
+       ↓
+Insert Local Order
+```
+
+This has a potential crash window:
+
+```text
+Stripe Session Created
+       ↓
+process crashes
+       ↓
+Local Order Missing
+```
+
+Do not redesign this before the controlled test unless the current code cannot safely complete the test.
+
+Instead, instrument/observe the relationship.
+
+---
+
+# STEP 9 — REQUIRED IDENTIFIERS
+
+During the test capture:
+
+```text
+Store Order UUID
+
+Stripe Checkout Session ID
+
+Stripe Payment Intent ID
+if applicable
+
+Stripe Event ID
+
+Store Product UUID
+
+Store Variant UUID
+
+Printful external_id
+
+Printful Order ID
+```
+
+Redact secrets, not identifiers necessary for correlation.
+
+---
+
+# STEP 10 — VERIFY CORRELATION
+
+The final report must prove the same transaction can be followed across:
+
+```text
+Store
+→ Stripe Session
+→ Stripe Event
+→ Local Order
+→ Printful external_id
+→ Printful Order
+```
+
+---
+
+# PART D — STOREFRONT TEST
+
+## STEP 11 — USE THE REAL STOREFRONT
+
+Open the actual storefront application used for this environment.
+
+Navigate to:
+
+```text
+Phase 5.1A US Test Tee
+```
+
+Do not create the Stripe session by manually calling the checkout API unless browser/UI execution is technically impossible.
+
+The objective is to verify the customer path.
+
+---
+
+# STEP 12 — VERIFY PRODUCT PAGE
+
+Confirm:
+
+```text
+product loads
+correct title
+correct price
+correct primary image
+correct variant
+product is active
+```
+
+Record evidence.
+
+---
+
+# STEP 13 — SELECT VERIFIED VARIANT
+
+Select:
+
+```text
+Black / S
+```
+
+Store Variant UUID must resolve to:
+
+```text
+6869ca2f-25cc-4a47-a674-e57ab9391c64
+```
+
+Do not expose Printful catalog variant IDs to the browser as authoritative checkout identity.
+
+---
+
+# STEP 14 — ADD TO CART
+
+Add quantity:
+
+```text
+1
+```
+
+Verify cart stores:
+
+```text
+Store Product UUID
+Store Variant UUID
+quantity
+```
+
+not a Printful provider identifier as its authoritative identity.
+
+---
+
+# PART E — CHECKOUT INITIALIZATION
+
+## STEP 15 — INITIATE CHECKOUT THROUGH APPLICATION
+
+Use the normal storefront checkout action.
+
+The application must resolve the retail price server-side.
+
+Expected retail price:
+
+```text
+$34.99
+```
+
+unless the database has intentionally changed since Phase 5.1A.
+
+If the price changed, use the current authoritative database price and document it.
+
+---
+
+# STEP 16 — VERIFY SNAPSHOT EXISTS BEFORE PAYMENT
+
+Before completing Stripe payment, verify the order/checkout workflow has successfully frozen the manufacturing snapshot at the intended lifecycle point.
+
+Expected snapshot includes:
+
+```text
+version = 1
+
+strategy = DIRECT_CATALOG_ORDER
+
+store_product_id
+
+store_variant_id
+
+printful_catalog_product_id = 71
+
+printful_catalog_variant_id = 4016
+
+design_id
+
+artwork_url
+
+placement = front
+
+technique = DTG
+
+files
+
+options = []
+
+frozen_at
+```
+
+Do not continue if the snapshot is missing or invalid.
+
+---
+
+# STEP 17 — VERIFY NO PRINTFUL ORDER YET
+
+Before payment:
+
+```text
+Printful order created = NO
+```
+
+Checkout initialization alone must not submit fulfillment.
+
+---
+
+# PART F — STRIPE TEST PAYMENT
+
+## STEP 18 — USE STRIPE TEST PAYMENT ONLY
+
+Complete checkout using Stripe's official TEST payment mechanism.
+
+Do not use a real payment card.
+
+Do not switch Stripe to live mode.
+
+---
+
+# STEP 19 — SHIPPING ADDRESS
+
+Use controlled US test recipient data acceptable for Stripe/Printful testing.
+
+Do not use unnecessary real personal information.
+
+The address must be structurally valid enough for the integration test.
+
+---
+
+# STEP 20 — COMPLETE TEST PAYMENT
+
+Complete exactly one test checkout.
+
+Record:
+
+```text
+Stripe Checkout Session ID
+payment status
+Payment Intent ID if present
+```
+
+Do not initiate multiple customer checkouts unless required to diagnose a failure.
+
+---
+
+# PART G — REAL SIGNED WEBHOOK
+
+## STEP 21 — REQUIRE REAL STRIPE WEBHOOK DELIVERY
+
+The successful payment must trigger the configured Stripe webhook normally.
+
+Do not substitute a manually fabricated webhook request.
+
+Verify Stripe signature validation succeeds.
+
+---
+
+# STEP 22 — CAPTURE EVENT
+
+Record:
+
+```text
+Stripe event ID
+event type
+Checkout Session ID
+local order UUID
+```
+
+Do not log Stripe secrets.
+
+---
+
+# STEP 23 — VERIFY PAYMENT STATE
+
+Verify the local order transitions to the correct paid state.
+
+Payment success and fulfillment success remain separate concepts.
+
+Expected conceptual state:
+
+```text
+payment = paid
+fulfillment = pending/submitting
+```
+
+Use actual repository state names.
+
+---
+
+# PART H — VERIFY FROZEN SNAPSHOT USE
+
+## STEP 24 — PROVE WEBHOOK DID NOT RE-RESOLVE PRODUCT
+
+The webhook must use:
+
+```text
+orders.fulfillment_snapshot
+```
+
+or the repository-equivalent stored snapshot.
+
+It must NOT rebuild manufacturing configuration from current:
+
+```text
+product_designs
+designs
+products
+```
+
+for this Catalog Builder order.
+
+Record evidence from logs/code/state sufficient to prove the frozen snapshot was used.
+
+---
+
+# STEP 25 — VERIFY SNAPSHOT MATCHES PURCHASE
+
+Confirm:
+
+```text
+store_product_id =
+5487d86f-1496-4a42-a64e-b4dc8babdefd
+
+store_variant_id =
+6869ca2f-25cc-4a47-a674-e57ab9391c64
+
+printful_catalog_product_id =
+71
+
+printful_catalog_variant_id =
+4016
+
+placement =
+front
+
+technique =
+DTG
+```
+
+Also verify the expected:
+
+```text
+design
+artwork
+files
+options
+```
+
+---
+
+# PART I — PRINTFUL DRAFT CREATION
+
+## STEP 26 — VERIFY DIRECT CATALOG ORDER
+
+The webhook must construct:
+
+```text
+DIRECT_CATALOG_ORDER
+```
+
+using:
+
+```text
+variant_id = 4016
+quantity = 1
+files = [...]
+options = []
+```
+
+using the exact current provider schema.
+
+It must NOT use:
+
+```text
+sync_variant_id
+```
+
+for this Catalog Builder product.
+
+---
+
+# STEP 27 — VERIFY EXTERNAL ID
+
+Confirm Printful receives the deterministic:
+
+```text
+external_id
+```
+
+derived from the local store order.
+
+Record both values.
+
+---
+
+# STEP 28 — VERIFY DRAFT
+
+Because:
+
+```text
+PRINTFUL_AUTO_CONFIRM=false
+```
+
+the Printful order must remain:
+
+```text
+draft / unconfirmed
+```
+
+If it is confirmed:
+
+```text
+STOP
+```
+
+Treat Phase 5.2 as failed and immediately investigate without submitting anything else.
+
+---
+
+# PART J — INSPECT REAL PRINTFUL ORDER
+
+## STEP 29 — FETCH ORDER FROM PRINTFUL
+
+Retrieve the newly created Printful order using:
+
+```text
+Printful Order ID
+```
+
+and/or:
+
+```text
+external_id
+```
+
+Verify provider state.
+
+---
+
+# STEP 30 — VERIFY ITEM IDENTITY
+
+Confirm the Printful order contains exactly the expected test item:
+
+```text
+Bella+Canvas 3001
+Black / S
+Catalog Variant 4016
+Quantity 1
+```
+
+Do not accept HTTP 200 alone as proof.
+
+---
+
+# STEP 31 — VERIFY NO SYNC ID
+
+For the Catalog Builder item verify:
+
+```text
+sync_variant_id = null
+```
+
+or current API equivalent showing direct catalog construction.
+
+---
+
+# STEP 32 — VERIFY MANUFACTURING FILE
+
+Confirm the Printful item references the intended manufacturing artwork.
+
+It must NOT reference:
+
+```text
+product mockup image
+temporary Printful mockup URL
+untrusted arbitrary URL
+```
+
+---
+
+# STEP 33 — VERIFY PLACEMENT
+
+Confirm:
+
+```text
+placement/type = front
+```
+
+or the exact current Printful representation.
+
+---
+
+# STEP 34 — VERIFY TECHNIQUE
+
+Confirm the order represents the expected:
+
+```text
+DTG
+```
+
+production configuration.
+
+Do not infer technique solely from the product title.
+
+---
+
+# STEP 35 — VERIFY QUANTITY
+
+Confirm:
+
+```text
+quantity = 1
+```
+
+---
+
+# STEP 36 — VERIFY RECIPIENT
+
+Confirm the provider received the intended controlled US recipient information.
+
+Do not reproduce unnecessary address details in the final report.
+
+---
+
+# STEP 37 — RECORD COSTS
+
+If Printful returns:
+
+```text
+product
+shipping
+tax
+total
+```
+
+record them.
+
+Clearly distinguish:
+
+```text
+Store retail price
+```
+
+from:
+
+```text
+Printful fulfillment cost
+```
+
+Do not treat them as the same concept.
+
+---
+
+# PART K — LOCAL FULFILLMENT STATE
+
+## STEP 38 — VERIFY PRINTFUL ORDER ID PERSISTED
+
+The local order must store the provider order ID.
+
+Verify:
+
+```text
+orders.printful_order_id
+```
+
+or repository-equivalent equals the actual Printful order.
+
+---
+
+# STEP 39 — VERIFY FULFILLMENT STATUS
+
+Verify local fulfillment state reflects successful draft creation.
+
+Use actual repository state names.
+
+Do not report:
+
+```text
+fulfilled
+```
+
+if all that exists is a Printful draft.
+
+Use semantically accurate status.
+
+---
+
+# PART L — DUPLICATE WEBHOOK SAFETY
+
+## STEP 40 — CONTROLLED WEBHOOK REPLAY
+
+After the first workflow succeeds, safely replay/re-deliver the SAME Stripe TEST event using Stripe-supported test/retry tooling if available.
+
+Do not create another payment.
+
+The purpose is to verify idempotency of the actual deployed pipeline.
+
+---
+
+# STEP 41 — EXPECTED RESULT
+
+After replay:
+
+```text
+Local Store Orders:
+1
+
+Printful Orders for external_id:
+1
+```
+
+The webhook must not create another provider order.
+
+---
+
+# STEP 42 — VERIFY GUARD
+
+Determine which protection handled the replay:
+
+```text
+Stripe event already processed
+```
+
+and/or:
+
+```text
+printful_order_id already present
+```
+
+and/or another existing idempotency guard.
+
+Record it.
+
+---
+
+# STEP 43 — DO NOT MANUFACTURE
+
+Replay must not alter:
+
+```text
+PRINTFUL_AUTO_CONFIRM=false
+```
+
+and must not confirm the existing Printful draft.
+
+---
+
+# PART M — PRINTFUL DRAFT CLEANUP
+
+## STEP 44 — CANCEL TEST DRAFT
+
+After ALL verification evidence has been collected:
+
+cancel/delete the Printful draft using the supported Printful API.
+
+Do not cancel before recording its contents.
+
+---
+
+# STEP 45 — VERIFY CANCELED STATE
+
+Retrieve/verify the provider order after cancellation if the API supports it.
+
+Record:
+
+```text
+Printful Order ID
+final status = canceled
+```
+
+or equivalent.
+
+---
+
+# STEP 46 — DO NOT DELETE LOCAL CUSTOMER-ORDER EVIDENCE
+
+The Stripe payment is a TEST payment.
+
+Do not automatically delete the local order merely to make the database look clean.
+
+Preserve sufficient records to demonstrate the end-to-end test.
+
+If the application has an explicit test-order marker, use it.
+
+Otherwise document the order as a test record.
+
+---
+
+# PART N — CHECKOUT/ORDER CORRELATION GAP
+
+## STEP 47 — VERIFY SESSION ↔ ORDER LINK
+
+Specifically inspect the previously identified non-atomic boundary:
+
+```text
+Stripe Checkout Session
+        ↓
+Local Order
+```
+
+Verify this successful test has a one-to-one correlation.
+
+Record:
+
+```text
+Stripe Session ID
+Local Order UUID
+```
+
+---
+
+# STEP 48 — FAILURE WINDOW ANALYSIS
+
+Do NOT intentionally crash the live checkout unless there is an existing safe automated harness.
+
+Instead inspect and document what happens if:
+
+```text
+Stripe Session successfully created
+        ↓
+Local order insertion fails
+```
+
+Determine whether the application can recover using:
+
+```text
+Stripe Session metadata
+client_reference_id
+external_id
+webhook data
+```
+
+or other current identifiers.
+
+---
+
+# STEP 49 — DECISION
+
+Classify this as one of:
+
+```text
+RECOVERABLE
+```
+
+```text
+PARTIALLY RECOVERABLE
+```
+
+```text
+NOT RECOVERABLE
+```
+
+based on actual implementation.
+
+If NOT RECOVERABLE and a successful customer payment could become detached from any local order:
+
+treat this as a production-readiness blocker and recommend a narrow Phase 5.2A fix.
+
+Do not silently call the system production-ready.
+
+---
+
+# PART O — SECURITY VERIFICATION
+
+## STEP 50 — STRIPE SIGNATURE
+
+Confirm the real webhook event passed:
+
+```text
+constructEventAsync
+```
+
+or repository-equivalent signature verification.
+
+---
+
+# STEP 51 — SECRETS
+
+Verify no secret appears in:
+
+```text
+browser payload
+browser console
+report
+application response
+stored fulfillment snapshot
+```
+
+including:
+
+```text
+STRIPE_SECRET_KEY
+STRIPE_WEBHOOK_SECRET
+PRINTFUL_API_TOKEN
+SUPABASE_SERVICE_ROLE_KEY
+```
+
+---
+
+# STEP 52 — PRICE AUTHORITY
+
+Verify the final Stripe amount came from the server-side database price.
+
+The browser/cart must not have been authoritative.
+
+---
+
+# STEP 53 — ARTWORK AUTHORITY
+
+Verify the manufacturing artwork came from the frozen trusted snapshot, not customer input.
+
+---
+
+# PART P — CATALOG OWNERSHIP REGRESSION
+
+## STEP 54 — VERIFY TEST PRODUCT
+
+After the test:
+
+```text
+catalog_source = catalog_builder
+
+printful_id = NULL
+
+printful_catalog_id = 71
+```
+
+must remain true.
+
+---
+
+# STEP 55 — VERIFY NO SYNC PRODUCT
+
+Confirm:
+
+```text
+Printful Sync Products created:
+0
+
+Printful Sync Variants created:
+0
+```
+
+during Phase 5.2.
+
+---
+
+# STEP 56 — EXISTING SYNC PRODUCT
+
+Verify the existing quarter-zip remains unchanged:
+
+```text
+Product UUID:
+aed80c7d-5f07-495a-8e1a-8ff1ec74726b
+
+catalog_source:
+printful_sync
+
+printful_id:
+476330305
+
+printful_catalog_id:
+903
+```
+
+---
+
+# PART Q — AUTOMATED REGRESSION
+
+## STEP 57 — ADD PHASE 5.2 TESTS ONLY WHERE NEEDED
+
+The live test is the primary objective.
+
+Do not write dozens of redundant unit tests simply to inflate the test count.
+
+Add tests for any new bug or behavior discovered during the E2E verification.
+
+At minimum ensure existing automated coverage still protects:
+
+```text
+snapshot requirement
+snapshot immutability
+direct catalog item construction
+auto-confirm false
+duplicate webhook protection
+OR-13 recovery
+catalog ownership
+```
+
+---
+
+# STEP 58 — FINAL REGRESSION
+
+Run:
+
+```bash
+npx tsc --noEmit
+npx vitest run
+npm run build
+```
+
+and lint if configured.
+
+Required:
+
+```text
+TypeScript PASS
+
+Tests >= 470
+All tests PASS
+
+Build PASS
+```
+
+If new tests are added, report the new count.
+
+---
+
+# PART R — FINAL DATABASE/PROVIDER STATE
+
+## STEP 59 — CAPTURE AFTER STATE
+
+Record:
+
+```text
+new local orders
+new order_items
+Stripe test session
+Stripe test payment
+Printful test draft
+Printful final canceled state
+```
+
+Explain all expected deltas.
+
+---
+
+# STEP 60 — VERIFY EXACTLY ONE BUSINESS TRANSACTION
+
+The controlled test should result in:
+
+```text
+Stripe Test Checkout:
+1
+
+Stripe Test Payment:
+1
+
+Local Store Order:
+1
+
+Printful Draft Order:
+1
+
+Printful Production Orders:
+0
+```
+
+Webhook replay must not increase these counts except for webhook-delivery/event logs where expected.
+
+---
+
+# DO NOT DO THESE THINGS
+
+Do NOT:
+
+```text
+use Stripe live mode
+
+use a real credit/debit card
+
+confirm Printful order
+
+trigger manufacturing
+
+create Printful Sync Product
+
+create Printful Sync Variant
+
+populate catalog_builder products.printful_id
+
+change storefront UUIDs
+
+change variant UUIDs
+
+use mockup as manufacturing artwork
+
+bypass storefront just to manufacture a passing result
+
+manually mark an order paid
+
+manually insert a fake Printful order ID
+
+fabricate webhook success
+
+disable Stripe signature verification
+
+disable fulfillment snapshot validation
+
+turn PRINTFUL_AUTO_CONFIRM=true
+
+delete evidence before reporting
+```
+
+---
+
+# FAILURE RULES
+
+## STRIPE LIVE MODE DETECTED
+
+```text
+STOP
+```
+
+## PRINTFUL AUTO-CONFIRM TRUE
+
+```text
+STOP
+```
+
+## SNAPSHOT INVALID
+
+```text
+STOP BEFORE PAYMENT
+```
+
+## US VARIANT UNAVAILABLE
+
+```text
+STOP BEFORE PAYMENT
+```
+
+## PAYMENT SUCCEEDS BUT WEBHOOK FAILS
+
+Preserve payment/order evidence.
+
+Diagnose.
+
+Do not manually bypass the webhook to manufacture a passing result.
+
+## PRINTFUL REJECTS ORDER
+
+Preserve the paid test order.
+
+Record exact sanitized provider error.
+
+Do not switch to Sync Products.
+
+## PRINTFUL ORDER BECOMES CONFIRMED
+
+Stop further testing immediately and investigate.
+
+Do not submit another order.
+
+---
+
+# REQUIRED REPORT
+
+Create:
+
+```text
+PHASE-5.2-CONTROLLED-END-TO-END-ORDER-VERIFICATION-REPORT.md
+```
+
+Do not overwrite earlier reports.
+
+---
+
+# REPORT STRUCTURE
+
+## 1. Executive Summary
+
+State whether the complete Stripe → webhook → Printful draft chain passed.
+
+## 2. Pre-Flight Safety
+
+Report:
+
+```text
+Stripe mode
+PRINTFUL_AUTO_CONFIRM
+US variant availability
+```
+
+## 3. Test Product
+
+Record store and provider identities.
+
+## 4. Before State
+
+Record relevant counts/state.
+
+## 5. Storefront Verification
+
+Document product page, price, variant, image.
+
+## 6. Cart
+
+Document stable Store UUID identity.
+
+## 7. Fulfillment Snapshot
+
+Show sanitized frozen snapshot.
+
+## 8. Stripe Checkout
+
+Record Checkout Session ID and amount.
+
+## 9. Stripe Test Payment
+
+Record payment result and Payment Intent where applicable.
+
+## 10. Stripe Webhook
+
+Record:
+
+```text
+event ID
+event type
+signature verification
+```
+
+## 11. Local Order
+
+Record:
+
+```text
+order UUID
+payment state
+fulfillment state
+```
+
+## 12. Transaction Correlation
+
+Show:
+
+```text
+Store Order UUID
+↕
+Stripe Checkout Session
+↕
+Stripe Event
+↕
+Printful external_id
+↕
+Printful Order ID
+```
+
+## 13. Frozen Snapshot Use
+
+Prove webhook used the stored snapshot.
+
+## 14. Printful Request
+
+Show sanitized direct catalog payload.
+
+## 15. Printful Draft
+
+Record provider order ID and status.
+
+## 16. Manufacturing Item Verification
+
+Record:
+
+```text
+variant
+quantity
+artwork
+placement
+technique/options
+sync_variant_id
+```
+
+## 17. Recipient Verification
+
+Confirm controlled US recipient was accepted.
+
+## 18. Financial Separation
+
+Record separately:
+
+```text
+store retail amount
+Printful product cost
+Printful shipping
+Printful tax
+Printful total
+```
+
+## 19. Local Fulfillment State
+
+Confirm Printful ID/status persisted.
+
+## 20. Webhook Replay
+
+Document duplicate delivery result.
+
+## 21. Idempotency
+
+Prove:
+
+```text
+1 local order
+1 Printful order
+```
+
+after replay.
+
+## 22. Printful Draft Cleanup
+
+Record cancellation.
+
+## 23. Checkout/Order Atomicity Analysis
+
+Classify:
+
+```text
+RECOVERABLE
+PARTIALLY RECOVERABLE
+NOT RECOVERABLE
+```
+
+for Stripe-session-created/local-order-insert-failed scenario.
+
+## 24. Security
+
+Report signature, secret, price, and artwork authority checks.
+
+## 25. Catalog Ownership
+
+Confirm:
+
+```text
+catalog_builder
+printful_id = NULL
+no Sync Product
+no Sync Variant
+```
+
+## 26. Existing Product Regression
+
+Confirm synchronized quarter-zip unchanged.
+
+## 27. Final Regression
+
+Report TypeScript/tests/build.
+
+## 28. After State
+
+Explain database/provider deltas.
+
+## 29. Remaining Risks
+
+List actual remaining production blockers only.
+
+---
+
+# REQUIRED TRANSACTION TRACE
+
+Include one trace similar to:
+
+```text
+Store Product:
+5487d86f...
+
+Store Variant:
+6869ca2f...
+        ↓
+Snapshot:
+DIRECT_CATALOG_ORDER
+variant 4016
+DTG / front
+        ↓
+Stripe Checkout:
+cs_test_...
+        ↓
+Stripe Payment:
+pi_...
+        ↓
+Stripe Event:
+evt_...
+        ↓
+Local Order:
+<UUID>
+        ↓
+Printful external_id:
+store-order-<UUID>
+        ↓
+Printful Order:
+<ID>
+status = draft
+        ↓
+Webhook Replay:
+NO DUPLICATE
+        ↓
+Printful Order:
+canceled
+```
+
+Use actual sanitized IDs from the test.
+
+Do not fabricate missing values.
+
+---
+
+# REQUIRED PASS/FAIL MATRIX
+
+| Verification | Result |
+|---|---|
+| Stripe confirmed TEST mode | PASS/FAIL |
+| PRINTFUL_AUTO_CONFIRM false | PASS/FAIL |
+| US variant currently available | PASS/FAIL |
+| Real storefront product loaded | PASS/FAIL |
+| Correct Store Variant UUID used | PASS/FAIL |
+| Retail price resolved server-side | PASS/FAIL |
+| Fulfillment snapshot frozen before payment | PASS/FAIL |
+| Snapshot DIRECT_CATALOG_ORDER | PASS/FAIL |
+| Stripe test Checkout Session created | PASS/FAIL |
+| Stripe test payment succeeded | PASS/FAIL |
+| Real signed webhook received | PASS/FAIL |
+| Stripe signature verified | PASS/FAIL |
+| Local order became paid | PASS/FAIL |
+| Webhook used frozen snapshot | PASS/FAIL |
+| Direct catalog Printful request created | PASS/FAIL |
+| Catalog variant 4016 used | PASS/FAIL |
+| Correct manufacturing artwork used | PASS/FAIL |
+| Correct placement used | PASS/FAIL |
+| Correct technique/options used | PASS/FAIL |
+| sync_variant_id absent/null | PASS/FAIL |
+| Printful draft created | PASS/FAIL |
+| Printful order remained unconfirmed | PASS/FAIL |
+| Printful order ID persisted locally | PASS/FAIL |
+| Deterministic external_id used | PASS/FAIL |
+| Webhook replay performed | PASS/FAIL |
+| Replay created no second local order | PASS/FAIL |
+| Replay created no second Printful order | PASS/FAIL |
+| Printful draft canceled after verification | PASS/FAIL |
+| Catalog Builder printful_id remains NULL | PASS/FAIL |
+| Printful Sync Products created = 0 | PASS/FAIL |
+| Printful Sync Variants created = 0 | PASS/FAIL |
+| Existing printful_sync product unchanged | PASS/FAIL |
+| Stripe Session ↔ local order correlation verified | PASS/FAIL |
+| Checkout/order failure window classified | PASS/FAIL |
+| Secrets remain server-side | PASS/FAIL |
+| TypeScript passes | PASS/FAIL |
+| Tests >= 470 and all pass | PASS/FAIL |
+| Production build passes | PASS/FAIL |
+
+A live requirement cannot receive PASS based only on code inspection.
+
+---
+
+# CRITICAL LIVE PASS GATE
+
+The phase passes only if this REAL chain executes:
+
+```text
+REAL STOREFRONT
+      ↓
+REAL CART
+      ↓
+STORE VARIANT UUID
+      ↓
+FROZEN SNAPSHOT
+      ↓
+STRIPE TEST CHECKOUT
+      ↓
+STRIPE TEST PAYMENT
+      ↓
+REAL SIGNED STRIPE WEBHOOK
+      ↓
+LOCAL PAID ORDER
+      ↓
+FROZEN SNAPSHOT
+      ↓
+DIRECT_CATALOG_ORDER
+      ↓
+REAL PRINTFUL DRAFT
+```
+
+and:
+
+```text
+Printful confirmation = NO
+
+Manufacturing = NO
+
+Printful Sync Product = NO
+
+Printful Sync Variant = NO
+```
+
+---
+
+# PRODUCTION-READINESS RULE
+
+Do NOT automatically declare the store production-ready merely because the E2E test passes.
+
+Production readiness additionally requires that:
+
+```text
+checkout/order correlation is sufficiently recoverable
+
+no unresolved payment→order loss condition exists
+
+no unresolved duplicate fulfillment condition exists
+
+production artwork meets manufacturing requirements
+
+production environment configuration is explicitly reviewed
+```
+
+If the checkout-session/local-order crash window is classified:
+
+```text
+NOT RECOVERABLE
+```
+
+then:
+
+```text
+READY FOR PRODUCTION ORDER: NO
+```
+
+even if the happy-path E2E test passes.
+
+---
+
+# FINAL DECISION
+
+End the report with exactly one of:
+
+```text
+PHASE 5.2 CONTROLLED END-TO-END ORDER VERIFICATION: COMPLETE
+```
+
+or:
+
+```text
+PHASE 5.2 CONTROLLED END-TO-END ORDER VERIFICATION: INCOMPLETE
+```
+
+Then exactly one of:
+
+```text
+STRIPE → PRINTFUL END-TO-END LIVE TEST: PASS
+```
+
+or:
+
+```text
+STRIPE → PRINTFUL END-TO-END LIVE TEST: FAIL
+```
+
+Then exactly one of:
+
+```text
+WEBHOOK IDEMPOTENCY LIVE TEST: PASS
+```
+
+or:
+
+```text
+WEBHOOK IDEMPOTENCY LIVE TEST: FAIL
+```
+
+Then exactly one of:
+
+```text
+CHECKOUT → ORDER RECOVERY SAFETY: PASS
+```
+
+```text
+CHECKOUT → ORDER RECOVERY SAFETY: CONDITIONAL
+```
+
+or:
+
+```text
+CHECKOUT → ORDER RECOVERY SAFETY: FAIL
+```
+
+Then exactly one of:
+
+```text
+READY FOR PRODUCTION-READINESS HARDENING: YES
+```
+
+or:
+
+```text
+READY FOR PRODUCTION-READINESS HARDENING: NO
+```
+
+---
+
+# IMPORTANT
+
+A successful Phase 5.2 means:
+
+> A real customer-shaped transaction has been proven from the storefront through Stripe's TEST payment infrastructure, through the application's real signed webhook, into a correctly constructed Printful direct-catalog DRAFT order.
+
+It does NOT mean:
+
+> A real customer should yet be charged or a real Printful production order should yet be confirmed.
+
+Those are later production-readiness gates.

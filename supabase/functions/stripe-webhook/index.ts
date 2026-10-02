@@ -38,12 +38,15 @@ interface FulfillmentSnapshot {
 
 // Deterministic external_id — same store order always produces the same value.
 // Used for idempotency and lost-response recovery.
+// NOTE: Printful external_id max length is 32 characters.
+// We use "so-" prefix + first 29 chars of UUID (dashes stripped) = 32 chars.
 // NOTE: Printful returns HTTP 400 (OR-13) on duplicate external_id — it does NOT
 // silently return the existing order. Application-level duplicate protection via
 // printful_order_id guard is therefore required. The @external_id lookup endpoint
 // (GET /orders/@<external_id>) is used for lost-response recovery.
 function buildExternalId(storeOrderId: string): string {
-  return `store-order-${storeOrderId}`;
+  const stripped = storeOrderId.replace(/-/g, "").substring(0, 29);
+  return `so-${stripped}`;
 }
 
 // Phase 5.1A: Validate a stored FulfillmentSnapshot before using it.
@@ -161,7 +164,7 @@ Deno.serve(async (req: Request) => {
         const session = event.data.object as Stripe.Checkout.Session;
         const paymentIntentId = session.payment_intent as string;
 
-        const { data: updatedOrder } = await supabase
+        let { data: updatedOrder } = await supabase
           .from("orders")
           .update({
             status: "paid",
@@ -172,6 +175,62 @@ Deno.serve(async (req: Request) => {
           .eq("stripe_session_id", session.id)
           .select("id, subtotal, affiliate_code, fulfillment_snapshot, items, printful_order_id")
           .maybeSingle();
+
+        // ── Phase 5.2A: Crash-window recovery ────────────────────────────────
+        // If updatedOrder is null, the stripe-checkout edge function created the
+        // Stripe session but the local order INSERT failed (DB error / timeout).
+        // The customer paid; we must not lose the record.
+        // Reconstruct the order from session metadata and insert it now.
+        // NOTE: fulfillment_snapshot is NOT in metadata (too large), so
+        // Printful fulfillment will be blocked for catalog_builder items on this
+        // recovered order — status will be set to "needs_admin_review".
+        // The order record exists; admin can resolve fulfillment manually.
+        if (!updatedOrder) {
+          console.warn("[webhook] no local order for session", session.id, "— attempting recovery from metadata");
+          try {
+            const meta = session.metadata ?? {};
+            const recoveredItems = meta.items ? JSON.parse(meta.items) : [];
+            const recoveredShipping = Number(meta.shipping_cost) || 0;
+            const recoveredSubtotal = Number(meta.subtotal) || ((session.amount_total ?? 0) / 100) - recoveredShipping;
+            const recoveredTotal = Number(meta.total) || (session.amount_total ?? 0) / 100;
+            const recoveredAddress = meta.shipping_address ? JSON.parse(meta.shipping_address) : {};
+
+            if (meta.email && meta.shipping_name) {
+              const { data: inserted } = await supabase
+                .from("orders")
+                .insert({
+                  stripe_session_id: session.id,
+                  stripe_payment_intent_id: paymentIntentId,
+                  email: meta.email,
+                  shipping_name: meta.shipping_name,
+                  shipping_address: recoveredAddress,
+                  shipping_cost: recoveredShipping,
+                  subtotal: recoveredSubtotal,
+                  total: recoveredTotal,
+                  status: "paid",
+                  livemode: event.livemode,
+                  items: recoveredItems,
+                  fulfillment_status: "needs_admin_review",
+                  ...(meta.affiliate_code ? { affiliate_code: meta.affiliate_code } : {}),
+                })
+                .select("id, subtotal, affiliate_code, fulfillment_snapshot, items, printful_order_id")
+                .maybeSingle();
+
+              if (inserted) {
+                updatedOrder = inserted;
+                console.log("[webhook] recovered order inserted:", inserted.id, "for session", session.id);
+              } else {
+                console.error("[webhook] recovery insert failed for session", session.id);
+              }
+            } else {
+              console.error("[webhook] recovery impossible — missing email/shipping_name in metadata for session", session.id);
+            }
+          } catch (recoveryErr) {
+            console.error("[webhook] recovery error for session", session.id, ":",
+              String((recoveryErr as Error)?.message ?? recoveryErr).replace(/[\r\n]/g, " "));
+          }
+        }
+        // ─────────────────────────────────────────────────────────────────────
 
         // Record affiliate conversion
         const affiliateCode = updatedOrder?.affiliate_code || session.metadata?.affiliate_code;

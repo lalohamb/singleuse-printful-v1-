@@ -397,9 +397,10 @@ describe("10. Printful external_id idempotency", () => {
     expect(buildPrintfulExternalId(orderId)).toBe(buildPrintfulExternalId(orderId));
   });
 
-  it("external_id format is store-order-<uuid>", () => {
+  it("external_id format is so-<uuid-stripped-29chars>", () => {
     const orderId = "5487d86f-1496-4a42-a64e-b4dc8babdefd";
-    expect(buildPrintfulExternalId(orderId)).toBe(`store-order-${orderId}`);
+    const expected = "so-" + orderId.replace(/-/g, "").substring(0, 29);
+    expect(buildPrintfulExternalId(orderId)).toBe(expected);
   });
 
   it("different orders produce different external_ids", () => {
@@ -451,7 +452,7 @@ describe("11. Application-level duplicate protection", () => {
     // When Printful returns OR-13, the webhook recovers via external_id lookup.
     const externalId = buildPrintfulExternalId("order-uuid");
     const recoveryUrl = `https://api.printful.com/orders/@${encodeURIComponent(externalId)}`;
-    expect(recoveryUrl).toContain("@store-order-order-uuid");
+    expect(recoveryUrl).toContain("@so-");
   });
 });
 
@@ -465,7 +466,8 @@ describe("12. Lost-response recovery", () => {
   });
 
   it("recovery sets printful_order_id from existing order", () => {
-    const recoveredOrder = { id: 178843915, status: "draft", external_id: "store-order-order-uuid" };
+    const externalId = buildPrintfulExternalId("order-uuid");
+    const recoveredOrder = { id: 178843915, status: "draft", external_id: externalId };
     const printfulOrderId = String(recoveredOrder.id);
     expect(printfulOrderId).toBe("178843915");
   });

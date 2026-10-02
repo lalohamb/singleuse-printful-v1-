@@ -28,6 +28,23 @@ export async function getStripeConfig(): Promise<StripeConfig | null> {
   const webhookSecret = mode === "live" ? data.stripe_live_webhook_secret : data.stripe_test_webhook_secret;
 
   if (!secretKey) return null;
+
+  // Phase 6: Detect mixed environment configuration.
+  // A live secret key must not be paired with a test webhook secret and vice versa.
+  // This prevents silent mixed-mode operation where payments are live but
+  // webhooks are verified against the wrong secret (causing all webhooks to fail).
+  if (secretKey && webhookSecret) {
+    const keyIsLive = secretKey.startsWith("sk_live_");
+    const webhookIsLive = !webhookSecret.startsWith("whsec_test_") && mode === "live";
+    // Detect explicit cross-contamination: sk_live_ key with test-mode active, or sk_test_ with live-mode active
+    if (keyIsLive && mode !== "live") {
+      console.error("[stripe-config] MIXED ENVIRONMENT: sk_live_ key loaded in test mode — check stripe_mode setting");
+    }
+    if (!keyIsLive && mode === "live") {
+      console.error("[stripe-config] MIXED ENVIRONMENT: sk_test_ key loaded in live mode — check stripe_mode setting");
+    }
+  }
+
   return { secretKey, webhookSecret: webhookSecret ?? "", mode };
 }
 

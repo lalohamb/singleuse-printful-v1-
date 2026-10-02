@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Search, Eye, X, Package, Truck, RefreshCw, CheckCircle, AlertTriangle, Trash2, Loader2 } from "lucide-react";
+import { Search, Eye, X, Package, Truck, RefreshCw, CheckCircle, AlertTriangle, Trash2, Loader2, ShieldAlert } from "lucide-react";
 import { supabase, formatPrice } from "@/lib/supabase";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
 import type { Order } from "@/types";
@@ -25,6 +25,7 @@ function Orders() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [modeFilter, setModeFilter] = useState("all");
+  const [attentionFilter, setAttentionFilter] = useState(false);
   const [selected, setSelected] = useState<Order | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [infoDismissed, setInfoDismissed] = useState(false);
@@ -46,12 +47,20 @@ function Orders() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
+  const needsAttention = (o: Order & { printful_fulfillment_status?: string | null; fulfillment_snapshot?: unknown }) =>
+    (o as any).fulfillment_status === "needs_admin_review" ||
+    (o as any).printful_fulfillment_status === "failed" ||
+    (o.status === "paid" && !o.printful_order_id);
+
   const filtered = orders.filter((o) => {
     const matchesSearch = o.shipping_name.toLowerCase().includes(search.toLowerCase()) || o.email.toLowerCase().includes(search.toLowerCase()) || o.id.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === "all" || o.status === statusFilter;
     const matchesMode = modeFilter === "all" || (modeFilter === "live" ? o.livemode : !o.livemode);
-    return matchesSearch && matchesStatus && matchesMode;
+    const matchesAttention = !attentionFilter || needsAttention(o as any);
+    return matchesSearch && matchesStatus && matchesMode && matchesAttention;
   });
+
+  const attentionCount = orders.filter((o) => needsAttention(o as any)).length;
 
   const deleteOrder = async (id: string) => {
     if (!confirm("Delete this test order from the database?")) return;
@@ -129,6 +138,19 @@ function Orders() {
           <option value="live">Live only</option>
           <option value="test">Test only</option>
         </select>
+        <button
+          onClick={() => setAttentionFilter((v) => !v)}
+          className={`flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg border transition-colors ${
+            attentionFilter
+              ? "bg-error-600 text-white border-error-600"
+              : attentionCount > 0
+              ? "bg-error-50 text-error-700 border-error-200 hover:bg-error-100"
+              : "text-secondary-400 border-secondary-200"
+          }`}
+        >
+          <ShieldAlert size={15} />
+          Needs Attention{attentionCount > 0 ? ` (${attentionCount})` : ""}
+        </button>
         <button onClick={fetchOrders} disabled={loading} className="flex items-center gap-2 text-sm text-secondary-500 hover:text-secondary-900 transition-colors">
           <RefreshCw size={15} className={loading ? "animate-spin" : ""} />Refresh
         </button>
@@ -157,7 +179,12 @@ function Orders() {
                     <td className="px-4 py-3 hidden md:table-cell"><p className="text-sm font-medium text-secondary-900">{order.shipping_name}</p><p className="text-xs text-secondary-500">{order.email}</p></td>
                     <td className="px-4 py-3 text-sm text-secondary-600 hidden lg:table-cell">{new Date(order.created_at).toLocaleDateString()}</td>
                     <td className="px-4 py-3 font-medium text-secondary-900">{formatPrice(Number(order.total))}</td>
-                    <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded-full ${statusColors[order.status] || "bg-secondary-100 text-secondary-500"}`}>{order.status}</span></td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs px-2 py-1 rounded-full ${statusColors[order.status] || "bg-secondary-100 text-secondary-500"}`}>{order.status}</span>
+                      {needsAttention(order as any) && (
+                        <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-error-100 text-error-700 font-medium">⚠</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 hidden sm:table-cell">
                       {order.livemode
                         ? <span className="text-xs px-2 py-1 rounded-full bg-success-50 text-success-700 font-medium">Live</span>
@@ -192,6 +219,30 @@ function OrderDetailModal({ order, onClose, onUpdateStatus }: { order: Order; on
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
   const [synced, setSynced] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [confirmResult, setConfirmResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  const adminOrderAction = async (action: "confirm_printful" | "cancel_printful") => {
+    const label = action === "confirm_printful" ? "confirm" : "cancel";
+    if (!confirm(`Are you sure you want to ${label} this Printful order? This cannot be undone.`)) return;
+    setConfirming(true); setConfirmResult(null);
+    try {
+      const res = await fetch("/api/admin/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, order_id: order.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setConfirmResult({ ok: false, msg: data.error || `${label} failed` });
+      } else {
+        setConfirmResult({ ok: true, msg: `Printful order ${label}ed. Status: ${data.printful_status}` });
+      }
+    } catch (e: unknown) {
+      setConfirmResult({ ok: false, msg: getErrorMessage(e) });
+    }
+    setConfirming(false);
+  };
 
   // Keep local status in sync when parent updates the order prop
   useEffect(() => { setLocalStatus(order.status); }, [order.status]);
@@ -255,6 +306,25 @@ function OrderDetailModal({ order, onClose, onUpdateStatus }: { order: Order; on
           <button onClick={onClose} className="p-2 text-secondary-400 hover:text-secondary-900"><X size={20} /></button>
         </div>
         <div className="p-6 space-y-6">
+          {/* needs_admin_review / failed fulfillment alert */}
+          {((order as any).fulfillment_status === "needs_admin_review" ||
+            (order as any).printful_fulfillment_status === "failed" ||
+            (order.status === "paid" && !order.printful_order_id)) && (
+            <div className="flex items-start gap-2 bg-error-50 border border-error-200 rounded-lg px-3 py-3 text-sm text-error-800">
+              <ShieldAlert size={16} className="flex-shrink-0 mt-0.5 text-error-500" />
+              <div className="space-y-1">
+                {(order as any).fulfillment_status === "needs_admin_review" && (
+                  <p><strong>Needs Admin Review:</strong> Recovered from crash window. Fulfillment snapshot may be missing. Verify before confirming.</p>
+                )}
+                {(order as any).printful_fulfillment_status === "failed" && (
+                  <p><strong>Fulfillment Failed:</strong> Printful submission failed for this paid order. Check Printful order ID and resolve manually.</p>
+                )}
+                {order.status === "paid" && !order.printful_order_id && (order as any).fulfillment_status !== "needs_admin_review" && (
+                  <p><strong>No Printful Order:</strong> This paid order has no Printful order ID. Fulfillment may have failed silently.</p>
+                )}
+              </div>
+            </div>
+          )}
           <div>
             <label className="label-text">Order Status <span className="text-xs font-normal text-secondary-400 ml-1">(updates your store only)</span></label>
             {order.livemode && (
@@ -332,6 +402,36 @@ function OrderDetailModal({ order, onClose, onUpdateStatus }: { order: Order; on
                       : <span className="flex items-center gap-1 text-xs text-success-600 font-medium"><CheckCircle size={13} />Synced!</span>
                     }
                   </div>
+                  {/* Manual confirm/cancel — only shown for draft orders */}
+                  {printfulData.status === "draft" && order.status === "paid" && (
+                    <div className="border-t border-primary-100 pt-3 space-y-2">
+                      <p className="text-xs font-semibold text-secondary-700 uppercase tracking-wide">Manual Actions</p>
+                      <p className="text-xs text-secondary-500">Order is DRAFT. Confirm to send to production, or cancel to void.</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => adminOrderAction("confirm_printful")}
+                          disabled={confirming}
+                          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded bg-success-600 text-white hover:bg-success-700 transition-colors disabled:opacity-50"
+                        >
+                          {confirming ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+                          Confirm → Production
+                        </button>
+                        <button
+                          onClick={() => adminOrderAction("cancel_printful")}
+                          disabled={confirming}
+                          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-error-300 text-error-700 hover:bg-error-50 transition-colors disabled:opacity-50"
+                        >
+                          {confirming ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
+                          Cancel Draft
+                        </button>
+                      </div>
+                      {confirmResult && (
+                        <p className={`text-xs ${confirmResult.ok ? "text-success-700" : "text-error-600"}`}>
+                          {confirmResult.ok ? "✓" : "✗"} {confirmResult.msg}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

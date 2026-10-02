@@ -280,6 +280,39 @@ Deno.serve(async (req: Request) => {
       return json({ synced: rows.length, archived: toArchive.length, variants_synced: rows.reduce((s: number, r: any) => s + (r.variants?.length ?? 0), 0) });
     }
 
+    // GET /orders/:id  — fetch a single Printful order by numeric ID
+    const orderGetMatch = route.match(/^\/orders\/(\d+)$/);
+    if (req.method === "GET" && orderGetMatch) {
+      const data = await pfGet(token, `/orders/${orderGetMatch[1]}`);
+      return json(data);
+    }
+
+    // POST /orders/:id/confirm  — manually confirm a Printful draft order
+    // Admin-only: caller must be authenticated admin (enforced at Next.js API layer).
+    // Printful: POST /orders/{id}/confirm transitions draft → pending/in-production.
+    const orderConfirmMatch = route.match(/^\/orders\/(\d+)\/confirm$/);
+    if (req.method === "POST" && orderConfirmMatch) {
+      const res = await fetch(`${PRINTFUL_BASE}/orders/${orderConfirmMatch[1]}/confirm`, {
+        method: "POST",
+        headers: pfHeaders(token),
+      });
+      const data = await res.json();
+      return json(data, res.status);
+    }
+
+    // DELETE /orders/:id  — cancel a Printful draft order
+    // Only works while order is in draft status. Printful rejects cancellation
+    // of orders already in production.
+    const orderCancelMatch = route.match(/^\/orders\/(\d+)$/);
+    if (req.method === "DELETE" && orderCancelMatch) {
+      const res = await fetch(`${PRINTFUL_BASE}/orders/${orderCancelMatch[1]}`, {
+        method: "DELETE",
+        headers: pfHeaders(token),
+      });
+      const data = await res.json();
+      return json(data, res.status);
+    }
+
     // POST /orders
     if (req.method === "POST" && route === "/orders") {
       const body = await req.json();

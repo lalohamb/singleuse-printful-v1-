@@ -54,6 +54,9 @@ export function buildPrintfulCatalogOrderItem(
 // Deterministic external_id for a store order.
 // Used for idempotency: same order always produces the same external_id.
 // Printful deduplicates on external_id — prevents duplicate orders on retry.
+// NOTE: Printful external_id max length is 32 characters.
+// Format: "so-" + first 29 chars of UUID (dashes stripped) = 32 chars exactly.
 export function buildPrintfulExternalId(storeOrderId: string): string {
-  return `store-order-${storeOrderId}`;
+  const stripped = storeOrderId.replace(/-/g, "").substring(0, 29);
+  return `so-${stripped}`;
 }

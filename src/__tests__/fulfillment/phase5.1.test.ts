@@ -630,9 +630,10 @@ describe("20. Webhook retry idempotency", () => {
     expect(id1).toBe(id2);
   });
 
-  it("external_id format is store-order-<uuid>", () => {
+  it("external_id format is so-<uuid-stripped-29chars>", () => {
     const orderId = "9f00d7b8-6ec0-4d62-bfa4-c1211c66241f";
-    expect(buildPrintfulExternalId(orderId)).toBe(`store-order-${orderId}`);
+    const expected = "so-" + orderId.replace(/-/g, "").substring(0, 29);
+    expect(buildPrintfulExternalId(orderId)).toBe(expected);
   });
 
   it("different orders produce different external_ids", () => {
@@ -653,14 +654,15 @@ describe("20. Webhook retry idempotency", () => {
 describe("21. Deterministic provider external ID", () => {
   it("same store order always produces same Printful external_id", () => {
     const storeOrderId = "abc-123-def-456";
-    expect(buildPrintfulExternalId(storeOrderId)).toBe("store-order-abc-123-def-456");
+    const expected = "so-" + storeOrderId.replace(/-/g, "").substring(0, 29);
+    expect(buildPrintfulExternalId(storeOrderId)).toBe(expected);
   });
 
   it("external_id is derived from store order UUID not Stripe session", () => {
     const storeOrderId = "9f00d7b8-6ec0-4d62-bfa4-c1211c66241f";
     const extId = buildPrintfulExternalId(storeOrderId);
-    expect(extId).toContain(storeOrderId);
-    expect(extId.startsWith("store-order-")).toBe(true);
+    expect(extId.startsWith("so-")).toBe(true);
+    expect(extId.length).toBeLessThanOrEqual(32);
   });
 });
 
