@@ -18,8 +18,8 @@
 
 set -euo pipefail
 
-APP_DIR="${APP_DIR:-/var/www/bodyandsleeves}"
-PM2_NAME="bodyandsleeves"
+APP_DIR="${APP_DIR:-/var/www/countybuys}"
+PM2_NAME="countybuys"
 DOMAIN="${DOMAIN:?Set DOMAIN, e.g. DOMAIN=yourdomain.com}"
 REPO="${REPO:?Set REPO, e.g. REPO=git@github.com:user/repo.git}"
 
@@ -31,6 +31,7 @@ npm install -g pm2
 # ── Clone repo ────────────────────────────────────────────────────────────────
 mkdir -p "$APP_DIR"
 GIT_SSH_COMMAND='ssh -i /root/.ssh/github_deploy' git clone "$REPO" "$APP_DIR"
+
 cd "$APP_DIR"
 
 # ── Copy .env.local ───────────────────────────────────────────────────────────
@@ -55,17 +56,17 @@ cp .env.local .next/standalone/.env.local
 # ── ecosystem.config.js ───────────────────────────────────────────────────────
 node - << 'JSEOF'
 const fs = require('fs');
-const raw = fs.readFileSync('/var/www/bodyandsleeves/.env.local', 'utf8');
+const raw = fs.readFileSync('/var/www/countybuys/.env.local', 'utf8');
 const env = {};
 raw.split('\n').forEach(l => {
   const m = l.match(/^([^#=]+)=(.*)/);
   if (m) env[m[1].trim()] = m[2].trim();
 });
-env.APP_ROOT = '/var/www/bodyandsleeves';
-env.PM2_APP_NAME = 'bodyandsleeves';
+env.APP_ROOT = '/var/www/countybuys';
+env.PM2_APP_NAME = 'countybuys';
 env.PORT = '3000';
 const app = {
-  name: 'bodyandsleeves',
+  name: 'countybuys',
   script: 'server.js',
   interpreter: 'node',
   cwd: '/var/www/bodyandsleeves/.next/standalone',
@@ -74,7 +75,7 @@ const app = {
   env,
 };
 const config = 'module.exports = { apps: [' + JSON.stringify(app) + '] };';
-fs.writeFileSync('/var/www/bodyandsleeves/ecosystem.config.js', config);
+fs.writeFileSync('/var/www/countybuys/ecosystem.config.js', config);
 console.log('ecosystem.config.js written (max_memory_restart=400M, max-old-space-size=512)');
 JSEOF
 
@@ -182,21 +183,13 @@ else
   cd "$APP_DIR"
   export SUPABASE_ACCESS_TOKEN
 
-  supabase functions deploy printify-proxy printify-webhook stripe-checkout stripe-webhook \
+  supabase functions deploy printful-proxy stripe-checkout stripe-webhook \
     --project-ref "$SUPABASE_PROJECT_REF"
 
   # Set edge function secrets
   supabase secrets set \
     SITE_URL="$SITE_URL" \
-    PRINTIFY_SHOP_ID="$PRINTIFY_SHOP_ID" \
     --project-ref "$SUPABASE_PROJECT_REF"
-
-  # Set Printify token separately to avoid shell interpolation issues
-  if [ -n "$PRINTIFY_API_TOKEN" ]; then
-    printf 'PRINTIFY_API_TOKEN=%s' "$PRINTIFY_API_TOKEN" > /tmp/printify_secret.env
-    supabase secrets set --env-file /tmp/printify_secret.env --project-ref "$SUPABASE_PROJECT_REF"
-    rm -f /tmp/printify_secret.env
-  fi
 
   echo "✅ Edge functions deployed."
 fi
@@ -209,5 +202,5 @@ fi
 #     --non-interactive --agree-tos -m you@example.com --redirect
 
 echo ""
-echo "✅ Setup complete. App running at http://$DOMAIN"
+echo "✅ Setup complete. App running at http://$DOMAIN (countybuys)"
 echo "   Run certbot (see commented block above) to enable HTTPS."

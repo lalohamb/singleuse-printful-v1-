@@ -21,6 +21,7 @@ export interface CatalogBuilderMockupInput {
   mockup_task_key: string | null;
   is_primary: boolean;
   display_order: number;
+  variant_ids?: number[];  // Printful catalog variant IDs this mockup covers
 }
 
 export interface CatalogBuilderCreateInput {
@@ -234,7 +235,7 @@ export async function POST(req: Request) {
     );
   }
 
-  // 4. Create product_images for selected mockups
+  // 4. Create product_images for selected mockups and sync back to products.image_url
   if (mockups && mockups.length > 0) {
     const imageRows = mockups.map((m, i) => ({
       product_id: productId,
@@ -249,8 +250,29 @@ export async function POST(req: Request) {
 
     const { error: imageError } = await sb.from("product_images").insert(imageRows);
     if (imageError) {
-      // Non-fatal: product exists but without images — admin can add later
       console.error("[catalog-builder] product_images insert failed:", imageError.message);
+    } else {
+      // Sync primary mockup URL back to products.image_url and products.images
+      const primaryMockup = mockups.find((m) => m.is_primary) ?? mockups[0];
+      const allUrls = mockups.map((m) => m.image_url);
+      await sb.from("products").update({
+        image_url: primaryMockup.image_url,
+        images: allUrls,
+        updated_at: new Date().toISOString(),
+      }).eq("id", productId);
+
+      // Update product_variants.image_url with per-color mockup URLs.
+      // Each mockup has variant_ids listing which Printful catalog variants it covers.
+      // Match those to store variants by printful_variant_id and update image_url.
+      for (const mockup of mockups) {
+        if (!mockup.variant_ids?.length) continue;
+        for (const pfVarId of mockup.variant_ids) {
+          await sb.from("product_variants")
+            .update({ image_url: mockup.image_url, updated_at: new Date().toISOString() })
+            .eq("product_id", productId)
+            .eq("printful_variant_id", String(pfVarId));
+        }
+      }
     }
   }
 

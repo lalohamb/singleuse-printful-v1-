@@ -20,7 +20,7 @@ env_set() {
 
 # If key is missing or empty, prompt user and write it
 env_require() {
-  local key="$1" file="$2" prompt="$3" default="$4"
+  local key="$1" file="$2" prompt="$3" default="${4:-}"
   local current
   current=$(env_get "$key" "$file")
   if [[ -z "$current" ]]; then

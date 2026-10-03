@@ -4,7 +4,8 @@ import { PrintfulApiError } from "@/lib/printful/errors";
 import { requireAdmin } from "@/lib/require-admin";
 
 const VALID_TECHNIQUES = new Set([
-  "DIGITAL", "CUT-SEW", "UV", "EMBROIDERY", "SUBLIMATION", "ENGRAVING", "DTG",
+  "DIGITAL", "CUT-SEW", "UV", "EMBROIDERY", "SUBLIMATION", "ENGRAVING",
+  "DTG", "DTFILM", "DIRECT-TO-FABRIC", "KNITWEAR",
 ]);
 
 export async function GET(

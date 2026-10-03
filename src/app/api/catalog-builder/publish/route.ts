@@ -60,15 +60,16 @@ export async function POST(req: Request) {
   if (!designs || designs.length === 0)
     errors.push("a product design is required");
 
-  // Require at least one product image
+  // Require at least one product image (soft check — warn but don't block)
+  // Mockups are storefront presentation only. A product without images can still
+  // be published and images added later via the admin products panel.
   const { data: images } = await sb
     .from("product_images")
     .select("id")
     .eq("product_id", product_id)
     .limit(1);
 
-  if (!images || images.length === 0)
-    errors.push("at least one product image is required");
+  const hasImages = images && images.length > 0;
 
   if (errors.length > 0)
     return NextResponse.json({ error: "Publication validation failed", details: errors }, { status: 400 });
@@ -86,5 +87,34 @@ export async function POST(req: Request) {
   if (updateError)
     return NextResponse.json({ error: updateError.message }, { status: 500 });
 
-  return NextResponse.json({ published: true, product_id, slug: product.slug });
+  // Sync product_images back to products.image_url / products.images if not already set
+  if (hasImages) {
+    const { data: allImages } = await sb
+      .from("product_images")
+      .select("image_url, is_primary, display_order")
+      .eq("product_id", product_id)
+      .order("display_order");
+    if (allImages && allImages.length > 0) {
+      const primary = allImages.find((i) => i.is_primary) ?? allImages[0];
+      const { data: currentProduct } = await sb
+        .from("products")
+        .select("image_url")
+        .eq("id", product_id)
+        .maybeSingle();
+      if (!currentProduct?.image_url) {
+        await sb.from("products").update({
+          image_url: primary.image_url,
+          images: allImages.map((i) => i.image_url),
+          updated_at: new Date().toISOString(),
+        }).eq("id", product_id);
+      }
+    }
+  }
+
+  return NextResponse.json({
+    published: true,
+    product_id,
+    slug: product.slug,
+    warnings: hasImages ? [] : ["No product images — add mockups via the Products panel for best storefront presentation."],
+  });
 }

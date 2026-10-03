@@ -195,7 +195,7 @@ CREATE POLICY "admin_delete_categories" ON categories FOR DELETE
 -- ============ PRODUCTS ============
 CREATE TABLE IF NOT EXISTS products (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  printify_id text UNIQUE,
+  printful_id text UNIQUE,
   title text NOT NULL,
   description text,
   category_id uuid REFERENCES categories(id) ON DELETE SET NULL,
@@ -494,7 +494,7 @@ INSERT INTO products (title, description, category_id, price, cost, image_url, i
     'active', false,
     '[{"id":"OS","label":"One Size","color":"Black","price":26.00}]'::jsonb
   )
-ON CONFLICT (printify_id) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 -- ============ POLICIES ============
 CREATE TABLE IF NOT EXISTS policies (

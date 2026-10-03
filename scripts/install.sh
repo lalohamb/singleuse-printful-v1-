@@ -70,8 +70,8 @@ STRIPE_LIVE_SECRET=$(env_require    "STRIPE_LIVE_SECRET_KEY"     "$ENV_LOCAL" "S
 echo -e "\n  ${YELLOW}Other services${NC}"
 RESEND_KEY=$(env_require            "RESEND_API_KEY"             "$ENV_LOCAL" "Resend API Key")
 MAILER_LITE_KEY=$(env_require       "MAILER_LITE_API_KEY"        "$ENV_LOCAL" "MailerLite API Key")
-PRINTIFY_TOKEN=$(env_require        "PRINTIFY_API_TOKEN"         "$ENV_LOCAL" "Printify API Token")
-PRINTIFY_SHOP_ID=$(env_require      "PRINTIFY_SHOP_ID"           "$ENV_LOCAL" "Printify Shop ID")
+
+warn "Printful API key — add PRINTFUL_API_KEY manually to .env.local after this script"
 
 echo -e "\n  ${YELLOW}Admin account${NC}"
 ADMIN_EMAIL=$(env_require           "ADMIN_EMAIL"                "$ENV_LOCAL" "Admin Email")
@@ -207,8 +207,6 @@ echo "  Pushing secrets..."
 if push_secrets "$SUPABASE_PROJECT_REF" "$SUPABASE_ACCESS_TOKEN" \
   "SUPABASE_URL"               "$SUPABASE_URL" \
   "SUPABASE_SERVICE_ROLE_KEY"  "$SERVICE_ROLE_KEY" \
-  "PRINTIFY_API_TOKEN"         "$PRINTIFY_TOKEN" \
-  "PRINTIFY_SHOP_ID"           "$PRINTIFY_SHOP_ID" \
   "RESEND_API_KEY"             "$RESEND_KEY" \
   "MAILER_LITE_API_KEY"        "$MAILER_LITE_KEY" \
   "SITE_URL"                   "$SITE_URL"; then
@@ -219,7 +217,7 @@ fi
 
 echo "  Deploying edge functions..."
 deploy_functions "$SUPABASE_PROJECT_REF" \
-  stripe-webhook stripe-checkout printify-proxy printify-webhook
+  stripe-webhook stripe-checkout printful-proxy printful-webhook
 ok "Edge functions deployed"
 
 # =============================================================================

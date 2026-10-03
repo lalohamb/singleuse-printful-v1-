@@ -12,8 +12,9 @@ import MockupStatus from "@/components/product-designer/MockupStatus";
 import PlacementSelector from "@/components/product-designer/PlacementSelector";
 import TechniqueSelector from "@/components/product-designer/TechniqueSelector";
 import OptionsSelector from "@/components/product-designer/OptionsSelector";
-import { BlankSelector, VariantPicker, DesignPicker } from "./StageComponents";
+import { BlankSelector, VariantPicker, DesignPicker, ArtworkValidationPanel } from "./StageComponents";
 import { initialBuilderState, type BuilderStage, type CatalogBuilderState, type BuiltMockup, type VariantPricing } from "./types";
+import type { ArtworkValidationResult } from "@/lib/fulfillment/artwork-validation";
 
 const CANVAS_W = 400;
 const CANVAS_H = 400;
@@ -47,6 +48,8 @@ export default function CatalogBuilder() {
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [productId, setProductId] = useState<string | null>(null);
+  const [artworkValidation, setArtworkValidation] = useState<ArtworkValidationResult | null>(null);
+
   const { upload, uploading, error: uploadError } = useArtworkUpload();
 
   const update = (patch: Partial<CatalogBuilderState>) =>
@@ -151,7 +154,7 @@ export default function CatalogBuilder() {
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      const persisted: BuiltMockup[] = (data.mockups ?? []).map((m: BuiltMockup, i: number) => ({
+      const persisted: BuiltMockup[] = (data.result ?? data.mockups ?? []).map((m: BuiltMockup, i: number) => ({
         ...m,
         is_primary: i === 0,
         display_order: i,
@@ -218,7 +221,14 @@ export default function CatalogBuilder() {
           meta_title: metaTitle || null,
           meta_description: metaDescription || null,
           price,
-          mockups: selectedMockups,
+          mockups: selectedMockups.map((m) => ({
+            storage_path: m.storage_path,
+            image_url: m.stored_url,
+            mockup_task_key: m.mockup_task_key,
+            is_primary: m.is_primary,
+            display_order: m.display_order,
+            variant_ids: m.variant_ids,
+          })),
           idempotency_key: idempotencyKey,
         }),
       });
@@ -236,6 +246,9 @@ export default function CatalogBuilder() {
       });
       const pubData = await pubRes.json();
       if (pubData.error) throw new Error(pubData.error);
+      // Surface any non-blocking warnings (e.g. no mockups)
+      if (pubData.warnings?.length) setError(pubData.warnings.join(" "));
+      else setError(null);
 
       go("review");
     } catch (e) {
@@ -313,12 +326,19 @@ export default function CatalogBuilder() {
       {stage === "design" && (
         <section className="space-y-3">
           <h2 className="text-base font-semibold">Choose a design</h2>
-          <DesignPicker selected={state.design} onSelect={(d) => {
-            update({ design: d, artworkUrl: d.artwork_url });
-            go("production");
-            if (state.catalogProduct && state.technique)
-              loadProduction(state.catalogProduct.id, state.technique);
-          }} />
+          <DesignPicker
+            selected={state.design}
+            catalogProductId={state.catalogProduct?.id}
+            placement={state.placement}
+            variantId={state.selectedVariants[0]?.id}
+            onSelect={(d, validation) => {
+              setArtworkValidation(validation);
+              update({ design: d, artworkUrl: d.artwork_url });
+              go("production");
+              if (state.catalogProduct && state.technique)
+                loadProduction(state.catalogProduct.id, state.technique);
+            }}
+          />
           <button onClick={() => go("variants")} className="text-sm text-secondary-400 underline">← Back</button>
         </section>
       )}
@@ -554,6 +574,7 @@ export default function CatalogBuilder() {
                 <div className="flex justify-between"><span className="text-secondary-500">Blank</span><span className="font-medium">{state.catalogProduct?.title}</span></div>
                 <div className="flex justify-between"><span className="text-secondary-500">Variants</span><span className="font-medium">{state.selectedVariants.length} selected</span></div>
                 <div className="flex justify-between"><span className="text-secondary-500">Design</span><span className="font-medium">{state.design?.name}</span></div>
+                <div className="flex justify-between"><span className="text-secondary-500">Technique</span><span className="font-medium">{state.technique}</span></div>
                 <div className="flex justify-between"><span className="text-secondary-500">Placement</span><span className="font-medium">{state.placement}</span></div>
                 <div className="flex justify-between"><span className="text-secondary-500">Mockups</span><span className="font-medium">{state.selectedMockupIndices.length} selected</span></div>
                 <div className="flex justify-between"><span className="text-secondary-500">Title</span><span className="font-medium">{state.title}</span></div>
@@ -562,6 +583,7 @@ export default function CatalogBuilder() {
                   <span className="font-medium">${Math.min(...state.variantPricing.map((v) => v.retail_price).filter((p) => p > 0)).toFixed(2)}</span>
                 </div>
               </div>
+              {artworkValidation && <ArtworkValidationPanel result={artworkValidation} />}
               <div className="flex justify-between pt-2">
                 <button onClick={() => go("pricing")} className="text-sm text-secondary-400 underline">← Back</button>
                 <button

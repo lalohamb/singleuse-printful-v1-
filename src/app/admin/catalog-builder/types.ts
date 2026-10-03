@@ -23,6 +23,7 @@ export interface BuiltMockup {
   mockup_task_key: string | null;
   is_primary: boolean;
   display_order: number;
+  variant_ids?: number[];
 }
 
 export interface VariantPricing {
