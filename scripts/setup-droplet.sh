@@ -69,7 +69,7 @@ const app = {
   name: 'countybuys',
   script: 'server.js',
   interpreter: 'node',
-  cwd: '/var/www/bodyandsleeves/.next/standalone',
+  cwd: '/var/www/countybuys/.next/standalone',
   max_memory_restart: '400M',
   node_args: '--max-old-space-size=512',
   env,
@@ -93,7 +93,7 @@ if ! grep -q 'zone=nextimage' "$NGINX_CONF"; then
     # Rate-limit zones\n    limit_req_zone $binary_remote_addr zone=nextimage:10m rate=5r/s;\n    limit_req_zone $binary_remote_addr zone=authotp:10m rate=5r/m;' "$NGINX_CONF"
 fi
 
-cat > /etc/nginx/sites-available/bodyandsleeves << EOF
+cat > /etc/nginx/sites-available/countybuys << EOF
 server {
     listen 80;
     server_name $DOMAIN www.$DOMAIN;
@@ -153,7 +153,7 @@ server {
 }
 EOF
 
-ln -sf /etc/nginx/sites-available/bodyandsleeves /etc/nginx/sites-enabled/
+ln -sf /etc/nginx/sites-available/countybuys /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
 
@@ -166,8 +166,7 @@ source_env() {
 
 SUPABASE_ACCESS_TOKEN=$(source_env SUPABASE_ACCESS_TOKEN)
 SUPABASE_PROJECT_REF=$(source_env SUPABASE_PROJECT_REF)
-PRINTIFY_API_TOKEN=$(source_env PRINTIFY_API_TOKEN)
-PRINTIFY_SHOP_ID=$(source_env PRINTIFY_SHOP_ID)
+PRINTFUL_API_KEY=$(source_env PRINTFUL_API_KEY)
 SITE_URL="https://$DOMAIN"
 
 if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$SUPABASE_PROJECT_REF" ]; then

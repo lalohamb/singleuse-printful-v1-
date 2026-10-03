@@ -96,6 +96,41 @@ if [ -n "$SUPABASE_ACCESS_TOKEN" ] && [ -n "$SUPABASE_PROJECT_REF" ]; then
   export SUPABASE_ACCESS_TOKEN
   npx supabase functions deploy printful-proxy stripe-checkout stripe-webhook \
     --project-ref "$SUPABASE_PROJECT_REF" || echo "⚠️  Edge function deploy failed — skipping."
+
+  # ── Sync active Stripe key to edge function secrets ───────────────────────
+  # Edge function code is redeployed above but secrets are NOT automatically
+  # re-synced. Read the active key from the DB and push it now so the
+  # deployed function always boots with the correct key.
+  echo "🔑 Syncing Stripe secrets to edge functions..."
+  SUPABASE_URL=$(source_env NEXT_PUBLIC_SUPABASE_URL)
+  SUPABASE_SERVICE_ROLE_KEY=$(source_env SUPABASE_SERVICE_ROLE_KEY)
+  node - << STRIPE_SYNC_EOF
+const https = require('https');
+const url = '${SUPABASE_URL}/rest/v1/settings?select=stripe_mode,stripe_live_secret_key,stripe_test_secret_key,stripe_live_webhook_secret,stripe_test_webhook_secret';
+const options = { headers: { apikey: '${SUPABASE_SERVICE_ROLE_KEY}', Authorization: 'Bearer ${SUPABASE_SERVICE_ROLE_KEY}' } };
+https.get(url, options, (res) => {
+  let data = '';
+  res.on('data', c => data += c);
+  res.on('end', () => {
+    try {
+      const rows = JSON.parse(data);
+      const s = rows[0];
+      if (!s) { console.error('No settings row found'); process.exit(1); }
+      const mode = s.stripe_mode || 'test';
+      const secretKey = mode === 'live' ? s.stripe_live_secret_key : s.stripe_test_secret_key;
+      const webhookSecret = mode === 'live' ? s.stripe_live_webhook_secret : s.stripe_test_webhook_secret;
+      if (!secretKey) { console.error('No active Stripe key in DB for mode:', mode); process.exit(1); }
+      const body = JSON.stringify([{ name: 'STRIPE_SECRET_KEY', value: secretKey }, { name: 'STRIPE_WEBHOOK_SECRET', value: webhookSecret || '' }]);
+      const req = https.request({ hostname: 'api.supabase.com', path: '/v1/projects/${SUPABASE_PROJECT_REF}/secrets', method: 'POST', headers: { Authorization: 'Bearer ${SUPABASE_ACCESS_TOKEN}', 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } }, (r) => {
+        let rb = ''; r.on('data', c => rb += c);
+        r.on('end', () => { if (r.statusCode >= 200 && r.statusCode < 300) { console.log('Stripe secrets synced (mode=' + mode + ')'); } else { console.error('Secret sync failed:', r.statusCode, rb); } });
+      });
+      req.on('error', e => console.error('Secret sync error:', e.message));
+      req.write(body); req.end();
+    } catch(e) { console.error('Secret sync parse error:', e.message); }
+  });
+}).on('error', e => console.error('DB fetch error:', e.message));
+STRIPE_SYNC_EOF
 else
   echo "⚠️  Skipping edge functions (SUPABASE_ACCESS_TOKEN or SUPABASE_PROJECT_REF not set)."
 fi

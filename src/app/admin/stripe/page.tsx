@@ -236,6 +236,7 @@ function StripeSetup({ activeMode: activeModeOverride, onActivated }: { activeMo
             onChange={(e) => { setKey(e.target.value); setResult(null); }}
             placeholder="sk_live_... or sk_test_..."
             className="input-field pr-10 font-mono text-sm"
+            autoComplete="new-password"
           />
           <button type="button" onClick={() => setShowKey((v) => !v)} className="absolute right-3 top-2.5 text-secondary-400">
             {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -257,6 +258,7 @@ function StripeSetup({ activeMode: activeModeOverride, onActivated }: { activeMo
             onChange={(e) => { setWebhookSecret(e.target.value); setResult(null); }}
             placeholder="whsec_... (optional — auto-registered if blank)"
             className="input-field pr-10 font-mono text-sm"
+            autoComplete="new-password"
           />
           <button type="button" onClick={() => setShowWebhook((v) => !v)} className="absolute right-3 top-2.5 text-secondary-400">
             {showWebhook ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -366,7 +368,7 @@ function StripeDashboard() {
       }
     } catch (e: unknown) {
       if (showSpinner) setError(getErrorMessage(e));
-      else setRefreshError("Data refresh failed after mode switch — click Refresh to retry.");
+      else setRefreshError("Data refresh failed after mode switch — click Refresh to retry - Check or Re-Enter stripe keys.");
     }
     if (showSpinner) setLoading(false);
   };

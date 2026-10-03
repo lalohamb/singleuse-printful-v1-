@@ -29,6 +29,25 @@ async function pushSecretsToSupabase(secretKey: string, webhookSecret: string) {
     const text = await res.text();
     throw new Error(`Supabase secrets update failed: ${res.status} ${text}`);
   }
+
+  // Force-redeploy stripe-checkout so the new key takes effect immediately
+  // rather than waiting for the next natural cold boot. Non-fatal.
+  try {
+    const deployRes = await fetch(
+      `https://api.supabase.com/v1/projects/${projectRef}/functions/stripe-checkout/deploy`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }
+    );
+    if (!deployRes.ok) {
+      const t = await deployRes.text();
+      console.warn(`stripe-checkout redeploy failed (non-fatal): ${deployRes.status} ${t}`);
+    }
+  } catch (e) {
+    console.warn("stripe-checkout redeploy error (non-fatal):", e);
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -50,7 +69,7 @@ export async function POST(req: NextRequest) {
   try {
     await pushSecretsToSupabase(secretKey, webhookSecret ?? "");
     await setStripeMode(mode);
-    return NextResponse.json({ ok: true, mode });
+    return NextResponse.json({ ok: true, mode, redeployed: true });
   } catch (e: unknown) {
     return NextResponse.json({ error: getErrorMessage(e) }, { status: 500 });
   }

@@ -78,8 +78,8 @@ ADMIN_EMAIL=$(env_require           "ADMIN_EMAIL"                "$ENV_LOCAL" "A
 ADMIN_PASSWORD=$(env_require        "ADMIN_PASSWORD"             "$ENV_LOCAL" "Admin Password (min 6 chars)")
 
 echo -e "\n  ${YELLOW}Server (production only)${NC}"
-APP_ROOT=$(env_require              "APP_ROOT"                   "$ENV_LOCAL" "App Root on server" "/var/www/myapp")
-PM2_APP_NAME=$(env_require          "PM2_APP_NAME"               "$ENV_LOCAL" "PM2 App Name" "myapp")
+APP_ROOT=$(env_require              "APP_ROOT"                   "$ENV_LOCAL" "App Root on server" "/var/www/countybuys")
+PM2_APP_NAME=$(env_require          "PM2_APP_NAME"               "$ENV_LOCAL" "PM2 App Name" "countybuys")
 SITE_URL=$(env_require              "NEXT_PUBLIC_SITE_URL"       "$ENV_LOCAL" "Site URL" "http://localhost:3000")
 
 # Write remaining required vars
@@ -116,7 +116,7 @@ if [[ "$USE_PSQL" == "true" ]]; then
     read -rp "  Supabase DB Password (from dashboard → Settings → Database): " DB_PASSWORD
     env_set "DB_PASSWORD" "$DB_PASSWORD" "$ENV_LOCAL"
   fi
-  DB_URL="postgresql://postgres.${SUPABASE_PROJECT_REF}:${DB_PASSWORD}@aws-0-us-west-2.pooler.supabase.com:6543/postgres"
+  DB_URL="postgresql://postgres.${SUPABASE_PROJECT_REF}:${DB_PASSWORD}@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
 fi
 
 echo "  Running 01_schema.sql..."
