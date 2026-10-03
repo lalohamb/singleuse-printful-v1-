@@ -9,56 +9,149 @@ import {
   type ArtworkValidationResult,
   type ArtworkValidationStatus,
 } from "@/lib/fulfillment/artwork-validation";
+import type { ProductSummary } from "./types";
+
+// ── Module-level summary cache (shared with Phase11AComponents) ───────────────
+// Keyed by Printful catalog product ID. Populated in batches of 20.
+// TTL: page session only — no stale data served across navigations.
+const _summaryCache = new Map<number, ProductSummary | "loading" | null>();
+
+async function batchFetchSummaries(ids: number[]): Promise<void> {
+  const missing = ids.filter((id) => !_summaryCache.has(id));
+  if (missing.length === 0) return;
+  // Mark as loading immediately to prevent duplicate requests
+  for (const id of missing) _summaryCache.set(id, "loading");
+  // Fetch in chunks of 20 (server cap)
+  for (let i = 0; i < missing.length; i += 20) {
+    const chunk = missing.slice(i, i + 20);
+    try {
+      const res = await fetch(`/api/catalog-builder/product-summary?ids=${chunk.join(",")}`);
+      const data = await res.json();
+      for (const id of chunk) {
+        const entry = data[id];
+        _summaryCache.set(id, entry?.error || !entry ? null : (entry as ProductSummary));
+      }
+    } catch {
+      for (const id of chunk) _summaryCache.set(id, null);
+    }
+  }
+}
+
+// ── Skeleton card ─────────────────────────────────────────────────────────────
+function SkeletonCard() {
+  return (
+    <div className="rounded-xl border border-secondary-100 p-3 animate-pulse">
+      <div className="aspect-square bg-secondary-100 rounded-lg mb-2" />
+      <div className="h-3 bg-secondary-100 rounded w-3/4 mb-1" />
+      <div className="h-2.5 bg-secondary-100 rounded w-1/2" />
+    </div>
+  );
+}
 
 // ── Stage 1: Blank Selection ──────────────────────────────────────────────────
+// Issue C fix:
+// - Products render immediately as skeletons while the catalog fetch is in flight
+// - Search box is available before products load
+// - After products load, a single batch request fetches all summaries at once
+// - Summary costs populate progressively per card without blocking browsing
+// - Images use loading="lazy" to defer off-screen decoding
 
 export function BlankSelector({ onSelect }: { onSelect: (p: PrintfulProduct) => void }) {
   const [products, setProducts] = useState<PrintfulProduct[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [catalogLoading, setCatalogLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  // summaryTick increments when cache is updated, triggering card re-renders
+  const [summaryTick, setSummaryTick] = useState(0);
 
   useEffect(() => {
     fetch("/api/printful/products")
       .then((r) => r.json())
-      .then((d) => { if (d.error) throw new Error(d.error); setProducts(d.result ?? []); })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+      .then(async (d) => {
+        if (d.error) throw new Error(d.error);
+        const list: PrintfulProduct[] = d.result ?? [];
+        setProducts(list);
+        setCatalogLoading(false);
+        // Batch-fetch all summaries after catalog loads; update tick when done
+        await batchFetchSummaries(list.map((p) => p.id));
+        setSummaryTick((t) => t + 1);
+      })
+      .catch((e) => { setError(e.message); setCatalogLoading(false); });
   }, []);
 
   const filtered = products.filter((p) =>
-    !search || p.title.toLowerCase().includes(search.toLowerCase()) ||
+    !search ||
+    p.title.toLowerCase().includes(search.toLowerCase()) ||
     (p.brand ?? "").toLowerCase().includes(search.toLowerCase())
   );
 
-  if (loading) return <div className="flex justify-center py-12"><Loader2 size={28} className="animate-spin text-secondary-300" /></div>;
-  if (error) return <div className="bg-error-50 text-error-700 rounded-lg p-3 text-sm">{error}</div>;
+  if (error) return <div className="bg-red-50 text-red-700 rounded-lg p-3 text-sm">{error}</div>;
 
   return (
     <div className="space-y-4">
       <div className="relative">
         <Search size={16} className="absolute left-3 top-2.5 text-secondary-400" />
         <input
-          value={search} onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search blanks by name or brand..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search blanks by name or brand…"
           className="input-field pl-9 py-2"
+          disabled={catalogLoading}
         />
       </div>
+
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        {filtered.map((p) => (
-          <button key={p.id} onClick={() => onSelect(p)}
-            className="rounded-xl border border-secondary-200 p-3 text-left hover:border-secondary-900 hover:shadow-sm transition-all group">
-            <div className="aspect-square bg-secondary-50 rounded-lg overflow-hidden mb-2 relative">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p.image} alt={p.title} className="w-full h-full object-contain p-1" />
-            </div>
-            <p className="text-xs font-semibold text-secondary-900 line-clamp-2 leading-tight">{p.title}</p>
-            {p.brand && <p className="text-[10px] text-secondary-400 mt-0.5">{p.brand}</p>}
-            <p className="text-[10px] text-secondary-400 mt-0.5">{p.variant_count} variants</p>
-          </button>
-        ))}
+        {catalogLoading
+          // Show 12 skeleton cards while catalog is loading
+          ? Array.from({ length: 12 }).map((_, i) => <SkeletonCard key={i} />)
+          : filtered.map((p) => {
+              const cached = _summaryCache.get(p.id);
+              const summary = cached && cached !== "loading" ? cached : null;
+              const summaryLoading = cached === "loading";
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => onSelect(p)}
+                  className="rounded-xl border border-secondary-200 p-3 text-left hover:border-secondary-900 hover:shadow-sm transition-all group"
+                >
+                  <div className="aspect-square bg-secondary-50 rounded-lg overflow-hidden mb-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={p.image}
+                      alt={p.title}
+                      loading="lazy"
+                      className="w-full h-full object-contain p-1"
+                    />
+                  </div>
+                  <p className="text-xs font-semibold text-secondary-900 line-clamp-2 leading-tight">{p.title}</p>
+                  {p.brand && <p className="text-[10px] text-secondary-400 mt-0.5">{p.brand}</p>}
+                  {summaryLoading ? (
+                    <div className="mt-1 h-2.5 bg-secondary-100 rounded w-2/3 animate-pulse" />
+                  ) : summary ? (
+                    <div className="mt-1 space-y-0.5">
+                      <p className="text-[10px] text-secondary-500">
+                        {summary.color_count} colors · {summary.size_count} sizes
+                      </p>
+                      {summary.min_cost !== null && (
+                        <p className="text-[10px] font-medium text-secondary-700">
+                          From ${summary.min_cost.toFixed(2)}
+                          {summary.max_cost !== null && summary.max_cost !== summary.min_cost
+                            ? `–$${summary.max_cost.toFixed(2)}`
+                            : ""}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-secondary-400 mt-0.5">{p.variant_count} variants</p>
+                  )}
+                </button>
+              );
+            })}
       </div>
-      {filtered.length === 0 && <p className="text-center text-secondary-400 py-8">No blanks found.</p>}
+
+      {!catalogLoading && filtered.length === 0 && (
+        <p className="text-center text-secondary-400 py-8">No blanks found.</p>
+      )}
     </div>
   );
 }

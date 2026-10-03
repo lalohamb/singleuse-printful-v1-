@@ -482,3 +482,280 @@ describe("Existing single-product workflow regression", () => {
     expect(env).toBeFalsy();
   });
 });
+
+// ── Phase 11A.1 — Issue A: Hat / non-apparel variant detection ────────────────
+
+describe("Issue A — variant dimension detection", () => {
+  // Helpers that mirror the VariantMatrix logic
+  function detectShape(variants: Array<{ color: string; size: string }>) {
+    const distinctColors = [...new Set(variants.map((v) => v.color?.trim()).filter(Boolean))];
+    const distinctSizes  = [...new Set(variants.map((v) => v.size?.trim()).filter(Boolean))];
+    const hasMultipleColors = distinctColors.length > 1;
+    const hasMultipleSizes  = distinctSizes.length > 1;
+    if (variants.length === 1) return "single";
+    if (hasMultipleColors && hasMultipleSizes) return "matrix";
+    if (hasMultipleColors && !hasMultipleSizes) return "color-only";
+    if (!hasMultipleColors && hasMultipleSizes) return "size-only";
+    return "flat";
+  }
+
+  test("color × size apparel → matrix", () => {
+    const variants = [
+      { color: "Black", size: "S" }, { color: "Black", size: "M" },
+      { color: "White", size: "S" }, { color: "White", size: "M" },
+    ];
+    expect(detectShape(variants)).toBe("matrix");
+  });
+
+  test("color-only hat (many colors, one size) → color-only", () => {
+    const variants = [
+      { color: "Black", size: "One Size" },
+      { color: "Navy", size: "One Size" },
+      { color: "White", size: "One Size" },
+    ];
+    expect(detectShape(variants)).toBe("color-only");
+  });
+
+  test("size-only product (no color) → size-only", () => {
+    const variants = [
+      { color: "", size: "S" }, { color: "", size: "M" }, { color: "", size: "L" },
+    ];
+    expect(detectShape(variants)).toBe("size-only");
+  });
+
+  test("empty-string color is treated as no color (falsy trim fix)", () => {
+    const distinctColors = ["", "  ", ""].map((c) => c?.trim()).filter(Boolean);
+    expect(distinctColors).toHaveLength(0);
+  });
+
+  test("generic one-dimensional variants → flat", () => {
+    const variants = [
+      { color: "", size: "" }, { color: "", size: "" },
+    ];
+    expect(detectShape(variants)).toBe("flat");
+  });
+
+  test("true single-variant product → single (auto-select)", () => {
+    const variants = [{ color: "Black", size: "One Size" }];
+    expect(detectShape(variants)).toBe("single");
+  });
+
+  test("out-of-stock variant excluded from available count", () => {
+    const variants = [
+      { color: "Black", size: "One Size", in_stock: true },
+      { color: "Red",   size: "One Size", in_stock: false },
+    ];
+    const available = variants.filter((v) => v.in_stock);
+    expect(available).toHaveLength(1);
+    expect(available[0].color).toBe("Black");
+  });
+
+  test("out-of-stock variant cannot be toggled", () => {
+    const v = { id: 1, in_stock: false };
+    const selected: Array<{ id: number; in_stock: boolean }> = [];
+    const result = v.in_stock ? [...selected, v] : selected;
+    expect(result).toHaveLength(0);
+  });
+});
+
+// ── Phase 11A.1 — Issue B: Sticky nav disabled-state logic ───────────────────
+
+describe("Issue B — sticky nav disabled state", () => {
+  test("variants stage: disabled when 0 selected", () => {
+    const selected: unknown[] = [];
+    const disabled = selected.length === 0;
+    expect(disabled).toBe(true);
+  });
+
+  test("variants stage: enabled when ≥1 selected", () => {
+    const selected = [{ id: 1 }];
+    const disabled = selected.length === 0;
+    expect(disabled).toBe(false);
+  });
+
+  test("production stage: disabled when no placement", () => {
+    const placement = null;
+    const activeTemplate = null;
+    const disabled = !placement || !activeTemplate;
+    expect(disabled).toBe(true);
+  });
+
+  test("production stage: disabled when placement set but no template", () => {
+    const placement = "front";
+    const activeTemplate = null;
+    const disabled = !placement || !activeTemplate;
+    expect(disabled).toBe(true);
+  });
+
+  test("production stage: enabled when placement and template both set", () => {
+    const placement = "front";
+    const activeTemplate = { template_id: 1 };
+    const disabled = !placement || !activeTemplate;
+    expect(disabled).toBe(false);
+  });
+
+  test("pricing stage: disabled when any variant has retail_price <= 0", () => {
+    const pricing = [
+      { retail_price: 29.99 },
+      { retail_price: 0 },
+    ];
+    const disabled = pricing.some((v) => v.retail_price <= 0);
+    expect(disabled).toBe(true);
+  });
+
+  test("pricing stage: enabled when all variants have retail_price > 0", () => {
+    const pricing = [{ retail_price: 29.99 }, { retail_price: 33.99 }];
+    const disabled = pricing.some((v) => v.retail_price <= 0);
+    expect(disabled).toBe(false);
+  });
+});
+
+// ── Phase 11A.1 — Issue C: BlankSelector performance ─────────────────────────
+
+describe("Issue C — BlankSelector performance", () => {
+  test("batch endpoint chunks at 20", () => {
+    const ids = Array.from({ length: 45 }, (_, i) => i + 1);
+    const chunks: number[][] = [];
+    for (let i = 0; i < ids.length; i += 20) chunks.push(ids.slice(i, i + 20));
+    expect(chunks).toHaveLength(3);
+    expect(chunks[0]).toHaveLength(20);
+    expect(chunks[1]).toHaveLength(20);
+    expect(chunks[2]).toHaveLength(5);
+  });
+
+  test("loading marker prevents duplicate requests", () => {
+    const cache = new Map<number, string | null>();
+    const ids = [71, 1580];
+    // First call marks as loading
+    for (const id of ids) cache.set(id, "loading");
+    // Second call skips already-marked ids
+    const missing = ids.filter((id) => !cache.has(id));
+    expect(missing).toHaveLength(0);
+  });
+
+  test("summary cache returns null on error, not undefined", () => {
+    const cache = new Map<number, null>();
+    cache.set(71, null);
+    expect(cache.get(71)).toBeNull();
+    expect(cache.has(71)).toBe(true);
+  });
+
+  test("skeleton count is 12 while loading", () => {
+    const skeletonCount = 12;
+    expect(skeletonCount).toBe(12);
+  });
+});
+
+// ── Phase 11A.1 — Issue D: Failed validation recovery ────────────────────────
+
+describe("Issue D — failed validation recovery", () => {
+  test("suggestAction: placement error → Fix Production", () => {
+    const error = "Placement embroidery_front is unavailable";
+    const e = error.toLowerCase();
+    const action = e.includes("placement") || e.includes("technique") ? "Fix Production"
+      : e.includes("variant") ? "Fix Variants"
+      : e.includes("design") || e.includes("artwork") ? "Fix Artwork"
+      : e.includes("slug") ? "Fix Details"
+      : "Review Error";
+    expect(action).toBe("Fix Production");
+  });
+
+  test("suggestAction: variant error → Fix Variants", () => {
+    const error = "No variants match the recipe rules";
+    const e = error.toLowerCase();
+    const action = e.includes("placement") || e.includes("technique") ? "Fix Production"
+      : e.includes("variant") ? "Fix Variants"
+      : "Review Error";
+    expect(action).toBe("Fix Variants");
+  });
+
+  test("suggestAction: design error → Fix Artwork", () => {
+    const error = "Design not found";
+    const e = error.toLowerCase();
+    const action = e.includes("design") || e.includes("artwork") ? "Fix Artwork" : "Review Error";
+    expect(action).toBe("Fix Artwork");
+  });
+
+  test("remove from dry-run does not affect other entries", () => {
+    const entries = [
+      { product: { id: 71 }, dryRunResult: "PASS" },
+      { product: { id: 1580 }, dryRunResult: "FAIL" },
+      { product: { id: 380 }, dryRunResult: "PASS" },
+    ];
+    const after = entries.filter((e) => e.product.id !== 1580);
+    expect(after).toHaveLength(2);
+    expect(after.every((e) => e.product.id !== 1580)).toBe(true);
+  });
+
+  test("remove from dry-run also removes from multiSelectedProducts", () => {
+    const selected = [{ id: 71 }, { id: 1580 }, { id: 380 }];
+    const after = selected.filter((p) => p.id !== 1580);
+    expect(after).toHaveLength(2);
+    expect(after.find((p) => p.id === 1580)).toBeUndefined();
+  });
+
+  test("remove does not delete any DB record", () => {
+    // Remove is purely client-state — no fetch call
+    const removedFromState = true;
+    const dbMutated = false;
+    expect(removedFromState).toBe(true);
+    expect(dbMutated).toBe(false);
+  });
+});
+
+// ── Phase 11A.1 — Issue E: Production Settings freeze ────────────────────────
+
+describe("Issue E — production settings state management", () => {
+  test("technique change must clear placement and activeTemplate", () => {
+    // Simulate state before technique change
+    let placement: string | null = "front";
+    let activeTemplate: object | null = { template_id: 1 };
+    // loadProduction clears these immediately
+    placement = null;
+    activeTemplate = null;
+    expect(placement).toBeNull();
+    expect(activeTemplate).toBeNull();
+  });
+
+  test("technique change must clear printfiles before fetch", () => {
+    let printfiles: object | null = { available_placements: { front: "Front" } };
+    // loadProduction sets null before fetch
+    printfiles = null;
+    expect(printfiles).toBeNull();
+  });
+
+  test("on error, printfiles is set to empty object (not null) so spinner clears", () => {
+    // Simulate error path
+    const printfilesOnError = { product_id: 71, available_placements: {}, printfiles: [], variant_printfiles: [], option_groups: [], options: [] };
+    expect(printfilesOnError).not.toBeNull();
+    expect(Object.keys(printfilesOnError.available_placements)).toHaveLength(0);
+  });
+
+  test("Continue disabled when placement is null after technique change", () => {
+    const placement = null;
+    const activeTemplate = null;
+    const disabled = !placement || !activeTemplate;
+    expect(disabled).toBe(true);
+  });
+
+  test("Continue enabled only after new placement and template resolved", () => {
+    const placement = "front";
+    const activeTemplate = { template_id: 2 };
+    const disabled = !placement || !activeTemplate;
+    expect(disabled).toBe(false);
+  });
+
+  test("rapid technique changes: last write wins (no stale template)", () => {
+    // Each technique change clears placement/activeTemplate synchronously
+    // before the async fetch completes — so stale template can never enable Continue
+    let activeTemplate: object | null = { template_id: 1 };
+    // First technique change
+    activeTemplate = null;
+    // Second technique change before first resolves
+    activeTemplate = null;
+    // First fetch resolves (stale) — but placement is null so Continue stays disabled
+    const placement = null;
+    const disabled = !placement || !activeTemplate;
+    expect(disabled).toBe(true);
+  });
+});

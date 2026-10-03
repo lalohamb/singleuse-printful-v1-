@@ -15,7 +15,7 @@ import OptionsSelector from "@/components/product-designer/OptionsSelector";
 import { BlankSelector, DesignPicker, ArtworkValidationPanel } from "./StageComponents";
 import {
   CreationModeSelector, ProductCard, VariantMatrix, PricingPreview, BuildSummary,
-  MultiDryRunPanel, prefetchSummaries,
+  MultiDryRunPanel, StickyWizardNav, prefetchSummaries,
   type MultiDryRunEntry,
 } from "./Phase11AComponents";
 import { initialBuilderState, type BuilderStage, type CatalogBuilderState, type BuiltMockup, type VariantPricing } from "./types";
@@ -132,18 +132,28 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
   });
 
   // ── Stage: production — load printfiles + templates ───────────────────────
-  async function loadProduction(productId: number, technique: string) {
+  // Issue E fix: always clear printfiles/templates/placement/activeTemplate before
+  // fetching so the UI never shows stale data. On error, restore to empty (not null)
+  // so the spinner clears and the operator sees the error with a retry path.
+  async function loadProduction(catalogProductId: number, technique: string) {
     setError(null);
+    // Clear stale state immediately — prevents Continue staying enabled with old template
+    setPrintfiles(null);
+    setTemplates(null);
+    update({ placement: null, activeTemplate: null, printfileId: null });
     try {
       const [pf, tmpl] = await Promise.all([
-        fetch(`/api/printful/printfiles/${productId}`).then((r) => r.json()),
-        fetch(`/api/printful/templates/${productId}?technique=${technique}`).then((r) => r.json()),
+        fetch(`/api/printful/printfiles/${catalogProductId}`).then((r) => r.json()),
+        fetch(`/api/printful/templates/${catalogProductId}?technique=${technique}`).then((r) => r.json()),
       ]);
       if (pf.error) throw new Error(pf.error);
       if (tmpl.error) throw new Error(tmpl.error);
       setPrintfiles(pf.result);
       setTemplates(tmpl.result);
     } catch (e) {
+      // Set empty objects so the spinner clears — error is shown, operator can retry
+      setPrintfiles({ product_id: catalogProductId, available_placements: {}, printfiles: [], variant_printfiles: [], option_groups: [], options: [] });
+      setTemplates(null);
       setError(e instanceof Error ? e.message : "Failed to load production data");
     }
   }
@@ -377,6 +387,12 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
     }
   }
 
+  // ── Multi-mode: remove one product from dry-run candidates ────────────────
+  function handleRemoveFromDryRun(productId: number) {
+    update({ multiSelectedProducts: state.multiSelectedProducts.filter((p) => p.id !== productId) });
+    setMultiDryRunEntries((prev) => prev.filter((e) => e.product.id !== productId));
+  }
+
   // ── Multi-mode: proceed to design stage ──────────────────────────────────
   function handleMultiProceed() {
     go("design");
@@ -485,8 +501,96 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
 
   const showSummary = !["mode", "blank", "review"].includes(stage) && !!(state.catalogProduct || (state.creationMode === "multi" && state.multiSelectedProducts.length > 0));
 
+  // ── Sticky nav config per stage ───────────────────────────────────────────────
+  // mode and review stages manage their own navigation inline.
+  interface NavConfig {
+    stepLabel: string; stepIndex: number; totalSteps: number;
+    onBack?: () => void; onContinue?: () => void;
+    continueLabel?: string; continueDisabled?: boolean;
+    continueDisabledReason?: string; statusText?: string; loading?: boolean;
+  }
+  const stickyNav = ((): NavConfig | null => {
+    const stageIdx = STAGES.indexOf(stage);
+    const base = { stepLabel: STAGE_LABELS[stage], stepIndex: stageIdx, totalSteps: STAGES.length };
+    switch (stage) {
+      case "blank":
+        return null; // blank uses card-click navigation, no Continue needed
+      case "variants": {
+        const n = state.selectedVariants.length;
+        return {
+          ...base,
+          onBack: () => go("blank"),
+          onContinue: () => go("design"),
+          continueLabel: `Continue (${n} selected)`,
+          continueDisabled: n === 0,
+          continueDisabledReason: n === 0 ? "Select at least one available variant." : undefined,
+          statusText: n > 0 ? `${n} variant${n !== 1 ? "s" : ""} selected` : undefined,
+        };
+      }
+      case "design":
+        return { ...base, onBack: () => go(state.creationMode === "multi" ? "blank" : "variants") };
+      case "production": {
+        const ready = !!state.placement && !!state.activeTemplate;
+        return {
+          ...base,
+          onBack: () => go("design"),
+          onContinue: () => go("designer"),
+          continueDisabled: !ready,
+          continueDisabledReason: !state.placement ? "Select a placement to continue." : !state.activeTemplate ? "No template found for this placement." : undefined,
+        };
+      }
+      case "designer":
+        return {
+          ...base,
+          onBack: () => go("production"),
+          onContinue: handleGenerate,
+          continueLabel: generating ? "Submitting…" : "Generate Mockups",
+          continueDisabled: !state.artworkUrl || generating || uploading,
+          continueDisabledReason: !state.artworkUrl ? "Position your artwork first." : undefined,
+          loading: generating,
+        };
+      case "mockups":
+        return { ...base, onBack: () => { go("designer"); } };
+      case "details": {
+        const ready = !!state.title && !!state.slug;
+        return {
+          ...base,
+          onBack: () => go("mockups"),
+          onContinue: () => {
+            if (state.variantPricing.length === 0) {
+              update({ variantPricing: state.selectedVariants.map((v) => ({
+                printful_variant_id: String(v.id),
+                label: v.name,
+                color: v.color || null,
+                size: v.size || null,
+                provider_cost: parseFloat(v.price) || 0,
+                retail_price: Math.ceil(parseFloat(v.price) * 2.5),
+              })) });
+            }
+            go("pricing");
+          },
+          continueDisabled: !ready,
+          continueDisabledReason: !state.title ? "Enter a product title." : !state.slug ? "Enter a product slug." : undefined,
+        };
+      }
+      case "pricing": {
+        const invalid = state.variantPricing.some((v) => v.retail_price <= 0);
+        return {
+          ...base,
+          onBack: () => go("details"),
+          onContinue: () => go("review"),
+          continueLabel: "Review",
+          continueDisabled: invalid,
+          continueDisabledReason: invalid ? "Set a price > $0 for all variants." : undefined,
+        };
+      }
+      default:
+        return null;
+    }
+  })();
+
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="max-w-5xl mx-auto pb-20">
     <div className={`gap-6 ${showSummary ? "grid grid-cols-1 lg:grid-cols-[1fr_220px]" : ""}`}>
     <div className="space-y-6">
       {editError && (
@@ -571,14 +675,6 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
             selected={state.selectedVariants}
             onChange={(v) => update({ selectedVariants: v })}
           />
-          <div className="flex justify-between pt-2">
-            <button onClick={() => go("blank")} className="text-sm text-secondary-400 underline">← Back</button>
-            <button
-              disabled={state.selectedVariants.length === 0}
-              onClick={() => go("design")}
-              className="btn-primary px-5 py-2 text-sm disabled:opacity-40"
-            >Continue ({state.selectedVariants.length} selected)</button>
-          </div>
         </section>
       )}
 
@@ -617,7 +713,6 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
                 loadProduction(state.catalogProduct.id, state.technique);
             }}
           />
-          <button onClick={() => go("variants")} className="text-sm text-secondary-400 underline">← Back</button>
         </section>
       )}
       {stage === "production" && state.catalogProduct && (
@@ -652,14 +747,6 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
               </div>
             </>
           )}
-          <div className="flex justify-between pt-2">
-            <button onClick={() => go("design")} className="text-sm text-secondary-400 underline">← Back</button>
-            <button
-              disabled={!state.placement || !state.activeTemplate}
-              onClick={() => go("designer")}
-              className="btn-primary px-5 py-2 text-sm disabled:opacity-40"
-            >Continue</button>
-          </div>
         </section>
       )}
 
@@ -677,17 +764,6 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
               filter which variants get mockups and frequently cause 400 errors when combined
               with a single variant. Users can use the standalone Product Designer for advanced options. */}
           {uploadError && <p className="text-xs text-red-500">{uploadError}</p>}
-          <div className="flex justify-between pt-2">
-            <button onClick={() => go("production")} className="text-sm text-secondary-400 underline">← Back</button>
-            <button
-              disabled={!state.artworkUrl || generating || uploading}
-              onClick={handleGenerate}
-              className="btn-primary px-5 py-2 text-sm disabled:opacity-40 flex items-center gap-2"
-            >
-              {generating && <Loader2 size={14} className="animate-spin" />}
-              {generating ? "Submitting…" : "Generate Mockups"}
-            </button>
-          </div>
         </section>
       )}
 
@@ -758,28 +834,6 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
               <input value={state.productType} onChange={(e) => update({ productType: e.target.value })} className="input-field" placeholder="e.g. T-Shirt" />
             </div>
           </div>
-
-          <div className="flex justify-between pt-2">
-            <button onClick={() => go("mockups")} className="text-sm text-secondary-400 underline">← Back</button>
-            <button
-              disabled={!state.title || !state.slug}
-              onClick={() => {
-                // Init pricing from selected variants
-                if (state.variantPricing.length === 0) {
-                  update({ variantPricing: state.selectedVariants.map((v) => ({
-                    printful_variant_id: String(v.id),
-                    label: v.name,
-                    color: v.color || null,
-                    size: v.size || null,
-                    provider_cost: parseFloat(v.price) || 0,
-                    retail_price: Math.ceil(parseFloat(v.price) * 2.5),
-                  })) });
-                }
-                go("pricing");
-              }}
-              className="btn-primary px-5 py-2 text-sm disabled:opacity-40"
-            >Continue</button>
-          </div>
         </section>
       )}
 
@@ -813,14 +867,6 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
               </div>
             ))}
           </div>
-          <div className="flex justify-between pt-2">
-            <button onClick={() => go("details")} className="text-sm text-secondary-400 underline">← Back</button>
-            <button
-              disabled={state.variantPricing.some((v) => v.retail_price <= 0)}
-              onClick={() => go("review")}
-              className="btn-primary px-5 py-2 text-sm disabled:opacity-40"
-            >Review</button>
-          </div>
         </section>
       )}
 
@@ -837,6 +883,7 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
               errors: [],
             }))}
             onRunAll={handleMultiDryRun}
+            onRemove={handleRemoveFromDryRun}
             running={multiDryRunning}
           />
           {/* Post-validation actions — only shown after at least one run */}
@@ -966,6 +1013,21 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
       </aside>
     )}
     </div>
+    {/* Sticky wizard nav — Issue B fix */}
+    {stickyNav && (
+      <StickyWizardNav
+        stepLabel={stickyNav.stepLabel}
+        stepIndex={stickyNav.stepIndex}
+        totalSteps={stickyNav.totalSteps}
+        onBack={stickyNav.onBack}
+        onContinue={stickyNav.onContinue}
+        continueLabel={stickyNav.continueLabel}
+        continueDisabled={stickyNav.continueDisabled}
+        continueDisabledReason={stickyNav.continueDisabledReason}
+        statusText={stickyNav.statusText}
+        loading={stickyNav.loading}
+      />
+    )}
     </div>
   );
 }

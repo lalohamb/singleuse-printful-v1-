@@ -131,7 +131,15 @@ export function ProductCard({
   );
 }
 
-// ── VariantMatrix: color × size grid ─────────────────────────────────────────
+// ── VariantMatrix: color × size grid, color-only, size-only, flat ────────────
+// Issue A fix: hats have color but one shared size — previously rendered as a
+// confusing single-column matrix. Now detects dimension shape and renders the
+// appropriate selector. Also fixes empty-string color (falsy) on some products.
+
+function variantLabel(v: PrintfulVariant): string {
+  const parts = [v.color, v.size].filter(Boolean);
+  return parts.length > 0 ? parts.join(" / ") : v.name;
+}
 
 export function VariantMatrix({
   catalogProductId,
@@ -153,21 +161,21 @@ export function VariantMatrix({
       .then((r) => r.json())
       .then((d) => {
         if (d.error) throw new Error(d.error);
-        setVariants(d.result?.variants ?? []);
+        const vs: PrintfulVariant[] = d.result?.variants ?? [];
+        setVariants(vs);
+        // Auto-select the only variant if exactly one exists and it is in stock
+        if (vs.length === 1 && vs[0].in_stock) onChange([vs[0]]);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalogProductId]);
 
   if (loading) return <div className="flex justify-center py-8"><Loader2 size={24} className="animate-spin text-secondary-300" /></div>;
   if (error) return <div className="bg-red-50 text-red-700 rounded-lg p-3 text-sm">{error}</div>;
 
   const selectedIds = new Set(selected.map((v) => v.id));
-
-  // Detect if this is a color×size product or a flat list
-  const hasColors = variants.some((v) => v.color);
-  const hasSizes  = variants.some((v) => v.size);
-  const isMatrix  = hasColors && hasSizes;
+  const available = variants.filter((v) => v.in_stock);
 
   const toggle = (v: PrintfulVariant) => {
     if (!v.in_stock) return;
@@ -175,16 +183,88 @@ export function VariantMatrix({
     else onChange([...selected, v]);
   };
 
-  const available = variants.filter((v) => v.in_stock);
+  // Determine dimension shape
+  // Use trimmed non-empty string check — some products have color="" (falsy)
+  const distinctColors = [...new Set(variants.map((v) => v.color?.trim()).filter(Boolean))];
+  const distinctSizes  = [...new Set(variants.map((v) => v.size?.trim()).filter(Boolean))];
+  const hasMultipleColors = distinctColors.length > 1;
+  const hasMultipleSizes  = distinctSizes.length > 1;
+  const isFullMatrix = hasMultipleColors && hasMultipleSizes;
+  const isColorOnly  = hasMultipleColors && !hasMultipleSizes; // hats: many colors, one size
+  const isSizeOnly   = !hasMultipleColors && hasMultipleSizes;
+  // Everything else (single variant, no dimensions, or truly flat) → flat list
 
-  // ── Non-apparel fallback: flat list ──────────────────────────────────────
-  if (!isMatrix) {
+  // ── Single variant: auto-selected, show confirmation ─────────────────────
+  if (variants.length === 1) {
+    const v = variants[0];
     return (
       <div className="space-y-3">
-        <div className="flex items-center gap-3">
-          <button onClick={() => onChange([...available])} className="text-xs text-primary-600 underline">
-            Select all available ({available.length})
-          </button>
+        <div className="flex items-center gap-3 p-3 bg-secondary-50 rounded-lg">
+          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+            v.in_stock ? "border-secondary-900 bg-secondary-900" : "border-secondary-200"
+          }`}>
+            {v.in_stock && <Check size={11} className="text-white" />}
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-secondary-900">{variantLabel(v)}</p>
+            <p className="text-xs text-secondary-500">
+              {v.in_stock ? `$${parseFloat(v.price).toFixed(2)} cost — auto-selected` : "Out of stock"}
+            </p>
+          </div>
+        </div>
+        {!v.in_stock && (
+          <p className="text-xs text-red-600">This product has no available variants.</p>
+        )}
+      </div>
+    );
+  }
+
+  // ── Color-only (hats): color swatches / buttons ───────────────────────────
+  if (isColorOnly) {
+    const toggleColor = (v: PrintfulVariant) => toggle(v);
+    const selectAll = () => onChange([...available]);
+    const clear = () => onChange([]);
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <button onClick={selectAll} className="text-xs text-primary-600 underline">Select all ({available.length})</button>
+          <button onClick={clear} className="text-xs text-secondary-400 underline">Clear</button>
+          <span className="text-xs text-secondary-500 ml-auto">{selected.length} selected</span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {variants.map((v) => {
+            const isSel = selectedIds.has(v.id);
+            const label = v.color?.trim() || v.name;
+            return (
+              <button
+                key={v.id}
+                onClick={() => toggleColor(v)}
+                disabled={!v.in_stock}
+                title={v.in_stock ? `$${parseFloat(v.price).toFixed(2)} cost` : "Out of stock"}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
+                  !v.in_stock
+                    ? "border-secondary-100 text-secondary-300 cursor-not-allowed line-through"
+                    : isSel
+                    ? "border-secondary-900 bg-secondary-900 text-white"
+                    : "border-secondary-200 text-secondary-700 hover:border-secondary-400"
+                }`}
+              >
+                {isSel && <Check size={11} />}
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Size-only: size buttons ───────────────────────────────────────────────
+  if (isSizeOnly) {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <button onClick={() => onChange([...available])} className="text-xs text-primary-600 underline">Select all ({available.length})</button>
           <button onClick={() => onChange([])} className="text-xs text-secondary-400 underline">Clear</button>
           <span className="text-xs text-secondary-500 ml-auto">{selected.length} selected</span>
         </div>
@@ -206,7 +286,7 @@ export function VariantMatrix({
                 }`}
               >
                 {isSel && <Check size={11} />}
-                {v.size || v.name}
+                {v.size}
               </button>
             );
           })}
@@ -215,113 +295,126 @@ export function VariantMatrix({
     );
   }
 
-  // ── Apparel matrix ────────────────────────────────────────────────────────
-  const colors: string[] = [];
-  const sizes: string[] = [];
-  const matrix = new Map<string, PrintfulVariant>();
+  // ── Full color × size matrix ──────────────────────────────────────────────
+  if (isFullMatrix) {
+    const colors = distinctColors;
+    const sizes  = distinctSizes;
+    const matrix = new Map<string, PrintfulVariant>();
+    for (const v of variants) {
+      const c = v.color?.trim() || "Default";
+      const s = v.size?.trim()  || "One Size";
+      matrix.set(`${c}|${s}`, v);
+    }
 
-  for (const v of variants) {
-    const c = v.color || "Default";
-    const s = v.size || "One Size";
-    if (!colors.includes(c)) colors.push(c);
-    if (!sizes.includes(s)) sizes.push(s);
-    matrix.set(`${c}|${s}`, v);
+    const toggleColor = (color: string) => {
+      const cv = variants.filter((v) => (v.color?.trim() || "Default") === color && v.in_stock);
+      const allSel = cv.every((v) => selectedIds.has(v.id));
+      if (allSel) onChange(selected.filter((s) => (s.color?.trim() || "Default") !== color));
+      else onChange([...selected, ...cv.filter((v) => !selectedIds.has(v.id))]);
+    };
+
+    const toggleSize = (size: string) => {
+      const sv = variants.filter((v) => (v.size?.trim() || "One Size") === size && v.in_stock);
+      const allSel = sv.every((v) => selectedIds.has(v.id));
+      if (allSel) onChange(selected.filter((s) => (s.size?.trim() || "One Size") !== size));
+      else onChange([...selected, ...sv.filter((v) => !selectedIds.has(v.id))]);
+    };
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <button onClick={() => onChange([...available])} className="text-xs text-primary-600 underline">Select all ({available.length})</button>
+          <button onClick={() => onChange([])} className="text-xs text-secondary-400 underline">Clear</button>
+          <span className="text-xs text-secondary-500 ml-auto">{selected.length} selected</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="text-xs border-collapse w-full">
+            <thead>
+              <tr>
+                <th className="text-left p-1.5 text-secondary-500 font-medium w-28">Color</th>
+                {sizes.map((s) => {
+                  const sv = variants.filter((v) => (v.size?.trim() || "One Size") === s && v.in_stock);
+                  const allSel = sv.length > 0 && sv.every((v) => selectedIds.has(v.id));
+                  return (
+                    <th key={s} className="p-1.5 text-center min-w-[48px]">
+                      <button onClick={() => toggleSize(s)}
+                        className={`text-[10px] font-semibold transition-colors ${allSel ? "text-secondary-900" : "text-secondary-400 hover:text-secondary-700"}`}>
+                        {s}
+                      </button>
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {colors.map((color) => {
+                const cv = variants.filter((v) => (v.color?.trim() || "Default") === color && v.in_stock);
+                const allSel = cv.length > 0 && cv.every((v) => selectedIds.has(v.id));
+                const someSel = cv.some((v) => selectedIds.has(v.id));
+                return (
+                  <tr key={color} className="border-t border-secondary-100">
+                    <td className="p-1.5">
+                      <button onClick={() => toggleColor(color)}
+                        className={`text-left font-medium transition-colors ${
+                          allSel ? "text-secondary-900" : someSel ? "text-secondary-600" : "text-secondary-400"
+                        }`}>
+                        {color}
+                      </button>
+                    </td>
+                    {sizes.map((size) => {
+                      const v = matrix.get(`${color}|${size}`);
+                      if (!v) return <td key={size} className="p-1.5 text-center text-secondary-200 text-[10px]">—</td>;
+                      if (!v.in_stock) return (
+                        <td key={size} className="p-1.5 text-center">
+                          <span className="inline-block w-9 h-7 rounded border border-secondary-100 bg-secondary-50 text-[9px] text-secondary-300 leading-7 text-center">OOS</span>
+                        </td>
+                      );
+                      const isSel = selectedIds.has(v.id);
+                      return (
+                        <td key={size} className="p-1.5 text-center">
+                          <button onClick={() => toggle(v)} title={`$${parseFloat(v.price).toFixed(2)} cost`}
+                            className={`w-9 h-7 rounded border text-[10px] font-medium transition-all ${
+                              isSel ? "border-secondary-900 bg-secondary-900 text-white" : "border-secondary-200 text-secondary-600 hover:border-secondary-500"
+                            }`}>
+                            {isSel ? <Check size={10} className="mx-auto" /> : "✓"}
+                          </button>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
   }
 
-  const toggleColor = (color: string) => {
-    const cv = variants.filter((v) => (v.color || "Default") === color && v.in_stock);
-    const allSel = cv.every((v) => selectedIds.has(v.id));
-    if (allSel) onChange(selected.filter((s) => (s.color || "Default") !== color));
-    else onChange([...selected, ...cv.filter((v) => !selectedIds.has(v.id))]);
-  };
-
-  const toggleSize = (size: string) => {
-    const sv = variants.filter((v) => (v.size || "One Size") === size && v.in_stock);
-    const allSel = sv.every((v) => selectedIds.has(v.id));
-    if (allSel) onChange(selected.filter((s) => (s.size || "One Size") !== size));
-    else onChange([...selected, ...sv.filter((v) => !selectedIds.has(v.id))]);
-  };
-
+  // ── Flat fallback: generic one-dimensional or unlabelled variants ─────────
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-3 flex-wrap">
-        <button onClick={() => onChange([...available])} className="text-xs text-primary-600 underline">
-          Select all available ({available.length})
-        </button>
+      <div className="flex items-center gap-3">
+        <button onClick={() => onChange([...available])} className="text-xs text-primary-600 underline">Select all ({available.length})</button>
         <button onClick={() => onChange([])} className="text-xs text-secondary-400 underline">Clear</button>
         <span className="text-xs text-secondary-500 ml-auto">{selected.length} selected</span>
       </div>
-      <div className="overflow-x-auto">
-        <table className="text-xs border-collapse w-full">
-          <thead>
-            <tr>
-              <th className="text-left p-1.5 text-secondary-500 font-medium w-28">Color</th>
-              {sizes.map((s) => {
-                const sv = variants.filter((v) => (v.size || "One Size") === s && v.in_stock);
-                const allSel = sv.length > 0 && sv.every((v) => selectedIds.has(v.id));
-                return (
-                  <th key={s} className="p-1.5 text-center min-w-[48px]">
-                    <button
-                      onClick={() => toggleSize(s)}
-                      className={`text-[10px] font-semibold transition-colors ${allSel ? "text-secondary-900" : "text-secondary-400 hover:text-secondary-700"}`}
-                    >
-                      {s}
-                    </button>
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
-          <tbody>
-            {colors.map((color) => {
-              const cv = variants.filter((v) => (v.color || "Default") === color && v.in_stock);
-              const allSel = cv.length > 0 && cv.every((v) => selectedIds.has(v.id));
-              const someSel = cv.some((v) => selectedIds.has(v.id));
-              return (
-                <tr key={color} className="border-t border-secondary-100">
-                  <td className="p-1.5">
-                    <button
-                      onClick={() => toggleColor(color)}
-                      className={`text-left font-medium transition-colors ${
-                        allSel ? "text-secondary-900" : someSel ? "text-secondary-600" : "text-secondary-400"
-                      }`}
-                    >
-                      {color}
-                    </button>
-                  </td>
-                  {sizes.map((size) => {
-                    const v = matrix.get(`${color}|${size}`);
-                    if (!v) return (
-                      <td key={size} className="p-1.5 text-center text-secondary-200 text-[10px]">—</td>
-                    );
-                    if (!v.in_stock) return (
-                      <td key={size} className="p-1.5 text-center">
-                        <span className="inline-block w-9 h-7 rounded border border-secondary-100 bg-secondary-50 text-[9px] text-secondary-300 leading-7 text-center">OOS</span>
-                      </td>
-                    );
-                    const isSel = selectedIds.has(v.id);
-                    const cost = parseFloat(v.price);
-                    return (
-                      <td key={size} className="p-1.5 text-center">
-                        <button
-                          onClick={() => toggle(v)}
-                          title={`$${cost.toFixed(2)} cost`}
-                          className={`w-9 h-7 rounded border text-[10px] font-medium transition-all ${
-                            isSel
-                              ? "border-secondary-900 bg-secondary-900 text-white"
-                              : "border-secondary-200 text-secondary-600 hover:border-secondary-500"
-                          }`}
-                        >
-                          {isSel ? <Check size={10} className="mx-auto" /> : "✓"}
-                        </button>
-                      </td>
-                    );
-                  })}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className="flex flex-wrap gap-2">
+        {variants.map((v) => {
+          const isSel = selectedIds.has(v.id);
+          return (
+            <button key={v.id} onClick={() => toggle(v)} disabled={!v.in_stock}
+              title={v.in_stock ? `$${parseFloat(v.price).toFixed(2)} cost` : "Out of stock"}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
+                !v.in_stock ? "border-secondary-100 text-secondary-300 cursor-not-allowed line-through"
+                : isSel ? "border-secondary-900 bg-secondary-900 text-white"
+                : "border-secondary-200 text-secondary-700 hover:border-secondary-400"
+              }`}>
+              {isSel && <Check size={11} />}
+              {variantLabel(v)}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -531,13 +624,29 @@ export interface MultiDryRunEntry {
   errors: string[];
 }
 
+// Derive a suggested action from the error message
+function suggestAction(error: string): { label: string; hint: string } {
+  const e = error.toLowerCase();
+  if (e.includes("placement") || e.includes("technique"))
+    return { label: "Fix Production", hint: "Go back to Production Settings and choose a valid placement/technique." };
+  if (e.includes("variant") || e.includes("no variant"))
+    return { label: "Fix Variants", hint: "Go back to Variant Selection and choose available variants." };
+  if (e.includes("design") || e.includes("artwork"))
+    return { label: "Fix Artwork", hint: "The design may be inactive or missing. Check your Design Library." };
+  if (e.includes("slug"))
+    return { label: "Fix Details", hint: "The product slug is already in use or invalid." };
+  return { label: "Review Error", hint: error };
+}
+
 export function MultiDryRunPanel({
   entries,
   onRunAll,
+  onRemove,
   running,
 }: {
   entries: MultiDryRunEntry[];
   onRunAll: () => void;
+  onRemove: (productId: number) => void;
   running: boolean;
 }) {
   if (entries.length === 0) return null;
@@ -546,17 +655,18 @@ export function MultiDryRunPanel({
   const rng = (a: number | null, b: number | null) =>
     a === null ? "—" : b !== null && Math.abs(a - b) > 0.005 ? `${fmt(a)}–${fmt(b)}` : fmt(a);
 
-  const resultColor = (r: MultiDryRunEntry["dryRunResult"]) => {
-    if (r === "PASS") return "text-green-700 font-semibold";
-    if (r === "WARNING") return "text-yellow-700 font-semibold";
-    if (r === "FAIL") return "text-red-700 font-semibold";
-    return "text-secondary-400";
+  const resultBadge = (r: MultiDryRunEntry["dryRunResult"]) => {
+    if (r === "PASS") return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] font-semibold">PASS</span>;
+    if (r === "WARNING") return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 text-[10px] font-semibold">WARNING</span>;
+    if (r === "FAIL") return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[10px] font-semibold">FAIL</span>;
+    if (r === "running") return <Loader2 size={12} className="animate-spin text-secondary-400" />;
+    return <span className="text-secondary-300 text-[10px]">—</span>;
   };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold">Review — {entries.length} Products</h2>
+        <h2 className="text-base font-semibold">Review — {entries.length} Product{entries.length !== 1 ? "s" : ""}</h2>
         <button
           onClick={onRunAll}
           disabled={running}
@@ -566,55 +676,130 @@ export function MultiDryRunPanel({
           {running ? "Validating…" : "Run Validation"}
         </button>
       </div>
-      <div className="overflow-x-auto rounded-xl border border-secondary-200">
-        <table className="text-xs w-full border-collapse">
-          <thead className="bg-secondary-50">
-            <tr>
-              <th className="text-left p-3 font-medium text-secondary-600">Product</th>
-              <th className="text-right p-3 font-medium text-secondary-600">Variants</th>
-              <th className="text-right p-3 font-medium text-secondary-600">Cost</th>
-              <th className="text-right p-3 font-medium text-secondary-600">Retail</th>
-              <th className="text-center p-3 font-medium text-secondary-600">DPI</th>
-              <th className="text-center p-3 font-medium text-secondary-600">Result</th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((e) => (
-              <tr key={e.product.id} className="border-t border-secondary-100">
-                <td className="p-3">
-                  <div className="flex items-center gap-2">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={e.product.image} alt={e.product.title} className="w-7 h-7 object-contain rounded border border-secondary-100 bg-secondary-50 flex-shrink-0" />
-                    <span className="font-medium text-secondary-900 line-clamp-1">{e.product.title}</span>
-                  </div>
-                  {e.errors.length > 0 && (
-                    <ul className="mt-1 space-y-0.5">
-                      {e.errors.map((err, i) => (
-                        <li key={i} className="flex items-start gap-1 text-red-600">
-                          <AlertCircle size={10} className="mt-0.5 flex-shrink-0" />
-                          {err}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </td>
-                <td className="p-3 text-right text-secondary-700">{e.variantCount || "—"}</td>
-                <td className="p-3 text-right text-secondary-700">{rng(e.minCost, e.maxCost)}</td>
-                <td className="p-3 text-right text-secondary-700">{rng(e.minRetail, e.maxRetail)}</td>
-                <td className="p-3 text-center text-secondary-500">{e.dpiResult ?? "—"}</td>
-                <td className={`p-3 text-center ${resultColor(e.dryRunResult)}`}>
-                  {e.dryRunResult === "pending" ? "—" :
-                   e.dryRunResult === "running" ? <Loader2 size={12} className="animate-spin mx-auto" /> :
-                   e.dryRunResult}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="space-y-2">
+        {entries.map((e) => (
+          <div key={e.product.id} className={`rounded-xl border p-3 ${
+            e.dryRunResult === "FAIL" ? "border-red-200 bg-red-50" :
+            e.dryRunResult === "WARNING" ? "border-yellow-200 bg-yellow-50" :
+            e.dryRunResult === "PASS" ? "border-green-200 bg-green-50" :
+            "border-secondary-200 bg-white"
+          }`}>
+            <div className="flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={e.product.image} alt={e.product.title} className="w-9 h-9 object-contain rounded border border-secondary-100 bg-white flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-secondary-900 line-clamp-1">{e.product.title}</p>
+                <p className="text-[10px] text-secondary-500">
+                  {e.variantCount > 0 ? `${e.variantCount} variants` : ""}
+                  {e.minCost !== null ? ` · Cost ${rng(e.minCost, e.maxCost)}` : ""}
+                  {e.minRetail !== null ? ` · Retail ${rng(e.minRetail, e.maxRetail)}` : ""}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {resultBadge(e.dryRunResult)}
+                <button
+                  onClick={() => onRemove(e.product.id)}
+                  disabled={running}
+                  className="text-[10px] text-secondary-400 hover:text-red-600 underline disabled:opacity-40 transition-colors"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+
+            {/* Error details + actionable suggestions */}
+            {e.dryRunResult === "FAIL" && e.errors.length > 0 && (
+              <div className="mt-2 space-y-2 pl-12">
+                {e.errors.map((err, i) => {
+                  const action = suggestAction(err);
+                  return (
+                    <div key={i} className="space-y-1">
+                      <div className="flex items-start gap-1.5">
+                        <AlertCircle size={11} className="mt-0.5 flex-shrink-0 text-red-500" />
+                        <p className="text-xs text-red-700">{err}</p>
+                      </div>
+                      <p className="text-[10px] text-red-600 pl-4">→ {action.hint}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
       <p className="text-[10px] text-secondary-400">
         Validation only — no products created, no mockups generated, no Printful orders.
       </p>
+    </div>
+  );
+}
+
+// ── StickyWizardNav: persistent bottom navigation bar (Issue B) ───────────────
+// Stays visible regardless of content length. Shows step progress, back/continue.
+// Continue is disabled with an explanation when validation is not met.
+
+export function StickyWizardNav({
+  stepLabel,
+  stepIndex,
+  totalSteps,
+  onBack,
+  onContinue,
+  continueLabel,
+  continueDisabled,
+  continueDisabledReason,
+  statusText,
+  loading,
+}: {
+  stepLabel: string;
+  stepIndex: number;
+  totalSteps: number;
+  onBack?: () => void;
+  onContinue?: () => void;
+  continueLabel?: string;
+  continueDisabled?: boolean;
+  continueDisabledReason?: string;
+  statusText?: string;
+  loading?: boolean;
+}) {
+  return (
+    <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-secondary-200 shadow-lg">
+      <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-4">
+        {/* Back */}
+        {onBack ? (
+          <button onClick={onBack} className="text-sm text-secondary-500 hover:text-secondary-900 transition-colors flex-shrink-0">
+            ← Back
+          </button>
+        ) : (
+          <div className="w-12 flex-shrink-0" />
+        )}
+
+        {/* Centre: step info + status */}
+        <div className="flex-1 min-w-0 text-center">
+          <p className="text-xs text-secondary-500">
+            Step {stepIndex + 1} of {totalSteps} — <span className="font-medium text-secondary-700">{stepLabel}</span>
+          </p>
+          {statusText && (
+            <p className="text-xs text-secondary-600 mt-0.5 truncate">{statusText}</p>
+          )}
+          {continueDisabled && continueDisabledReason && (
+            <p className="text-[10px] text-secondary-400 mt-0.5">{continueDisabledReason}</p>
+          )}
+        </div>
+
+        {/* Continue */}
+        {onContinue ? (
+          <button
+            onClick={onContinue}
+            disabled={continueDisabled || loading}
+            className="btn-primary px-5 py-2 text-sm disabled:opacity-40 flex items-center gap-2 flex-shrink-0"
+          >
+            {loading && <Loader2 size={13} className="animate-spin" />}
+            {continueLabel ?? "Continue →"}
+          </button>
+        ) : (
+          <div className="w-24 flex-shrink-0" />
+        )}
+      </div>
     </div>
   );
 }
