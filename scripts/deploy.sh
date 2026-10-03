@@ -64,7 +64,7 @@ const app = {
   name: 'countybuys',
   script: 'server.js',
   interpreter: 'node',
-  cwd: '/var/www/bodyandsleeves/.next/standalone',
+  cwd: '/var/www/countybuys/.next/standalone',
   max_memory_restart: '400M',
   node_args: '--max-old-space-size=512',
   env,
@@ -94,8 +94,8 @@ SUPABASE_PROJECT_REF=$(source_env SUPABASE_PROJECT_REF)
 if [ -n "$SUPABASE_ACCESS_TOKEN" ] && [ -n "$SUPABASE_PROJECT_REF" ]; then
   echo "🔁 Deploying edge functions..."
   export SUPABASE_ACCESS_TOKEN
-  supabase functions deploy printful-proxy stripe-checkout stripe-webhook \
-    --project-ref "$SUPABASE_PROJECT_REF" 2>/dev/null || echo "⚠️  Edge function deploy failed — skipping."
+  npx supabase functions deploy printful-proxy stripe-checkout stripe-webhook \
+    --project-ref "$SUPABASE_PROJECT_REF" || echo "⚠️  Edge function deploy failed — skipping."
 else
   echo "⚠️  Skipping edge functions (SUPABASE_ACCESS_TOKEN or SUPABASE_PROJECT_REF not set)."
 fi
