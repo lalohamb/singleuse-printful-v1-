@@ -66,8 +66,19 @@ export async function resolvePrintfulProductIdentity(
     throw new Error(`Product not found: ${storeProductUuid}`);
   }
 
+  // Catalog Builder products: printful_id is intentionally null.
+  // Resolve catalog identity from printful_catalog_id directly — no sync product needed.
   if (!product.printful_id) {
-    throw new Error(`Product ${storeProductUuid} has no Printful sync ID (printful_id is null)`);
+    if (product.printful_catalog_id) {
+      return {
+        syncProductId: 0 as PrintfulSyncProductId, // no sync product — catalog_builder
+        catalogProductId: product.printful_catalog_id as PrintfulCatalogProductId,
+      };
+    }
+    throw new Error(
+      `Product ${storeProductUuid} has no Printful catalog ID (printful_catalog_id is null). ` +
+      `Set printful_catalog_id on the product before generating mockups.`
+    );
   }
 
   const syncProductId = Number(product.printful_id) as PrintfulSyncProductId;

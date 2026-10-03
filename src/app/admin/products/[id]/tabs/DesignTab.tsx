@@ -33,6 +33,10 @@ export function DesignTab({ data, onReload }: { data: ProductWorkspaceData; onRe
       fd.append("file", file);
       if (primaryDesign?.design_id) fd.append("designId", primaryDesign.design_id);
       const res = await fetch("/api/printful/artwork-upload", { method: "POST", body: fd });
+      const contentType = res.headers.get("content-type") ?? "";
+      if (!contentType.includes("application/json")) {
+        throw new Error(`Server returned unexpected response (HTTP ${res.status}). Check your session and try again.`);
+      }
       const uploadData = await res.json();
       if (!res.ok) throw new Error(uploadData.error || "Upload failed");
 
@@ -117,15 +121,27 @@ export function DesignTab({ data, onReload }: { data: ProductWorkspaceData; onRe
       const variantIds = variants.map((v) => Number(v.printful_variant_id)).filter(Boolean);
       if (!variantIds.length) throw new Error("No variants with Printful IDs");
 
+      // Use frozen position from product_design configuration if available
+      const frozenPosition = (primaryDesign.configuration as Record<string, unknown>)?.position ?? null;
+
       const taskRes = await fetch("/api/printful/mockups", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           storeProductId: product.id,
           variant_ids: variantIds,
-          files: [{ placement: primaryDesign.placement, image_url: design.artwork_url }],
+          files: [{
+            placement: primaryDesign.placement,
+            image_url: design.artwork_url,
+            ...(frozenPosition ? { position: frozenPosition } : {}),
+          }],
+          technique: primaryDesign.technique ?? undefined,
         }),
       });
+      const contentType = taskRes.headers.get("content-type") ?? "";
+      if (!contentType.includes("application/json")) {
+        throw new Error(`Server returned unexpected response (HTTP ${taskRes.status}). Check your session and try again.`);
+      }
       const taskData = await taskRes.json();
       if (!taskRes.ok) throw new Error(taskData.error || "Mockup task failed");
 
