@@ -1,12 +1,14 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import Stripe from "npm:stripe@17.3.1";
 
-// CORS is restricted to the configured site origin.
+// CORS — allowed origins: SITE_URL secret, NEXT_PUBLIC_SITE_URL secret, localhost.
 function corsHeaders(req: Request): Record<string, string> {
-  const siteUrl = Deno.env.get("SITE_URL") ?? "";
+  const siteUrl = Deno.env.get("SITE_URL") ?? Deno.env.get("NEXT_PUBLIC_SITE_URL") ?? "";
   const requestOrigin = req.headers.get("origin") ?? "";
   const isLocalhost = requestOrigin.startsWith("http://localhost:") || requestOrigin.startsWith("http://127.0.0.1:");
-  const isAllowed = requestOrigin === siteUrl || isLocalhost;
+  const isAllowed = siteUrl
+    ? (requestOrigin === siteUrl || isLocalhost)
+    : (requestOrigin.startsWith("https://") || isLocalhost); // fallback: allow any https origin if SITE_URL unset
   const origin = isAllowed ? requestOrigin : "null";
   return {
     "Access-Control-Allow-Origin": origin,
