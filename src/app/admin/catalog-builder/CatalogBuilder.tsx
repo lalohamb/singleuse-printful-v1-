@@ -839,6 +839,53 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
             onRunAll={handleMultiDryRun}
             running={multiDryRunning}
           />
+          {/* Post-validation actions — only shown after at least one run */}
+          {multiDryRunEntries.length > 0 && !multiDryRunning && (() => {
+            const passing = multiDryRunEntries.filter((e) => e.dryRunResult === "PASS" || e.dryRunResult === "WARNING");
+            const failing = multiDryRunEntries.filter((e) => e.dryRunResult === "FAIL");
+            return (
+              <div className="space-y-3">
+                {failing.length > 0 && (
+                  <div className="flex items-start gap-2 bg-red-50 text-red-700 rounded-lg p-3 text-sm">
+                    <AlertCircle size={15} className="mt-0.5 flex-shrink-0" />
+                    <span>
+                      {failing.length} product{failing.length !== 1 ? "s" : ""} failed validation and will be skipped.
+                      Fix the errors above and re-run validation, or deselect those products.
+                    </span>
+                  </div>
+                )}
+                {passing.length > 0 && (
+                  <div className="flex items-center justify-between bg-secondary-50 rounded-xl p-4">
+                    <div>
+                      <p className="text-sm font-semibold text-secondary-900">
+                        {passing.length} product{passing.length !== 1 ? "s" : ""} ready to build
+                      </p>
+                      <p className="text-xs text-secondary-500 mt-0.5">
+                        Each product will be built individually through the single-product flow.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        // Seed the first passing product into single-product flow and restart
+                        const first = passing[0].product;
+                        update({
+                          creationMode: "single",
+                          catalogProduct: first,
+                          technique: first.techniques?.find((t: { is_default: boolean }) => t.is_default)?.key
+                            ?? first.techniques?.[0]?.key ?? null,
+                          multiSelectedProducts: [],
+                        });
+                        go("variants");
+                      }}
+                      className="btn-primary px-5 py-2 text-sm flex-shrink-0"
+                    >
+                      Build {passing[0].product.title.split(" ").slice(0, 2).join(" ")} →
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
           <div className="flex justify-between pt-2">
             <button onClick={() => go("design")} className="text-sm text-secondary-400 underline">← Back</button>
           </div>
