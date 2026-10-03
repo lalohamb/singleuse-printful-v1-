@@ -125,6 +125,17 @@ https.get(url, options, (res) => {
         let rb = ''; r.on('data', c => rb += c);
         r.on('end', () => { if (r.statusCode >= 200 && r.statusCode < 300) { console.log('Stripe secrets synced (mode=' + mode + ')'); } else { console.error('Secret sync failed:', r.statusCode, rb); } });
       });
+      // Also sync SITE_URL so CORS never drifts
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || '';
+      if (siteUrl) {
+        const siteBody = JSON.stringify([{ name: 'SITE_URL', value: siteUrl }]);
+        const siteReq = https.request({ hostname: 'api.supabase.com', path: '/v1/projects/${SUPABASE_PROJECT_REF}/secrets', method: 'POST', headers: { Authorization: 'Bearer ${SUPABASE_ACCESS_TOKEN}', 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(siteBody) } }, (r) => {
+          let rb = ''; r.on('data', c => rb += c);
+          r.on('end', () => { if (r.statusCode >= 200 && r.statusCode < 300) { console.log('SITE_URL synced:', siteUrl); } else { console.warn('SITE_URL sync failed:', r.statusCode); } });
+        });
+        siteReq.on('error', e => console.warn('SITE_URL sync error:', e.message));
+        siteReq.write(siteBody); siteReq.end();
+      }
       req.on('error', e => console.error('Secret sync error:', e.message));
       req.write(body); req.end();
     } catch(e) { console.error('Secret sync parse error:', e.message); }

@@ -2,10 +2,24 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
 const PRINTFUL_BASE = "https://api.printful.com";
 
-function json(data: unknown, status = 200) {
+function corsHeaders(req: Request): Record<string, string> {
+  const siteUrl = Deno.env.get("SITE_URL") ?? Deno.env.get("NEXT_PUBLIC_SITE_URL") ?? "";
+  const requestOrigin = req.headers.get("origin") ?? "";
+  const isLocalhost = requestOrigin.startsWith("http://localhost:") || requestOrigin.startsWith("http://127.0.0.1:");
+  const isAllowed = siteUrl
+    ? (requestOrigin === siteUrl || isLocalhost)
+    : (requestOrigin.startsWith("https://") || isLocalhost);
+  return {
+    "Access-Control-Allow-Origin": isAllowed ? requestOrigin : "null",
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+  };
+}
+
+function json(data: unknown, status = 200, req?: Request) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(req ? corsHeaders(req) : {}) },
   });
 }
 
@@ -20,10 +34,14 @@ async function pfGet(token: string, path: string) {
 }
 
 Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 200, headers: corsHeaders(req) });
+  }
+
   const url = new URL(req.url);
   const route = url.pathname.replace(/^\/printful-proxy/, "");
   const token = Deno.env.get("PRINTFUL_API_TOKEN");
-  if (!token) return json({ error: "PRINTFUL_API_TOKEN not set" }, 500);
+  if (!token) return json({ error: "PRINTFUL_API_TOKEN not set" }, 500, req);
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -34,7 +52,7 @@ Deno.serve(async (req: Request) => {
     // GET /stores
     if (req.method === "GET" && route === "/stores") {
       const data = await pfGet(token, "/stores");
-      return json(data);
+      return json(data, 200, req);
     }
 
     // GET /products
@@ -49,14 +67,14 @@ Deno.serve(async (req: Request) => {
         if (results.length < limit) break;
         offset += limit;
       }
-      return json({ result: all });
+      return json({ result: all }, 200, req);
     }
 
     // GET /products/:id
     const productMatch = route.match(/^\/products\/(\d+)$/);
     if (req.method === "GET" && productMatch) {
       const data = await pfGet(token, `/store/products/${productMatch[1]}`);
-      return json(data);
+      return json(data, 200, req);
     }
 
     // POST /sync
@@ -277,14 +295,14 @@ Deno.serve(async (req: Request) => {
           .not("id", "is", null);
       }
 
-      return json({ synced: rows.length, archived: toArchive.length, variants_synced: rows.reduce((s: number, r: any) => s + (r.variants?.length ?? 0), 0) });
+      return json({ synced: rows.length, archived: toArchive.length, variants_synced: rows.reduce((s: number, r: any) => s + (r.variants?.length ?? 0), 0) }, 200, req);
     }
 
     // GET /orders/:id  — fetch a single Printful order by numeric ID
     const orderGetMatch = route.match(/^\/orders\/(\d+)$/);
     if (req.method === "GET" && orderGetMatch) {
       const data = await pfGet(token, `/orders/${orderGetMatch[1]}`);
-      return json(data);
+      return json(data, 200, req);
     }
 
     // POST /orders/:id/confirm  — manually confirm a Printful draft order
@@ -297,7 +315,7 @@ Deno.serve(async (req: Request) => {
         headers: pfHeaders(token),
       });
       const data = await res.json();
-      return json(data, res.status);
+      return json(data, res.status, req);
     }
 
     // DELETE /orders/:id  — cancel a Printful draft order
@@ -310,7 +328,7 @@ Deno.serve(async (req: Request) => {
         headers: pfHeaders(token),
       });
       const data = await res.json();
-      return json(data, res.status);
+      return json(data, res.status, req);
     }
 
     // POST /orders
@@ -322,7 +340,7 @@ Deno.serve(async (req: Request) => {
         body: JSON.stringify(body),
       });
       const data = await res.json();
-      return json(data, res.status);
+      return json(data, res.status, req);
     }
 
     // POST /shipping
@@ -333,12 +351,11 @@ Deno.serve(async (req: Request) => {
         headers: pfHeaders(token),
         body: JSON.stringify(body),
       });
-      const data = await res.json();
-      return json(data, res.status);
+      return json(await res.json(), res.status, req);
     }
 
-    return json({ error: "Not found" }, 404);
+    return json({ error: "Not found" }, 404, req);
   } catch (err: any) {
-    return json({ error: err.message || "Internal error" }, 500);
+    return json({ error: err.message || "Internal error" }, 500, req);
   }
 });
