@@ -13,8 +13,8 @@
 
 set -euo pipefail
 
-APP_DIR="/var/www/bodyandsleeves"
-PM2_NAME="bodyandsleeves"
+APP_DIR="/var/www/countybuys"
+PM2_NAME="countybuys"
 SKIP_BUILD="${1:-}"
 
 echo "🚀 Deploying $PM2_NAME..."
@@ -51,17 +51,17 @@ cp .env.local .next/standalone/.env.local
 # ── Regenerate ecosystem.config.js ───────────────────────────────────────
 node - << 'JSEOF'
 const fs = require('fs');
-const raw = fs.readFileSync('/var/www/bodyandsleeves/.env.local', 'utf8');
+const raw = fs.readFileSync('/var/www/countybuys/.env.local', 'utf8');
 const env = {};
 raw.split('\n').forEach(l => {
   const m = l.match(/^([^#=]+)=(.*)/);
   if (m) env[m[1].trim()] = m[2].trim();
 });
-env.APP_ROOT = '/var/www/bodyandsleeves';
-env.PM2_APP_NAME = 'bodyandsleeves';
+env.APP_ROOT = '/var/www/countybuys';
+env.PM2_APP_NAME = 'countybuys';
 env.PORT = '3000';
 const app = {
-  name: 'bodyandsleeves',
+  name: 'countybuys',
   script: 'server.js',
   interpreter: 'node',
   cwd: '/var/www/bodyandsleeves/.next/standalone',
@@ -70,7 +70,7 @@ const app = {
   env,
 };
 const config = 'module.exports = { apps: [' + JSON.stringify(app) + '] };';
-fs.writeFileSync('/var/www/bodyandsleeves/ecosystem.config.js', config);
+fs.writeFileSync('/var/www/countybuys/ecosystem.config.js', config);
 console.log('ecosystem.config.js written (max_memory_restart=400M, max-old-space-size=512)');
 JSEOF
 
@@ -94,7 +94,7 @@ SUPABASE_PROJECT_REF=$(source_env SUPABASE_PROJECT_REF)
 if [ -n "$SUPABASE_ACCESS_TOKEN" ] && [ -n "$SUPABASE_PROJECT_REF" ]; then
   echo "🔁 Deploying edge functions..."
   export SUPABASE_ACCESS_TOKEN
-  supabase functions deploy printify-proxy printify-webhook stripe-checkout stripe-webhook \
+  supabase functions deploy printful-proxy stripe-checkout stripe-webhook \
     --project-ref "$SUPABASE_PROJECT_REF" 2>/dev/null || echo "⚠️  Edge function deploy failed — skipping."
 else
   echo "⚠️  Skipping edge functions (SUPABASE_ACCESS_TOKEN or SUPABASE_PROJECT_REF not set)."
