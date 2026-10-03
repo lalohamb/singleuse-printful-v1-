@@ -26,7 +26,55 @@ export async function GET(req: Request) {
   return NextResponse.json({ product_designs: data });
 }
 
-// POST /api/product-designs — attach a design to a product
+// PATCH /api/product-designs — update design configuration or replace artwork
+export async function PATCH(req: Request) {
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
+  let body: {
+    id: string;
+    design_id?: string;
+    placement?: string;
+    technique?: string;
+    configuration?: Record<string, unknown>;
+    needs_regeneration?: boolean;
+  };
+  try { body = await req.json(); }
+  catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
+
+  if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
+
+  const supabase = sb();
+
+  // If replacing design, verify new design is active
+  if (body.design_id) {
+    const { data: design } = await supabase
+      .from("designs")
+      .select("id, status")
+      .eq("id", body.design_id)
+      .maybeSingle();
+    if (!design) return NextResponse.json({ error: "Design not found" }, { status: 404 });
+    if (design.status === "archived")
+      return NextResponse.json({ error: "Cannot attach archived design" }, { status: 400 });
+  }
+
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (body.design_id !== undefined) patch.design_id = body.design_id;
+  if (body.placement !== undefined) patch.placement = body.placement;
+  if (body.technique !== undefined) patch.technique = body.technique;
+  if (body.configuration !== undefined) patch.configuration = body.configuration;
+  if (body.needs_regeneration !== undefined) patch.needs_regeneration = body.needs_regeneration;
+
+  const { data, error } = await supabase
+    .from("product_designs")
+    .update(patch)
+    .eq("id", body.id)
+    .select()
+    .single();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ product_design: data });
+}
 export async function POST(req: Request) {
   const authError = await requireAdmin();
   if (authError) return authError;

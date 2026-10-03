@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Plus, Edit2, Trash2, Search, X, Loader2, RefreshCw, Star, EyeOff, Package, Lock, CheckCircle, AlertTriangle } from "lucide-react";
 import { supabase, formatPrice } from "@/lib/supabase";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
@@ -8,6 +9,7 @@ import type { Product, Category } from "@/types";
 import AppImage from "@/components/AppImage";
 
 function Products() {
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -207,7 +209,7 @@ function Products() {
 </td>
                         <td className="px-4 py-3 hidden lg:table-cell"><div className="flex flex-wrap gap-1">{ACTIVE_FLAGS.filter((f) => f.key !== "featured" && (p as unknown as Record<string, boolean>)[f.key as string]).map((f) => <span key={f.key as string} className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${f.badgeClass}`}>{f.badge}</span>)}</div></td>
                         <td className="px-4 py-3"><button onClick={() => handleToggleFeatured(p)} className="p-1.5 rounded-lg hover:bg-secondary-100 transition-colors"><Star size={18} className={p.featured ? "fill-gold-500 text-gold-500" : "text-secondary-300"} /></button></td>
-                        <td className="px-4 py-3"><div className="flex items-center justify-end gap-1"><button onClick={() => handleSetDraft(p.id)} disabled={togglingStatus === p.id} title="Set to Draft" className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-warning-600 bg-warning-50 hover:bg-warning-100 border border-warning-200 rounded-lg transition-colors disabled:opacity-40">{togglingStatus === p.id ? <Loader2 size={13} className="animate-spin" /> : <EyeOff size={13} />}Draft</button><button onClick={() => { setEditing(p); setShowModal(true); }} className="p-2 text-secondary-500 hover:text-secondary-900 hover:bg-secondary-100 rounded-lg transition-colors"><Edit2 size={16} /></button><button onClick={() => handleDelete(p.id)} className="p-2 text-secondary-500 hover:text-error-500 hover:bg-error-50 rounded-lg transition-colors"><Trash2 size={16} /></button></div></td>
+                        <td className="px-4 py-3"><div className="flex items-center justify-end gap-1"><button onClick={() => handleSetDraft(p.id)} disabled={togglingStatus === p.id} title="Set to Draft" className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-warning-600 bg-warning-50 hover:bg-warning-100 border border-warning-200 rounded-lg transition-colors disabled:opacity-40">{togglingStatus === p.id ? <Loader2 size={13} className="animate-spin" /> : <EyeOff size={13} />}Draft</button><button onClick={() => router.push(`/admin/products/${p.id}`)} className="p-2 text-secondary-500 hover:text-secondary-900 hover:bg-secondary-100 rounded-lg transition-colors"><Edit2 size={16} /></button><button onClick={() => handleDelete(p.id)} className="p-2 text-secondary-500 hover:text-error-500 hover:bg-error-50 rounded-lg transition-colors"><Trash2 size={16} /></button></div></td>
                       </tr>
                     ))}
                   </tbody>

@@ -75,6 +75,54 @@ export async function POST(req: Request) {
   return NextResponse.json({ image: data }, { status: 201 });
 }
 
+// DELETE /api/product-images — delete an image (safety: cannot delete last image)
+export async function DELETE(req: Request) {
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
+  const url = new URL(req.url);
+  const imageId = url.searchParams.get("image_id");
+  const productId = url.searchParams.get("product_id");
+  if (!imageId || !productId)
+    return NextResponse.json({ error: "image_id and product_id required" }, { status: 400 });
+
+  const supabase = sb();
+
+  // Safety: don't delete the last image
+  const { count } = await supabase
+    .from("product_images")
+    .select("id", { count: "exact", head: true })
+    .eq("product_id", productId);
+  if ((count ?? 0) <= 1)
+    return NextResponse.json({ error: "Cannot delete the last product image" }, { status: 400 });
+
+  const { data: img } = await supabase
+    .from("product_images")
+    .select("is_primary")
+    .eq("id", imageId)
+    .maybeSingle();
+
+  const { error } = await supabase.from("product_images").delete().eq("id", imageId);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // If deleted image was primary, promote the next one
+  if (img?.is_primary) {
+    const { data: next } = await supabase
+      .from("product_images")
+      .select("id")
+      .eq("product_id", productId)
+      .order("display_order")
+      .limit(1)
+      .maybeSingle();
+    if (next) {
+      await supabase.from("product_images").update({ is_primary: true }).eq("id", next.id);
+      await supabase.from("products").update({ image_url: next.id, updated_at: new Date().toISOString() }).eq("id", productId);
+    }
+  }
+
+  return NextResponse.json({ ok: true });
+}
+
 // PATCH /api/product-images — set primary image
 export async function PATCH(req: Request) {
   const authError = await requireAdmin();

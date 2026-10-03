@@ -40,6 +40,7 @@ export async function POST(req: Request) {
     width?: number;
     height?: number;
     tags?: string[];
+    file_hash?: string;
   };
 
   try { body = await req.json(); }
@@ -71,6 +72,7 @@ export async function POST(req: Request) {
     width: body.width || null,
     height: body.height || null,
     tags: body.tags || [],
+    file_hash: body.file_hash || null,
     status: "active",
   }).select().single();
 

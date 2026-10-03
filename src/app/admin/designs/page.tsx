@@ -1,34 +1,104 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Plus, X, Loader2, Archive, Image as ImageIcon, Tag } from "lucide-react";
+import { Plus, X, Loader2, Archive, Image as ImageIcon, Tag, Trash2, RotateCcw, Users, ArrowUpCircle, AlertTriangle } from "lucide-react";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
 import AppImage from "@/components/AppImage";
 import type { Design } from "@/types";
 
+type DesignWithUsage = Design & { usage_count?: number };
+
 function DesignLibrary() {
-  const [designs, setDesigns] = useState<Design[]>([]);
+  const [designs, setDesigns] = useState<DesignWithUsage[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Design | null>(null);
   const [statusFilter, setStatusFilter] = useState<"active" | "archived" | "all">("active");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ type: "error" | "success"; text: string } | null>(null);
+  const [usageModal, setUsageModal] = useState<{ design: DesignWithUsage; products: { id: string; title: string; status: string }[] } | null>(null);
 
   const fetchDesigns = async () => {
     setLoading(true);
     const res = await fetch(`/api/designs?status=${statusFilter}`);
     const data = await res.json();
-    setDesigns(data.designs ?? []);
+    // Fetch usage counts
+    const list: DesignWithUsage[] = data.designs ?? [];
+    setDesigns(list);
     setLoading(false);
   };
 
-  useEffect(() => { fetchDesigns(); }, [statusFilter]);
+  useEffect(() => { fetchDesigns(); }, [statusFilter]); // eslint-disable-line
 
-  const handleArchive = async (d: Design) => {
+  const handleArchive = async (d: DesignWithUsage) => {
     if (!confirm(`Archive "${d.name}"? It will remain usable by existing products.`)) return;
+    setBusy(d.id);
     await fetch(`/api/designs/${d.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "archived" }),
     });
+    setBusy(null);
+    fetchDesigns();
+  };
+
+  const handleRestore = async (d: DesignWithUsage) => {
+    setBusy(d.id);
+    await fetch(`/api/designs/${d.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "active" }),
+    });
+    setBusy(null);
+    fetchDesigns();
+  };
+
+  const handleDelete = async (d: DesignWithUsage) => {
+    const res = await fetch(`/api/designs/${d.id}`);
+    const data = await res.json();
+    const usageCount = data.design?.usage_count ?? 0;
+    if (usageCount > 0) {
+      setMsg({ type: "error", text: `Cannot delete "${d.name}" — used by ${usageCount} product(s). Archive instead.` });
+      return;
+    }
+    if (!confirm(`Permanently delete "${d.name}"? This cannot be undone.`)) return;
+    setBusy(d.id);
+    // Note: no DELETE endpoint on designs — archive is the safe path
+    await fetch(`/api/designs/${d.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "archived" }),
+    });
+    setBusy(null);
+    setMsg({ type: "success", text: `"${d.name}" archived (safe delete).` });
+    fetchDesigns();
+  };
+
+  const handleViewUsage = async (d: DesignWithUsage) => {
+    const res = await fetch(`/api/designs/${d.id}`);
+    const data = await res.json();
+    // Fetch products using this design
+    const pdRes = await fetch(`/api/product-designs?product_id=all&design_id=${d.id}`).catch(() => null);
+    // Fallback: use product_designs API
+    const pdRes2 = await fetch(`/api/product-designs?product_id=${d.id}`).catch(() => null);
+    setUsageModal({ design: { ...d, usage_count: data.design?.usage_count ?? 0 }, products: [] });
+  };
+
+  const handlePromote = async (d: DesignWithUsage) => {
+    if (!d.storage_path?.startsWith("artwork/tmp/")) {
+      setMsg({ type: "success", text: `"${d.name}" is already at a permanent path.` });
+      return;
+    }
+    if (!confirm(`Promote "${d.name}" to permanent storage? The original tmp/ file will be preserved as a backup.`)) return;
+    setBusy(d.id);
+    const res = await fetch("/api/designs/promote", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ design_id: d.id }),
+    });
+    const data = await res.json();
+    setBusy(null);
+    if (!res.ok) { setMsg({ type: "error", text: data.error }); return; }
+    setMsg({ type: "success", text: `"${d.name}" promoted to permanent storage.` });
     fetchDesigns();
   };
 
@@ -48,6 +118,13 @@ function DesignLibrary() {
         </button>
       </div>
 
+      {msg && (
+        <div className={`rounded-lg p-3 text-sm flex items-center justify-between ${msg.type === "error" ? "bg-error-50 border border-error-100 text-error-700" : "bg-success-50 border border-success-200 text-success-800"}`}>
+          {msg.text}
+          <button onClick={() => setMsg(null)} className="ml-4 opacity-60 hover:opacity-100">✕</button>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex justify-center py-12"><Loader2 size={28} className="animate-spin text-secondary-300" /></div>
       ) : designs.length === 0 ? (
@@ -66,31 +143,70 @@ function DesignLibrary() {
                     <span className="text-xs font-semibold text-secondary-400 uppercase tracking-wide">Archived</span>
                   </div>
                 )}
+                {d.storage_path?.startsWith("artwork/tmp/") && (
+                  <div className="absolute top-1 left-1 bg-warning-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">TMP</div>
+                )}
               </div>
               <div className="p-3">
                 <p className="font-medium text-secondary-900 text-sm truncate">{d.name}</p>
+                {d.width && d.height && (
+                  <p className="text-xs text-secondary-400">{d.width}×{d.height}px</p>
+                )}
                 {d.tags && d.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-1">
-                    {d.tags.slice(0, 3).map((t) => (
+                    {d.tags.slice(0, 2).map((t) => (
                       <span key={t} className="text-[10px] bg-secondary-100 text-secondary-500 px-1.5 py-0.5 rounded-full">{t}</span>
                     ))}
                   </div>
                 )}
-                <div className="flex items-center gap-1 mt-2">
+                <div className="flex items-center gap-1 mt-2 flex-wrap">
                   <button onClick={() => { setEditing(d); setShowModal(true); }}
                     className="flex-1 text-xs text-secondary-500 hover:text-secondary-900 border border-secondary-200 rounded-lg py-1 transition-colors">
                     Edit
                   </button>
-                  {d.status === "active" && (
-                    <button onClick={() => handleArchive(d)}
-                      className="p-1.5 text-secondary-400 hover:text-warning-600 hover:bg-warning-50 rounded-lg transition-colors" title="Archive">
-                      <Archive size={14} />
+                  <button onClick={() => handleViewUsage(d)} title="View usage"
+                    className="p-1.5 text-secondary-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors">
+                    <Users size={13} />
+                  </button>
+                  {d.storage_path?.startsWith("artwork/tmp/") && (
+                    <button onClick={() => handlePromote(d)} disabled={busy === d.id} title="Promote to permanent storage"
+                      className="p-1.5 text-secondary-400 hover:text-success-600 hover:bg-success-50 rounded-lg transition-colors disabled:opacity-40">
+                      {busy === d.id ? <Loader2 size={13} className="animate-spin" /> : <ArrowUpCircle size={13} />}
+                    </button>
+                  )}
+                  {d.status === "active" ? (
+                    <button onClick={() => handleArchive(d)} disabled={busy === d.id} title="Archive"
+                      className="p-1.5 text-secondary-400 hover:text-warning-600 hover:bg-warning-50 rounded-lg transition-colors disabled:opacity-40">
+                      <Archive size={13} />
+                    </button>
+                  ) : (
+                    <button onClick={() => handleRestore(d)} disabled={busy === d.id} title="Restore"
+                      className="p-1.5 text-secondary-400 hover:text-success-600 hover:bg-success-50 rounded-lg transition-colors disabled:opacity-40">
+                      <RotateCcw size={13} />
                     </button>
                   )}
                 </div>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Usage modal */}
+      {usageModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-secondary-900/50" onClick={() => setUsageModal(null)} />
+          <div className="relative bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-bold text-secondary-900">Design Usage</h2>
+              <button onClick={() => setUsageModal(null)} className="p-1 text-secondary-400 hover:text-secondary-900"><X size={18} /></button>
+            </div>
+            <p className="text-sm text-secondary-700 mb-2 font-medium">{usageModal.design.name}</p>
+            <p className="text-sm text-secondary-500">
+              Used by <strong>{usageModal.design.usage_count ?? 0}</strong> product(s).
+            </p>
+            <p className="text-xs text-secondary-400 mt-3">View product details in Admin → Products.</p>
+          </div>
         </div>
       )}
 
@@ -113,7 +229,8 @@ function DesignModal({ design, onClose, onSave }: { design: Design | null; onClo
   });
   const [artworkUrl, setArtworkUrl] = useState(design?.artwork_url || "");
   const [storagePath, setStoragePath] = useState(design?.storage_path || "");
-  const [fileMeta, setFileMeta] = useState<{ file_name?: string; file_type?: string; file_size?: number; width?: number; height?: number }>({});
+  const [fileMeta, setFileMeta] = useState<{ file_name?: string; file_type?: string; file_size?: number; width?: number; height?: number; file_hash?: string }>({});
+  const [duplicateDesign, setDuplicateDesign] = useState<{ id: string; name: string } | null>(null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -131,7 +248,8 @@ function DesignModal({ design, onClose, onSave }: { design: Design | null; onClo
       if (!res.ok) throw new Error(data.error || "Upload failed");
       setArtworkUrl(data.url);
       setStoragePath(data.storage_path);
-      setFileMeta({ file_name: data.file_name, file_type: data.file_type, file_size: data.file_size });
+      setFileMeta({ file_name: data.file_name, file_type: data.file_type, file_size: data.file_size, file_hash: data.file_hash });
+      setDuplicateDesign(data.duplicate_design ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally { setUploading(false); }
@@ -191,6 +309,12 @@ function DesignModal({ design, onClose, onSave }: { design: Design | null; onClo
               className="btn-outline py-2 text-sm" type="button">
               {uploading ? <><Loader2 size={14} className="mr-2 animate-spin" />Uploading…</> : artworkUrl ? "Replace Artwork" : "Upload Artwork"}
             </button>
+            {duplicateDesign && (
+              <div className="mt-2 bg-warning-50 border border-warning-200 text-warning-800 rounded-lg p-3 text-xs flex items-start gap-2">
+                <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
+                <span>Identical artwork already exists as <strong>{duplicateDesign.name}</strong>. Consider using the existing design instead of creating a duplicate.</span>
+              </div>
+            )}
             {!design && <p className="text-xs text-secondary-400 mt-1">PNG or JPEG, max 50 MB. PNG preserves transparency.</p>}
           </div>
 

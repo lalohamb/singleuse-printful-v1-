@@ -34,8 +34,12 @@ const STAGE_LABELS: Record<BuilderStage, string> = {
 const STAGES: BuilderStage[] = ["blank","variants","design","production","designer","mockups","details","pricing","review"];
 
 
-export default function CatalogBuilder() {
+export default function CatalogBuilder({ editProductId }: { editProductId?: string }) {
   const router = useRouter();
+  const [mode, setMode] = useState<"create" | "edit">(editProductId ? "edit" : "create");
+  const [editLoading, setEditLoading] = useState(!!editProductId);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editUpdatedAt, setEditUpdatedAt] = useState<string | null>(null);
   const [stage, setStage] = useState<BuilderStage>("blank");
   const [state, setState] = useState<CatalogBuilderState>(initialBuilderState);
   const [printfiles, setPrintfiles] = useState<PrintfulPrintfilesResponse | null>(null);
@@ -56,6 +60,67 @@ export default function CatalogBuilder() {
     setState((s) => ({ ...s, ...patch }));
 
   const go = (s: BuilderStage) => { setError(null); setStage(s); };
+
+  // ── EDIT MODE: load existing product state ────────────────────────────────
+  useState(() => {
+    if (!editProductId) return;
+    (async () => {
+      try {
+        const res = await fetch(`/api/catalog-builder/load?product_id=${editProductId}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to load product");
+
+        const { product, variants, product_designs, images } = data;
+        const primaryDesign = product_designs.find((pd: Record<string,unknown>) => pd.is_primary) ?? product_designs[0];
+        const design = primaryDesign?.designs;
+
+        setEditUpdatedAt(product.updated_at);
+
+        // Reconstruct builder state from persisted data
+        update({
+          title: product.title ?? "",
+          slug: product.slug ?? "",
+          description: product.description ?? "",
+          shortDescription: product.short_description ?? "",
+          brand: product.brand ?? "",
+          productType: product.product_type ?? "",
+          categoryId: product.category_id ?? "",
+          metaTitle: product.meta_title ?? "",
+          metaDescription: product.meta_description ?? "",
+          design: design ? { id: primaryDesign.design_id, name: design.name, slug: design.slug, artwork_url: design.artwork_url, storage_path: design.storage_path, file_name: design.file_name, width: design.width, height: design.height, status: design.status, file_size: design.file_size, tags: [], description: null, created_by: null, created_at: "", updated_at: "", file_type: null } : null,
+          artworkUrl: design?.artwork_url ?? null,
+          placement: primaryDesign?.placement ?? null,
+          technique: primaryDesign?.technique ?? null,
+          designConfiguration: (primaryDesign?.configuration as Record<string,unknown>) ?? {},
+          variantPricing: variants.map((v: Record<string,unknown>) => ({
+            printful_variant_id: String(v.printful_variant_id),
+            label: String(v.label),
+            color: (v.color as string | null),
+            size: (v.size as string | null),
+            provider_cost: Number(v.provider_cost ?? 0),
+            retail_price: Number(v.retail_price),
+          })),
+          persistedMockups: images.map((img: Record<string,unknown>, i: number) => ({
+            placement: primaryDesign?.placement ?? "front",
+            stored_url: String(img.image_url),
+            original_url: String(img.image_url),
+            storage_path: String(img.storage_path ?? ""),
+            mockup_task_key: (img.mockup_task_key as string | null),
+            is_primary: Boolean(img.is_primary),
+            display_order: Number(img.display_order ?? i),
+          })),
+          selectedMockupIndices: images.map((_: unknown, i: number) => i),
+        });
+
+        // Jump to review stage in edit mode
+        setStage("review");
+      } catch (e) {
+        setEditError(e instanceof Error ? e.message : "Failed to load product for editing");
+      } finally {
+        setEditLoading(false);
+      }
+    })();
+  });
 
   // ── Stage: production — load printfiles + templates ───────────────────────
   async function loadProduction(productId: number, technique: string) {
@@ -176,7 +241,7 @@ export default function CatalogBuilder() {
       categoryId, metaTitle, metaDescription, variantPricing, persistedMockups,
       selectedMockupIndices, idempotencyKey } = state;
 
-    if (!catalogProduct || !design || !placement || !technique || !title || !slug) {
+    if (!design || !placement || !technique || !title || !slug) {
       setError("Missing required fields"); return;
     }
 
@@ -188,69 +253,113 @@ export default function CatalogBuilder() {
     setSaving(true);
     setError(null);
     try {
-      // 1. Create draft
-      const createRes = await fetch("/api/catalog-builder", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          printful_catalog_id: catalogProduct.id,
-          variants: selectedVariants.map((v) => {
-            const pricing = variantPricing.find((p) => p.printful_variant_id === String(v.id));
-            return {
-              printful_variant_id: String(v.id),
-              label: v.name,
-              color: v.color || null,
-              size: v.size || null,
-              retail_price: pricing?.retail_price ?? price,
-              provider_cost: pricing?.provider_cost ?? null,
-              image_url: v.image || null,
-            };
+      if (mode === "edit" && editProductId) {
+        // ── EDIT MODE: update existing product ────────────────────────────────
+        const updateRes = await fetch("/api/catalog-builder/update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            product_id: editProductId,
+            updated_at_check: editUpdatedAt,
+            design_id: design.id,
+            placement,
+            technique,
+            printfile_id: printfileId,
+            design_configuration: designConfiguration,
+            title: title.trim(),
+            slug,
+            description: description || null,
+            short_description: shortDescription || null,
+            brand: brand || null,
+            product_type: productType || null,
+            category_id: categoryId || null,
+            meta_title: metaTitle || null,
+            meta_description: metaDescription || null,
+            price,
+            variants: variantPricing.map((vp) => ({
+              printful_variant_id: vp.printful_variant_id,
+              retail_price: vp.retail_price,
+            })),
+            mockups: selectedMockups.map((m) => ({
+              storage_path: m.storage_path,
+              image_url: m.stored_url,
+              mockup_task_key: m.mockup_task_key,
+              is_primary: m.is_primary,
+              display_order: m.display_order,
+              variant_ids: m.variant_ids,
+            })),
+            idempotency_key: idempotencyKey,
           }),
-          design_id: design.id,
-          placement,
-          technique,
-          printfile_id: printfileId,
-          design_configuration: designConfiguration,
-          title: title.trim(),
-          slug,
-          description: description || null,
-          short_description: shortDescription || null,
-          brand: brand || null,
-          product_type: productType || null,
-          category_id: categoryId || null,
-          meta_title: metaTitle || null,
-          meta_description: metaDescription || null,
-          price,
-          mockups: selectedMockups.map((m) => ({
-            storage_path: m.storage_path,
-            image_url: m.stored_url,
-            mockup_task_key: m.mockup_task_key,
-            is_primary: m.is_primary,
-            display_order: m.display_order,
-            variant_ids: m.variant_ids,
-          })),
-          idempotency_key: idempotencyKey,
-        }),
-      });
-      const createData = await createRes.json();
-      if (createData.error) throw new Error(createData.error);
-      const pid = createData.product_id;
-      setProductId(pid);
+        });
+        const updateData = await updateRes.json();
+        if (updateData.conflict) throw new Error(updateData.error);
+        if (updateData.error) throw new Error(updateData.error);
+        setProductId(editProductId);
+        go("review");
+      } else {
+        // ── CREATE MODE: create new product ───────────────────────────────────
+        if (!catalogProduct) { setError("Missing required fields"); return; }
+        const createRes = await fetch("/api/catalog-builder", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            printful_catalog_id: catalogProduct.id,
+            variants: selectedVariants.map((v) => {
+              const pricing = variantPricing.find((p) => p.printful_variant_id === String(v.id));
+              return {
+                printful_variant_id: String(v.id),
+                label: v.name,
+                color: v.color || null,
+                size: v.size || null,
+                retail_price: pricing?.retail_price ?? price,
+                provider_cost: pricing?.provider_cost ?? null,
+                image_url: v.image || null,
+              };
+            }),
+            design_id: design.id,
+            placement,
+            technique,
+            printfile_id: printfileId,
+            design_configuration: designConfiguration,
+            title: title.trim(),
+            slug,
+            description: description || null,
+            short_description: shortDescription || null,
+            brand: brand || null,
+            product_type: productType || null,
+            category_id: categoryId || null,
+            meta_title: metaTitle || null,
+            meta_description: metaDescription || null,
+            price,
+            mockups: selectedMockups.map((m) => ({
+              storage_path: m.storage_path,
+              image_url: m.stored_url,
+              mockup_task_key: m.mockup_task_key,
+              is_primary: m.is_primary,
+              display_order: m.display_order,
+              variant_ids: m.variant_ids,
+            })),
+            idempotency_key: idempotencyKey,
+          }),
+        });
+        const createData = await createRes.json();
+        if (createData.error) throw new Error(createData.error);
+        const pid = createData.product_id;
+        setProductId(pid);
 
-      // 2. Publish
-      setPublishing(true);
-      const pubRes = await fetch("/api/catalog-builder/publish", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product_id: pid }),
-      });
-      const pubData = await pubRes.json();
-      if (pubData.error) throw new Error(pubData.error);
-      // Surface any non-blocking warnings (e.g. no mockups)
-      if (pubData.warnings?.length) setError(pubData.warnings.join(" "));
-      else setError(null);
+        setPublishing(true);
+        const pubRes = await fetch("/api/catalog-builder/publish", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ product_id: pid }),
+        });
+        const pubData = await pubRes.json();
+        if (pubData.error) throw new Error(pubData.error);
+        if (pubData.warnings?.length) setError(pubData.warnings.join(" "));
+        else setError(null);
 
-      go("review");
+        go("review");
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save product");
     } finally {
@@ -262,8 +371,18 @@ export default function CatalogBuilder() {
   // ── Progress bar ──────────────────────────────────────────────────────────
   const stageIdx = STAGES.indexOf(stage);
 
+  if (editLoading) return (
+    <div className="flex justify-center py-20"><Loader2 size={28} className="animate-spin text-secondary-300" /></div>
+  );
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
+      {editError && (
+        <div className="flex items-start gap-2 bg-red-50 text-red-700 rounded-lg p-3 text-sm">
+          <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
+          <span>Failed to load product for editing: {editError}</span>
+        </div>
+      )}
       {/* Progress */}
       <div className="flex items-center gap-1 overflow-x-auto pb-1">
         {STAGES.map((s, i) => (
@@ -569,7 +688,12 @@ export default function CatalogBuilder() {
             </div>
           ) : (
             <>
-              <h2 className="text-base font-semibold">Review & Publish</h2>
+              <h2 className="text-base font-semibold">{mode === "edit" ? "Review & Save Changes" : "Review & Publish"}</h2>
+              {mode === "edit" && (
+                <div className="bg-primary-50 border border-primary-100 text-primary-700 rounded-lg p-3 text-sm">
+                  Editing existing product. Store UUIDs and provider mappings are preserved. Changes affect future orders only.
+                </div>
+              )}
               <div className="bg-secondary-50 rounded-xl p-4 space-y-3 text-sm">
                 <div className="flex justify-between"><span className="text-secondary-500">Blank</span><span className="font-medium">{state.catalogProduct?.title}</span></div>
                 <div className="flex justify-between"><span className="text-secondary-500">Variants</span><span className="font-medium">{state.selectedVariants.length} selected</span></div>
@@ -592,7 +716,7 @@ export default function CatalogBuilder() {
                   className="btn-primary px-6 py-2 text-sm disabled:opacity-40 flex items-center gap-2"
                 >
                   {(saving || publishing) && <Loader2 size={14} className="animate-spin" />}
-                  {saving ? "Saving…" : publishing ? "Publishing…" : "Publish Product"}
+                  {saving ? "Saving…" : publishing ? "Publishing…" : mode === "edit" ? "Save Changes" : "Publish Product"}
                 </button>
               </div>
             </>

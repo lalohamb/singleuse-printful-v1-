@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Package, ShoppingBag, DollarSign, TrendingUp, Clock, CheckCircle, PauseCircle, PlayCircle, CreditCard, Users } from "lucide-react";
+import { Package, ShoppingBag, DollarSign, TrendingUp, Clock, CheckCircle, PauseCircle, PlayCircle, CreditCard, Users, FlaskConical, Layers } from "lucide-react";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { supabase, formatPrice } from "@/lib/supabase";
 import ProtectedAdmin from "@/components/ProtectedAdmin";
@@ -296,6 +296,8 @@ function Dashboard() {
             <h2 className="font-semibold text-secondary-900 mb-4">Quick Actions</h2>
             <div className="space-y-3">
               <Link href="/admin/products" className="flex items-center justify-between p-3 rounded-lg hover:bg-secondary-50 transition-colors"><span className="flex items-center gap-3 text-secondary-700"><Package size={20} className="text-primary-500" />Manage Products</span><TrendingUp size={18} className="text-secondary-300" /></Link>
+              <Link href="/admin/product-recipes" className="flex items-center justify-between p-3 rounded-lg hover:bg-secondary-50 transition-colors"><span className="flex items-center gap-3 text-secondary-700"><FlaskConical size={20} className="text-primary-500" />Product Recipes</span><TrendingUp size={18} className="text-secondary-300" /></Link>
+              <Link href="/admin/catalog-batches" className="flex items-center justify-between p-3 rounded-lg hover:bg-secondary-50 transition-colors"><span className="flex items-center gap-3 text-secondary-700"><Layers size={20} className="text-primary-500" />Batch Generator</span><TrendingUp size={18} className="text-secondary-300" /></Link>
               <Link href="/admin/orders" className="flex items-center justify-between p-3 rounded-lg hover:bg-secondary-50 transition-colors"><span className="flex items-center gap-3 text-secondary-700"><ShoppingBag size={20} className="text-primary-500" />View Orders</span><TrendingUp size={18} className="text-secondary-300" /></Link>
               <Link href="/admin/customers" className="flex items-center justify-between p-3 rounded-lg hover:bg-secondary-50 transition-colors"><span className="flex items-center gap-3 text-secondary-700"><Users size={20} className="text-primary-500" />View Customers</span><TrendingUp size={18} className="text-secondary-300" /></Link>
               <Link href="/admin/settings" className="flex items-center justify-between p-3 rounded-lg hover:bg-secondary-50 transition-colors"><span className="flex items-center gap-3 text-secondary-700"><DollarSign size={20} className="text-primary-500" />Store Settings</span><TrendingUp size={18} className="text-secondary-300" /></Link>

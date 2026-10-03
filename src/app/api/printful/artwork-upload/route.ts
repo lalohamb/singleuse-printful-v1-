@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requireAdmin } from "@/lib/require-admin";
+import { createHash } from "crypto";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -28,8 +29,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "File must be under 50 MB" }, { status: 400 });
   }
 
-  // designId may be provided to scope the path under a known design UUID.
-  // If not provided, a temporary path is used (for the designer preview flow).
   const designId = (formData.get("designId") as string | null)?.trim() || null;
   const ext = file.type === "image/png" ? "png" : "jpg";
   const path = designId
@@ -37,6 +36,19 @@ export async function POST(req: Request) {
     : `artwork/tmp/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
   const buffer = Buffer.from(await file.arrayBuffer());
+
+  // Compute SHA-256 for duplicate detection
+  const fileHash = createHash("sha256").update(buffer).digest("hex");
+
+  // Check for existing active design with same hash
+  const { data: existing } = await supabaseAdmin
+    .from("designs")
+    .select("id, name, artwork_url, width, height, file_size")
+    .eq("file_hash", fileHash)
+    .eq("status", "active")
+    .neq("id", designId ?? "00000000-0000-0000-0000-000000000000")
+    .limit(1)
+    .maybeSingle();
 
   const { error } = await supabaseAdmin.storage
     .from(BUCKET)
@@ -54,5 +66,8 @@ export async function POST(req: Request) {
     file_name: file.name,
     file_type: file.type,
     file_size: file.size,
+    file_hash: fileHash,
+    // If a duplicate exists, surface it so the UI can warn the operator
+    duplicate_design: existing ?? null,
   });
 }

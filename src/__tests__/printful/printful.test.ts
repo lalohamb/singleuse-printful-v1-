@@ -53,7 +53,7 @@ describe("1. Authorization header construction", () => {
     process.env.PRINTFUL_API_TOKEN = "test-token-abc";
     delete process.env.PRINTFUL_STORE_ID;
   });
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => { vi.unstubAllGlobals(); });
 
   it("attaches Bearer token to GET requests", async () => {
     mockFetch(200, { code: 200, result: [] });
@@ -305,7 +305,7 @@ describe("8. Create-task payload construction", () => {
 // ─── 9. Pending task handling ─────────────────────────────────────────────────
 
 describe("9. Pending task handling", () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => { vi.unstubAllGlobals(); });
 
   it("returns pending status without mockups", async () => {
     process.env.PRINTFUL_API_TOKEN = "test-token";
@@ -320,7 +320,7 @@ describe("9. Pending task handling", () => {
 // ─── 10. Completed task handling ─────────────────────────────────────────────
 
 describe("10. Completed task handling", () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => { vi.unstubAllGlobals(); });
 
   it("returns completed status with mockups array", async () => {
     process.env.PRINTFUL_API_TOKEN = "test-token";
@@ -352,7 +352,7 @@ describe("10. Completed task handling", () => {
 // ─── 11. Failed task handling ─────────────────────────────────────────────────
 
 describe("11. Failed task handling", () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => { vi.unstubAllGlobals(); });
 
   it("returns failed status with error message", async () => {
     process.env.PRINTFUL_API_TOKEN = "test-token";
@@ -370,7 +370,7 @@ describe("11. Failed task handling", () => {
 // ─── 12. Rate-limit response handling ────────────────────────────────────────
 
 describe("12. Rate-limit response handling", () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => { vi.unstubAllGlobals(); });
 
   it("throws PrintfulApiError with status 429 on rate limit", async () => {
     process.env.PRINTFUL_API_TOKEN = "test-token";
@@ -428,7 +428,7 @@ describe("13. Conflicting placements", () => {
 // ─── 14. Malformed Printful response ─────────────────────────────────────────
 
 describe("14. Malformed Printful response", () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => { vi.unstubAllGlobals(); });
 
   it("throws on non-ok status with no parseable body", async () => {
     process.env.PRINTFUL_API_TOKEN = "test-token";

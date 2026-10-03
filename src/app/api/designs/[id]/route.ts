@@ -28,7 +28,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (authError) return authError;
 
   const { id } = await params;
-  let body: { name?: string; description?: string; tags?: string[]; status?: string; slug?: string };
+let body: { name?: string; description?: string; tags?: string[]; status?: string; slug?: string; artwork_url?: string; storage_path?: string; file_name?: string; width?: number; height?: number; file_size?: number };
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 
@@ -38,6 +38,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (body.tags !== undefined) patch.tags = body.tags;
   if (body.status !== undefined) patch.status = body.status;
   if (body.slug !== undefined) patch.slug = body.slug?.trim() || null;
+  if (body.artwork_url !== undefined) patch.artwork_url = body.artwork_url;
+  if (body.storage_path !== undefined) patch.storage_path = body.storage_path;
+  if (body.file_name !== undefined) patch.file_name = body.file_name;
+  if (body.width !== undefined) patch.width = body.width;
+  if (body.height !== undefined) patch.height = body.height;
+  if (body.file_size !== undefined) patch.file_size = body.file_size;
+  if ((body as Record<string,unknown>).file_hash !== undefined) patch.file_hash = (body as Record<string,unknown>).file_hash;
 
   const { data, error } = await sb().from("designs").update(patch).eq("id", id).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
