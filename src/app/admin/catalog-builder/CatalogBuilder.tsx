@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronRight, Check, Loader2, AlertCircle } from "lucide-react";
 import { generateSlug } from "@/lib/catalog/types";
@@ -12,14 +12,21 @@ import MockupStatus from "@/components/product-designer/MockupStatus";
 import PlacementSelector from "@/components/product-designer/PlacementSelector";
 import TechniqueSelector from "@/components/product-designer/TechniqueSelector";
 import OptionsSelector from "@/components/product-designer/OptionsSelector";
-import { BlankSelector, VariantPicker, DesignPicker, ArtworkValidationPanel } from "./StageComponents";
+import { BlankSelector, DesignPicker, ArtworkValidationPanel } from "./StageComponents";
+import {
+  CreationModeSelector, ProductCard, VariantMatrix, PricingPreview, BuildSummary,
+  MultiDryRunPanel, prefetchSummaries,
+  type MultiDryRunEntry,
+} from "./Phase11AComponents";
 import { initialBuilderState, type BuilderStage, type CatalogBuilderState, type BuiltMockup, type VariantPricing } from "./types";
+import type { PrintfulProduct } from "@/lib/printful/types";
 import type { ArtworkValidationResult } from "@/lib/fulfillment/artwork-validation";
 
 const CANVAS_W = 400;
 const CANVAS_H = 400;
 
 const STAGE_LABELS: Record<BuilderStage, string> = {
+  mode: "Creation Mode",
   blank: "Choose Blank",
   variants: "Pick Variants",
   design: "Choose Design",
@@ -31,7 +38,7 @@ const STAGE_LABELS: Record<BuilderStage, string> = {
   review: "Review & Publish",
 };
 
-const STAGES: BuilderStage[] = ["blank","variants","design","production","designer","mockups","details","pricing","review"];
+const STAGES: BuilderStage[] = ["mode","blank","variants","design","production","designer","mockups","details","pricing","review"];
 
 
 export default function CatalogBuilder({ editProductId }: { editProductId?: string }) {
@@ -40,7 +47,7 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
   const [editLoading, setEditLoading] = useState(!!editProductId);
   const [editError, setEditError] = useState<string | null>(null);
   const [editUpdatedAt, setEditUpdatedAt] = useState<string | null>(null);
-  const [stage, setStage] = useState<BuilderStage>("blank");
+  const [stage, setStage] = useState<BuilderStage>(editProductId ? "blank" : "mode");
   const [state, setState] = useState<CatalogBuilderState>(initialBuilderState);
   const [printfiles, setPrintfiles] = useState<PrintfulPrintfilesResponse | null>(null);
   const [templates, setTemplates] = useState<PrintfulTemplatesResponse | null>(null);
@@ -53,6 +60,8 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
   const [error, setError] = useState<string | null>(null);
   const [productId, setProductId] = useState<string | null>(null);
   const [artworkValidation, setArtworkValidation] = useState<ArtworkValidationResult | null>(null);
+  const [multiDryRunEntries, setMultiDryRunEntries] = useState<MultiDryRunEntry[]>([]);
+  const [multiDryRunning, setMultiDryRunning] = useState(false);
 
   const { upload, uploading, error: uploadError } = useArtworkUpload();
 
@@ -368,6 +377,105 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
     }
   }
 
+  // ── Multi-mode: proceed to design stage ──────────────────────────────────
+  function handleMultiProceed() {
+    go("design");
+  }
+
+  // ── Multi-mode: run dry-run validation for all selected products ──────────
+  async function handleMultiDryRun() {
+    const { multiSelectedProducts, design, technique, placement, variantPricing } = state;
+    if (!design || !multiSelectedProducts.length) return;
+    setMultiDryRunning(true);
+
+    // Initialise entries as running
+    const initial: MultiDryRunEntry[] = multiSelectedProducts.map((p) => ({
+      product: p,
+      variantCount: 0,
+      minCost: null, maxCost: null, minRetail: null, maxRetail: null,
+      dpiResult: null,
+      dryRunResult: "running",
+      errors: [],
+    }));
+    setMultiDryRunEntries(initial);
+
+    const updated = [...initial];
+    await Promise.all(
+      multiSelectedProducts.map(async (p, idx) => {
+        try {
+          // Fetch variants for this product
+          const vRes = await fetch(`/api/printful/products/${p.id}`);
+          const vData = await vRes.json();
+          const variants: Array<{ id: number; price: string; in_stock: boolean; color: string; size: string; name: string }> =
+            vData.result?.variants ?? [];
+          const available = variants.filter((v) => v.in_stock);
+          const costs = available.map((v) => parseFloat(v.price)).filter((c) => c > 0);
+
+          // Build a minimal spec for dry-run
+          const defaultTechnique = technique ?? p.techniques.find((t) => t.is_default)?.key ?? p.techniques[0]?.key ?? "";
+          const defaultPlacement = placement ?? "front";
+          const basePrice = costs.length ? Math.min(...costs) * 2.5 : 0;
+
+          const spec = {
+            printful_catalog_id: p.id,
+            variants: available.slice(0, 5).map((v) => ({
+              printful_variant_id: String(v.id),
+              label: v.name,
+              color: v.color || null,
+              size: v.size || null,
+              retail_price: Math.ceil(parseFloat(v.price) * 2.5),
+              provider_cost: parseFloat(v.price),
+              image_url: null,
+            })),
+            design_id: design.id,
+            placement: defaultPlacement,
+            technique: defaultTechnique,
+            printfile_id: null,
+            design_configuration: { artworkUrl: design.artwork_url },
+            title: `${p.title} — Draft`,
+            slug: `${p.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}-draft-${p.id}`,
+            description: null, short_description: null, brand: null,
+            product_type: null, category_id: null, meta_title: null, meta_description: null,
+            price: basePrice > 0 ? Math.ceil(basePrice * 100) / 100 : 1,
+            mockups: [],
+            publication_mode: "draft" as const,
+            idempotency_key: `multi-dryrun-${p.id}-${Date.now()}`,
+          };
+
+          const drRes = await fetch("/api/catalog-builder/dry-run", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(spec),
+          });
+          const drData = await drRes.json();
+
+          const minCost = costs.length ? Math.min(...costs) : null;
+          const maxCost = costs.length ? Math.max(...costs) : null;
+          const retailPrices = spec.variants.map((v) => v.retail_price);
+          const minRetail = retailPrices.length ? Math.min(...retailPrices) : null;
+          const maxRetail = retailPrices.length ? Math.max(...retailPrices) : null;
+
+          updated[idx] = {
+            product: p,
+            variantCount: available.length,
+            minCost, maxCost, minRetail, maxRetail,
+            dpiResult: artworkValidation?.status ?? null,
+            dryRunResult: drData.valid ? (artworkValidation?.status === "PASS_WARNING" ? "WARNING" : "PASS") : "FAIL",
+            errors: drData.valid ? [] : (drData.errors ?? []).map((e: { message: string }) => e.message),
+          };
+        } catch (e) {
+          updated[idx] = {
+            ...updated[idx],
+            dryRunResult: "FAIL",
+            errors: [e instanceof Error ? e.message : "Validation failed"],
+          };
+        }
+        setMultiDryRunEntries([...updated]);
+      })
+    );
+    setMultiDryRunning(false);
+  }
+
   // ── Progress bar ──────────────────────────────────────────────────────────
   const stageIdx = STAGES.indexOf(stage);
 
@@ -375,8 +483,12 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
     <div className="flex justify-center py-20"><Loader2 size={28} className="animate-spin text-secondary-300" /></div>
   );
 
+  const showSummary = !["mode", "blank", "review"].includes(stage) && !!(state.catalogProduct || (state.creationMode === "multi" && state.multiSelectedProducts.length > 0));
+
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto">
+    <div className={`gap-6 ${showSummary ? "grid grid-cols-1 lg:grid-cols-[1fr_220px]" : ""}`}>
+    <div className="space-y-6">
       {editError && (
         <div className="flex items-start gap-2 bg-red-50 text-red-700 rounded-lg p-3 text-sm">
           <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
@@ -407,8 +519,36 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
         </div>
       )}
 
-      {/* Stage: blank */}
-      {stage === "blank" && (
+      {/* Stage: mode */}
+      {stage === "mode" && (
+        <section>
+          <CreationModeSelector onSelect={(m) => {
+            update({ creationMode: m });
+            go("blank");
+          }} />
+        </section>
+      )}
+
+      {/* Stage: blank — multi mode */}
+      {stage === "blank" && state.creationMode === "multi" && (
+        <section className="space-y-4">
+          <h2 className="text-base font-semibold">Select blanks</h2>
+          <MultiBlankSelector
+            selected={state.multiSelectedProducts}
+            onChange={(products) => update({ multiSelectedProducts: products })}
+          />
+          <div className="flex justify-between pt-2">
+            <button onClick={() => go("mode")} className="text-sm text-secondary-400 underline">← Back</button>
+            <button
+              disabled={state.multiSelectedProducts.length === 0}
+              onClick={handleMultiProceed}
+              className="btn-primary px-5 py-2 text-sm disabled:opacity-40"
+            >Continue ({state.multiSelectedProducts.length} selected)</button>
+          </div>
+        </section>
+      )}
+      {/* Stage: blank — single mode */}
+      {stage === "blank" && state.creationMode !== "multi" && (
         <section className="space-y-3">
           <h2 className="text-base font-semibold">Choose a blank product</h2>
           <BlankSelector onSelect={(p) => {
@@ -418,6 +558,7 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
             });
             go("variants");
           }} />
+          <button onClick={() => go("mode")} className="text-sm text-secondary-400 underline">← Back</button>
         </section>
       )}
 
@@ -425,7 +566,7 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
       {stage === "variants" && state.catalogProduct && (
         <section className="space-y-3">
           <h2 className="text-base font-semibold">{state.catalogProduct.title} — Select variants</h2>
-          <VariantPicker
+          <VariantMatrix
             catalogProductId={state.catalogProduct.id}
             selected={state.selectedVariants}
             onChange={(v) => update({ selectedVariants: v })}
@@ -441,8 +582,26 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
         </section>
       )}
 
-      {/* Stage: design */}
-      {stage === "design" && (
+      {/* Stage: design — multi mode skips variants/production/designer/mockups */}
+      {stage === "design" && state.creationMode === "multi" && (
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold">Choose a design for all products</h2>
+          <DesignPicker
+            selected={state.design}
+            onSelect={(d, validation) => {
+              setArtworkValidation(validation);
+              update({ design: d, artworkUrl: d.artwork_url });
+              // Multi mode: go straight to review/dry-run
+              setMultiDryRunEntries([]);
+              go("review");
+            }}
+          />
+          <button onClick={() => go("blank")} className="text-sm text-secondary-400 underline">← Back</button>
+        </section>
+      )}
+
+      {/* Stage: design — single mode */}
+      {stage === "design" && state.creationMode !== "multi" && (
         <section className="space-y-3">
           <h2 className="text-base font-semibold">Choose a design</h2>
           <DesignPicker
@@ -461,8 +620,6 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
           <button onClick={() => go("variants")} className="text-sm text-secondary-400 underline">← Back</button>
         </section>
       )}
-
-      {/* Stage: production */}
       {stage === "production" && state.catalogProduct && (
         <section className="space-y-4">
           <h2 className="text-base font-semibold">Production settings</h2>
@@ -630,6 +787,7 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
       {stage === "pricing" && (
         <section className="space-y-4">
           <h2 className="text-base font-semibold">Set pricing</h2>
+          <PricingPreview variantPricing={state.variantPricing} />
           <div className="space-y-2">
             {state.variantPricing.map((vp, i) => (
               <div key={vp.printful_variant_id} className="flex items-center gap-3 p-3 bg-secondary-50 rounded-lg">
@@ -666,8 +824,29 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
         </section>
       )}
 
-      {/* Stage: review */}
-      {stage === "review" && (
+      {/* Stage: review — multi mode: dry-run matrix, no DB writes */}
+      {stage === "review" && state.creationMode === "multi" && (
+        <section className="space-y-4">
+          <MultiDryRunPanel
+            entries={multiDryRunEntries.length > 0 ? multiDryRunEntries : state.multiSelectedProducts.map((p) => ({
+              product: p,
+              variantCount: 0,
+              minCost: null, maxCost: null, minRetail: null, maxRetail: null,
+              dpiResult: null,
+              dryRunResult: "pending" as const,
+              errors: [],
+            }))}
+            onRunAll={handleMultiDryRun}
+            running={multiDryRunning}
+          />
+          <div className="flex justify-between pt-2">
+            <button onClick={() => go("design")} className="text-sm text-secondary-400 underline">← Back</button>
+          </div>
+        </section>
+      )}
+
+      {/* Stage: review — single mode */}
+      {stage === "review" && state.creationMode !== "multi" && (
         <section className="space-y-4">
           {productId ? (
             <div className="text-center space-y-4 py-8">
@@ -723,6 +902,77 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
           )}
         </section>
       )}
+    </div>
+    {showSummary && (
+      <aside className="hidden lg:block">
+        <BuildSummary
+          mode={state.creationMode}
+          product={state.catalogProduct}
+          multiProducts={state.multiSelectedProducts}
+          variantCount={state.selectedVariants.length}
+          designName={state.design?.name ?? null}
+          technique={state.technique}
+          placement={state.placement}
+          variantPricing={state.variantPricing}
+          dpiResult={artworkValidation?.status ?? null}
+        />
+      </aside>
+    )}
+    </div>
+    </div>
+  );
+}
+
+// ── Multi-blank selector (used only in multi mode) ────────────────────────────
+function MultiBlankSelector({
+  selected,
+  onChange,
+}: {
+  selected: PrintfulProduct[];
+  onChange: (products: PrintfulProduct[]) => void;
+}) {
+  const [products, setProducts] = useState<PrintfulProduct[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    fetch("/api/printful/products")
+      .then((r) => r.json())
+      .then(async (d) => {
+        const list: PrintfulProduct[] = d.result ?? [];
+        setProducts(list);
+        // Batch-prefetch all summaries in one request (max 20 per call)
+        const ids = list.map((p) => p.id);
+        for (let i = 0; i < ids.length; i += 20) {
+          await prefetchSummaries(ids.slice(i, i + 20));
+        }
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filtered = products.filter((p) =>
+    !search || p.title.toLowerCase().includes(search.toLowerCase())
+  );
+  const selectedIds = new Set(selected.map((p) => p.id));
+
+  const toggle = (p: PrintfulProduct) => {
+    if (selectedIds.has(p.id)) onChange(selected.filter((s) => s.id !== p.id));
+    else onChange([...selected, p]);
+  };
+
+  if (loading) return <div className="flex justify-center py-12"><Loader2 size={28} className="animate-spin text-secondary-300" /></div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="relative">
+        <svg className="absolute left-3 top-2.5 text-secondary-400 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search blanks…" className="input-field pl-9 py-2" />
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {filtered.map((p) => (
+          <ProductCard key={p.id} product={p} selected={selectedIds.has(p.id)} onSelect={toggle} prefetched />
+        ))}
+      </div>
     </div>
   );
 }

@@ -4,7 +4,10 @@
 import type { PrintfulProduct, PrintfulVariant, PrintfulLayoutTemplate, PrintfulMockupTask } from "@/lib/printful/types";
 import type { Design } from "@/types";
 
+export type CreationMode = "single" | "multi" | null;
+
 export type BuilderStage =
+  | "mode"
   | "blank"
   | "variants"
   | "design"
@@ -35,9 +38,28 @@ export interface VariantPricing {
   retail_price: number;
 }
 
+// Lightweight summary returned by /api/catalog-builder/product-summary
+export interface ProductSummary {
+  id: number;
+  title: string;
+  brand: string | null;
+  image: string;
+  techniques: Array<{ key: string; display_name: string; is_default: boolean }>;
+  total_variants: number;
+  available_variants: number;
+  color_count: number;
+  size_count: number;
+  min_cost: number | null;
+  max_cost: number | null;
+}
+
 export interface CatalogBuilderState {
-  // Stage 1: Blank
+  // Creation mode
+  creationMode: CreationMode;
+
+  // Stage 1: Blank (single) / multi-select
   catalogProduct: PrintfulProduct | null;
+  multiSelectedProducts: PrintfulProduct[]; // multi mode
 
   // Stage 2: Variants
   selectedVariants: PrintfulVariant[];
@@ -79,9 +101,20 @@ export interface CatalogBuilderState {
   idempotencyKey: string;
 }
 
+// Per-product entry in multi-product mode
+export interface MultiProductEntry {
+  catalogProduct: PrintfulProduct;
+  selectedVariants: PrintfulVariant[];
+  technique: string | null;
+  placement: string | null;
+  variantPricing: VariantPricing[];
+}
+
 export function initialBuilderState(): CatalogBuilderState {
   return {
+    creationMode: null,
     catalogProduct: null,
+    multiSelectedProducts: [],
     selectedVariants: [],
     design: null,
     technique: null,
