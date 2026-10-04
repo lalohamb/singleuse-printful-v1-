@@ -3,8 +3,13 @@ import { getPrintfiles } from "@/lib/printful/templates";
 import { PrintfulApiError } from "@/lib/printful/errors";
 import { requireAdmin } from "@/lib/require-admin";
 
+const VALID_TECHNIQUES = new Set([
+  "DIGITAL", "CUT-SEW", "UV", "EMBROIDERY", "SUBLIMATION", "ENGRAVING",
+  "DTG", "DTFILM", "DIRECT-TO-FABRIC", "KNITWEAR",
+]);
+
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ productId: string }> }
 ) {
   const authError = await requireAdmin();
@@ -14,8 +19,13 @@ export async function GET(
   if (isNaN(id) || id <= 0) {
     return NextResponse.json({ error: "Invalid product ID" }, { status: 400 });
   }
+  const url = new URL(req.url);
+  const technique = url.searchParams.get("technique") ?? undefined;
+  if (technique && !VALID_TECHNIQUES.has(technique.toUpperCase())) {
+    return NextResponse.json({ error: "Invalid technique" }, { status: 400 });
+  }
   try {
-    const data = await getPrintfiles(id);
+    const data = await getPrintfiles(id, technique?.toUpperCase());
     return NextResponse.json({ result: data });
   } catch (err) {
     if (err instanceof PrintfulApiError) {

@@ -183,7 +183,7 @@ export async function POST(req: Request) {
     // 2. Fetch printfiles + templates for placement validation + auto-positioning
     try {
       const [printfilesResp, templatesResp] = await Promise.all([
-        getPrintfiles(recipe.printful_catalog_id),
+        getPrintfiles(recipe.printful_catalog_id, recipe.technique),
         getLayoutTemplates(recipe.printful_catalog_id, { technique: recipe.technique }),
       ]);
 

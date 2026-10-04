@@ -53,21 +53,15 @@ function makeSpec(overrides: Partial<ProductSpecification> = {}): ProductSpecifi
   };
 }
 
-// ── 1. Creation mode selection ────────────────────────────────────────────────
+// ── 1. Catalog Builder starts at blank ──────────────────────────────────────
 
-describe("Creation mode", () => {
-  test("valid modes are single and multi", () => {
-    const modes = ["single", "multi"] as const;
-    expect(modes).toContain("single");
-    expect(modes).toContain("multi");
-  });
-
-  test("null mode is the initial state", () => {
+describe("Catalog Builder initial state", () => {
+  test("initial catalogProduct is null", () => {
     const s = initialBuilderState();
-    expect(s.creationMode).toBeNull();
+    expect(s.catalogProduct).toBeNull();
   });
 
-  test("edit mode forces single — multiSelectedProducts stays empty", () => {
+  test("multiSelectedProducts preserved for future batch phase", () => {
     const s = initialBuilderState();
     expect(s.multiSelectedProducts).toEqual([]);
   });
@@ -81,16 +75,15 @@ describe("Single product selection", () => {
     expect(s.catalogProduct).toBeNull();
   });
 
-  test("single mode does not populate multiSelectedProducts", () => {
+  test("multiSelectedProducts stays empty in single flow", () => {
     const s = initialBuilderState();
-    s.creationMode = "single";
     expect(s.multiSelectedProducts).toHaveLength(0);
   });
 });
 
-// ── 3. Multi-product toggle ───────────────────────────────────────────────────
+// ── 3. Multi-product state preserved (deferred) ───────────────────────────────
 
-describe("Multi-product selection", () => {
+describe("Multi-product state (deferred)", () => {
   test("toggling adds a product", () => {
     const products = [
       { id: 71, title: "Tee" }, { id: 1580, title: "Long Sleeve" },

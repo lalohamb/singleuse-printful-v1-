@@ -154,7 +154,7 @@ export async function POST(
     try {
       const [templatesResp, printfilesResp] = await Promise.all([
         getLayoutTemplates(db.printful_catalog_id, { technique: db.technique }),
-        getPrintfiles(db.printful_catalog_id),
+        getPrintfiles(db.printful_catalog_id, db.technique),
       ]);
       // Use first template matching the recipe placement
       const template = templatesResp.templates[0];

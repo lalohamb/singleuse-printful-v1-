@@ -822,7 +822,7 @@ export function BuilderStepSidebar({ steps }: { steps: SidebarStep[] }) {
   return (
     <nav
       aria-label="Builder steps"
-      className="hidden lg:flex flex-col w-44 flex-shrink-0 pt-1"
+      className="hidden lg:flex flex-col w-44 flex-shrink-0 pl-4 pt-6 sticky top-0 self-start h-screen overflow-y-auto"
     >
       <p className="text-[10px] font-semibold text-secondary-400 uppercase tracking-widest mb-3 px-2">
         Build Product

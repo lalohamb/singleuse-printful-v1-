@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
-import { Search, Check, Loader2, Upload, AlertTriangle, CheckCircle, AlertCircle, Info } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Search, Check, Loader2, Upload, AlertTriangle, CheckCircle, AlertCircle, Info, X, ChevronDown, ChevronUp } from "lucide-react";
 import type { PrintfulProduct, PrintfulVariant } from "@/lib/printful/types";
 import type { Design } from "@/types";
 import {
@@ -48,20 +48,41 @@ function SkeletonCard() {
   );
 }
 
-// ── Stage 1: Blank Selection ──────────────────────────────────────────────────
-// Issue C fix:
-// - Products render immediately as skeletons while the catalog fetch is in flight
-// - Search box is available before products load
-// - After products load, a single batch request fetches all summaries at once
-// - Summary costs populate progressively per card without blocking browsing
-// - Images use loading="lazy" to defer off-screen decoding
+
+// ── Deterministic top-level category map ─────────────────────────────────────
+// Derived from Printful type_name values. Groups are ordered for operator UX.
+// type_names not listed fall into "More".
+const CATEGORY_MAP: { label: string; types: string[] }[] = [
+  { label: "Apparel",      types: ["T-Shirts","Long Sleeve Shirts","Sweatshirts & Hoodies","Hoodies","Sweatshirts","Polo Shirts","Jackets","Tank Tops","Crop Tops","Shirts","Jerseys","Leggings","Shorts","Pants","Dresses","Skirts","Bodysuits","Swimwear","Underwear","Socks","Activewear"] },
+  { label: "Hats",         types: ["Hats","Caps","Beanies","Bucket Hats","Snapbacks","Dad Hats","Trucker Hats","Visors"] },
+  { label: "Kids",         types: ["Kids","Youth","Baby","Toddler","Onesies","Kids T-Shirts","Kids Hoodies"] },
+  { label: "Accessories", types: ["Accessories","Bags","Tote Bags","Backpacks","Fanny Packs","Phone Cases","Stickers","Patches","Pins","Keychains","Face Masks","Luggage Tags"] },
+  { label: "Home & Living",types: ["Home & Living","Pillows","Blankets","Rugs","Towels","Aprons","Ornaments","Candles","Doormats","Flags","Tapestries"] },
+  { label: "Wall Art",     types: ["Wall Art","Posters","Canvas","Framed Prints","Metal Prints","Wood Prints","Art Prints"] },
+  { label: "Drinkware",    types: ["Drinkware","Mugs","Tumblers","Water Bottles","Glasses","Cups"] },
+];
+
+function getTopCategory(typeName: string): string {
+  for (const group of CATEGORY_MAP) {
+    if (group.types.some((t) => typeName.toLowerCase().includes(t.toLowerCase()) || t.toLowerCase().includes(typeName.toLowerCase()))) {
+      return group.label;
+    }
+  }
+  return "More";
+}
+
+type SortKey = "default" | "name" | "cost-asc" | "cost-desc" | "colors";
+
+// ── Stage 1: Catalog Browser ──────────────────────────────────────────────────
 
 export function BlankSelector({ onSelect }: { onSelect: (p: PrintfulProduct) => void }) {
   const [products, setProducts] = useState<PrintfulProduct[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  // summaryTick increments when cache is updated, triggering card re-renders
+  const [topCategory, setTopCategory] = useState<string>("All");
+  const [subType, setSubType] = useState<string>("All");
+  const [sort, setSort] = useState<SortKey>("default");
   const [summaryTick, setSummaryTick] = useState(0);
 
   useEffect(() => {
@@ -72,85 +93,221 @@ export function BlankSelector({ onSelect }: { onSelect: (p: PrintfulProduct) => 
         const list: PrintfulProduct[] = d.result ?? [];
         setProducts(list);
         setCatalogLoading(false);
-        // Batch-fetch all summaries after catalog loads; update tick when done
         await batchFetchSummaries(list.map((p) => p.id));
         setSummaryTick((t) => t + 1);
       })
       .catch((e) => { setError(e.message); setCatalogLoading(false); });
   }, []);
 
-  const filtered = products.filter((p) =>
-    !search ||
-    p.title.toLowerCase().includes(search.toLowerCase()) ||
-    (p.brand ?? "").toLowerCase().includes(search.toLowerCase())
-  );
+  // Top-level category tabs derived from data
+  const topCategories = useMemo(() => {
+    const present = new Set(products.map((p) => getTopCategory(p.type_name || "")));
+    const ordered = ["All", ...CATEGORY_MAP.map((g) => g.label).filter((l) => present.has(l))];
+    if (present.has("More")) ordered.push("More");
+    return ordered;
+  }, [products]);
+
+  // Sub-types within the selected top category
+  const subTypes = useMemo(() => {
+    if (topCategory === "All") return [];
+    const inGroup = products.filter((p) => getTopCategory(p.type_name || "") === topCategory);
+    const seen = new Map<string, number>();
+    for (const p of inGroup) {
+      const t = p.type_name || "Other";
+      seen.set(t, (seen.get(t) ?? 0) + 1);
+    }
+    if (seen.size <= 1) return [];
+    return ["All", ...[...seen.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k)];
+  }, [products, topCategory]);
+
+  const filtered = useMemo(() => {
+    let list = products.filter((p) => {
+      const matchTop = topCategory === "All" || getTopCategory(p.type_name || "") === topCategory;
+      const matchSub = subType === "All" || (p.type_name || "") === subType;
+      const q = search.toLowerCase();
+      const matchSearch = !q ||
+        p.title.toLowerCase().includes(q) ||
+        (p.brand ?? "").toLowerCase().includes(q) ||
+        (p.type_name ?? "").toLowerCase().includes(q);
+      return matchTop && matchSub && matchSearch;
+    });
+    if (sort === "name") list = [...list].sort((a, b) => a.title.localeCompare(b.title));
+    else if (sort === "cost-asc" || sort === "cost-desc") {
+      list = [...list].sort((a, b) => {
+        const ca = _summaryCache.get(a.id);
+        const cb = _summaryCache.get(b.id);
+        const va = ca && ca !== "loading" ? (ca.min_cost ?? Infinity) : Infinity;
+        const vb = cb && cb !== "loading" ? (cb.min_cost ?? Infinity) : Infinity;
+        return sort === "cost-asc" ? va - vb : vb - va;
+      });
+    } else if (sort === "colors") {
+      list = [...list].sort((a, b) => {
+        const ca = _summaryCache.get(a.id);
+        const cb = _summaryCache.get(b.id);
+        const va = ca && ca !== "loading" ? ca.color_count : 0;
+        const vb = cb && cb !== "loading" ? cb.color_count : 0;
+        return vb - va;
+      });
+    }
+    return list;
+  }, [products, topCategory, subType, search, sort, summaryTick]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const clearFilters = () => { setSearch(""); setTopCategory("All"); setSubType("All"); };
+  const hasFilters = search !== "" || topCategory !== "All" || subType !== "All";
 
   if (error) return <div className="bg-red-50 text-red-700 rounded-lg p-3 text-sm">{error}</div>;
 
   return (
-    <div className="space-y-4">
-      <div className="relative">
-        <Search size={16} className="absolute left-3 top-2.5 text-secondary-400" />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search blanks by name or brand…"
-          className="input-field pl-9 py-2"
+    <div className="space-y-3">
+      {/* Search + sort row */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search size={15} className="absolute left-3 top-2.5 text-secondary-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name, brand, or type…"
+            className="input-field pl-9 py-2 text-sm"
+            disabled={catalogLoading}
+          />
+        </div>
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value as SortKey)}
+          className="input-field py-2 text-sm w-44 flex-shrink-0"
           disabled={catalogLoading}
-        />
+        >
+          <option value="default">Default order</option>
+          <option value="name">Name A–Z</option>
+          <option value="cost-asc">Cost: Low → High</option>
+          <option value="cost-desc">Cost: High → Low</option>
+          <option value="colors">Most colors</option>
+        </select>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+      {/* Top-level category pills */}
+      {!catalogLoading && (
+        <div className="flex gap-1.5 flex-wrap">
+          {topCategories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => { setTopCategory(cat); setSubType("All"); }}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                topCategory === cat
+                  ? "bg-secondary-900 text-white"
+                  : "bg-secondary-100 text-secondary-600 hover:bg-secondary-200"
+              }`}
+            >{cat}</button>
+          ))}
+          {hasFilters && (
+            <button onClick={clearFilters} className="px-3 py-1 rounded-full text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 flex items-center gap-1">
+              <X size={10} />Clear Filters
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Sub-type pills */}
+      {!catalogLoading && subTypes.length > 0 && (
+        <div className="flex gap-1.5 flex-wrap pl-1">
+          {subTypes.map((t) => (
+            <button
+              key={t}
+              onClick={() => setSubType(t)}
+              className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-colors border ${
+                subType === t
+                  ? "border-secondary-900 bg-secondary-900 text-white"
+                  : "border-secondary-200 text-secondary-500 hover:border-secondary-400"
+              }`}
+            >{t}</button>
+          ))}
+        </div>
+      )}
+
+      {/* Product list */}
+      <div className="divide-y divide-secondary-100 rounded-xl border border-secondary-200 overflow-hidden">
         {catalogLoading
-          // Show 12 skeleton cards while catalog is loading
-          ? Array.from({ length: 12 }).map((_, i) => <SkeletonCard key={i} />)
+          ? Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 p-3 animate-pulse">
+                <div className="w-20 h-20 rounded-lg bg-secondary-100 flex-shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 bg-secondary-100 rounded w-2/3" />
+                  <div className="h-2.5 bg-secondary-100 rounded w-1/3" />
+                  <div className="h-2.5 bg-secondary-100 rounded w-1/4" />
+                </div>
+                <div className="h-8 w-16 bg-secondary-100 rounded-lg flex-shrink-0" />
+              </div>
+            ))
           : filtered.map((p) => {
               const cached = _summaryCache.get(p.id);
               const summary = cached && cached !== "loading" ? cached : null;
               const summaryLoading = cached === "loading";
+              const unavailable = summary !== null && summary.available_variants === 0;
+              const unknown = cached === undefined || cached === null;
               return (
-                <button
+                <div
                   key={p.id}
-                  onClick={() => onSelect(p)}
-                  className="rounded-xl border border-secondary-200 p-3 text-left hover:border-secondary-900 hover:shadow-sm transition-all group"
+                  className={`flex items-center gap-3 p-3 transition-colors ${
+                    unavailable ? "opacity-60 bg-secondary-50" : "hover:bg-secondary-50"
+                  }`}
                 >
-                  <div className="aspect-square bg-secondary-50 rounded-lg overflow-hidden mb-2">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={p.image}
-                      alt={p.title}
-                      loading="lazy"
-                      className="w-full h-full object-contain p-1"
-                    />
-                  </div>
-                  <p className="text-xs font-semibold text-secondary-900 line-clamp-2 leading-tight">{p.title}</p>
-                  {p.brand && <p className="text-[10px] text-secondary-400 mt-0.5">{p.brand}</p>}
-                  {summaryLoading ? (
-                    <div className="mt-1 h-2.5 bg-secondary-100 rounded w-2/3 animate-pulse" />
-                  ) : summary ? (
-                    <div className="mt-1 space-y-0.5">
-                      <p className="text-[10px] text-secondary-500">
-                        {summary.color_count} colors · {summary.size_count} sizes
-                      </p>
-                      {summary.min_cost !== null && (
-                        <p className="text-[10px] font-medium text-secondary-700">
-                          From ${summary.min_cost.toFixed(2)}
-                          {summary.max_cost !== null && summary.max_cost !== summary.min_cost
-                            ? `–$${summary.max_cost.toFixed(2)}`
-                            : ""}
-                        </p>
-                      )}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={p.image}
+                    alt={p.title}
+                    loading="lazy"
+                    className="w-20 h-20 object-contain rounded-lg border border-secondary-100 bg-white flex-shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-secondary-900 truncate">{p.title}</p>
+                    <p className="text-xs text-secondary-500 mt-0.5">
+                      {[p.brand, p.type_name].filter(Boolean).join(" • ")}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      {summaryLoading ? (
+                        <div className="h-2.5 bg-secondary-100 rounded w-28 animate-pulse" />
+                      ) : summary ? (
+                        <>
+                          <span className="text-xs text-secondary-500">
+                            {summary.color_count > 0 ? `${summary.color_count} color${summary.color_count !== 1 ? "s" : ""}` : ""}
+                            {summary.color_count > 0 && summary.size_count > 0 ? " · " : ""}
+                            {summary.size_count > 0 ? `${summary.size_count} size${summary.size_count !== 1 ? "s" : ""}` : ""}
+                          </span>
+                          {summary.min_cost !== null && (
+                            <span className="text-xs font-medium text-secondary-700">
+                              from ${summary.min_cost.toFixed(2)}
+                              {summary.max_cost !== null && summary.max_cost !== summary.min_cost
+                                ? `–$${summary.max_cost.toFixed(2)}` : ""}
+                            </span>
+                          )}
+                          {unavailable && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600">Unavailable</span>
+                          )}
+                        </>
+                      ) : unknown ? (
+                        <span className="text-[10px] text-secondary-400">{p.variant_count} variants</span>
+                      ) : null}
                     </div>
-                  ) : (
-                    <p className="text-[10px] text-secondary-400 mt-0.5">{p.variant_count} variants</p>
-                  )}
-                </button>
+                  </div>
+                  <button
+                    onClick={() => !unavailable && onSelect(p)}
+                    disabled={unavailable}
+                    className="flex-shrink-0 px-4 py-2 rounded-lg bg-secondary-900 text-white text-xs font-semibold hover:bg-secondary-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Select
+                  </button>
+                </div>
               );
             })}
       </div>
 
       {!catalogLoading && filtered.length === 0 && (
-        <p className="text-center text-secondary-400 py-8">No blanks found.</p>
+        <div className="text-center py-8 space-y-2">
+          <p className="text-secondary-400 text-sm">No blanks found.</p>
+          {hasFilters && (
+            <button onClick={clearFilters} className="text-xs text-secondary-500 underline">Clear filters</button>
+          )}
+        </div>
       )}
     </div>
   );

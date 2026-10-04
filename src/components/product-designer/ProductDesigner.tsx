@@ -63,7 +63,7 @@ export default function ProductDesigner() {
     if (!product || !technique) return;
     setError(null);
     Promise.all([
-      fetch(`/api/printful/printfiles/${product.id}`).then((r) => r.json()),
+      fetch(`/api/printful/printfiles/${product.id}?technique=${encodeURIComponent(technique)}`).then((r) => r.json()),
       fetch(`/api/printful/templates/${product.id}?technique=${technique}`).then((r) => r.json()),
     ])
       .then(([pf, tmpl]) => {

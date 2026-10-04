@@ -14,20 +14,17 @@ import TechniqueSelector from "@/components/product-designer/TechniqueSelector";
 import OptionsSelector from "@/components/product-designer/OptionsSelector";
 import { BlankSelector, DesignPicker, ArtworkValidationPanel } from "./StageComponents";
 import {
-  CreationModeSelector, ProductCard, VariantMatrix, PricingPreview, BuildSummary,
+  ProductCard, VariantMatrix, PricingPreview, BuildSummary,
   MultiDryRunPanel, StickyWizardNav, BuilderStepSidebar, MobileStepHeader,
-  prefetchSummaries,
   type MultiDryRunEntry, type SidebarStep, type StageStatus,
 } from "./Phase11AComponents";
 import { initialBuilderState, type BuilderStage, type CatalogBuilderState, type BuiltMockup, type VariantPricing } from "./types";
-import type { PrintfulProduct } from "@/lib/printful/types";
 import type { ArtworkValidationResult } from "@/lib/fulfillment/artwork-validation";
 
 const CANVAS_W = 400;
 const CANVAS_H = 400;
 
 const STAGE_LABELS: Record<BuilderStage, string> = {
-  mode: "Creation Mode",
   blank: "Choose Blank",
   variants: "Pick Variants",
   design: "Choose Design",
@@ -39,9 +36,8 @@ const STAGE_LABELS: Record<BuilderStage, string> = {
   review: "Review & Publish",
 };
 
-// Concise sidebar labels (shorter than STAGE_LABELS)
+// Concise sidebar labels
 const SIDEBAR_LABELS: Record<BuilderStage, string> = {
-  mode: "Creation Mode",
   blank: "Choose Blank",
   variants: "Variants",
   design: "Design",
@@ -53,9 +49,8 @@ const SIDEBAR_LABELS: Record<BuilderStage, string> = {
   review: "Review",
 };
 
-// Downstream dependency map: navigating back to a stage invalidates these
+// Downstream dependency map
 const DOWNSTREAM: Partial<Record<BuilderStage, BuilderStage[]>> = {
-  mode:       ["blank","variants","design","production","designer","mockups","details","pricing","review"],
   blank:      ["variants","design","production","designer","mockups","details","pricing","review"],
   variants:   ["production","designer","mockups","pricing","review"],
   design:     ["designer","mockups","review"],
@@ -66,10 +61,8 @@ const DOWNSTREAM: Partial<Record<BuilderStage, BuilderStage[]>> = {
   pricing:    ["review"],
 };
 
-// Single-product stage sequence
-const SINGLE_STAGES: BuilderStage[] = ["mode","blank","variants","design","production","designer","mockups","details","pricing","review"];
-// Multi-product stage sequence (validation-only, no per-product production/mockup)
-const MULTI_STAGES: BuilderStage[] = ["mode","blank","design","review"];
+// Single-product stage sequence (active for this release)
+const SINGLE_STAGES: BuilderStage[] = ["blank","variants","design","production","designer","mockups","details","pricing","review"];
 // Edit mode stage sequence
 const EDIT_STAGES: BuilderStage[] = ["details","pricing","review"];
 
@@ -82,7 +75,7 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
   const [editLoading, setEditLoading] = useState(!!editProductId);
   const [editError, setEditError] = useState<string | null>(null);
   const [editUpdatedAt, setEditUpdatedAt] = useState<string | null>(null);
-  const [stage, setStage] = useState<BuilderStage>(editProductId ? "blank" : "mode");
+  const [stage, setStage] = useState<BuilderStage>(editProductId ? "details" : "blank");
   const [state, setState] = useState<CatalogBuilderState>(initialBuilderState);
   const [printfiles, setPrintfiles] = useState<PrintfulPrintfilesResponse | null>(null);
   const [templates, setTemplates] = useState<PrintfulTemplatesResponse | null>(null);
@@ -97,7 +90,6 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
   const [artworkValidation, setArtworkValidation] = useState<ArtworkValidationResult | null>(null);
   const [multiDryRunEntries, setMultiDryRunEntries] = useState<MultiDryRunEntry[]>([]);
   const [multiDryRunning, setMultiDryRunning] = useState(false);
-  // Tracks which stages have been explicitly completed — drives sidebar state
   const [completedStages, setCompletedStages] = useState<Set<BuilderStage>>(new Set());
 
   const { upload, uploading, error: uploadError } = useArtworkUpload();
@@ -193,8 +185,8 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
     update({ placement: null, activeTemplate: null, printfileId: null });
     try {
       const [pf, tmpl] = await Promise.all([
-        fetch(`/api/printful/printfiles/${catalogProductId}`).then((r) => r.json()),
-        fetch(`/api/printful/templates/${catalogProductId}?technique=${technique}`).then((r) => r.json()),
+        fetch(`/api/printful/printfiles/${catalogProductId}?technique=${encodeURIComponent(technique)}`).then((r) => r.json()),
+        fetch(`/api/printful/templates/${catalogProductId}?technique=${encodeURIComponent(technique)}`).then((r) => r.json()),
       ]);
       if (pf.error) throw new Error(pf.error);
       if (tmpl.error) throw new Error(tmpl.error);
@@ -547,9 +539,9 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
     <div className="flex justify-center py-20"><Loader2 size={28} className="animate-spin text-secondary-300" /></div>
   );
 
-  const showSummary = !["mode", "blank", "review"].includes(stage) && !!(state.catalogProduct || (state.creationMode === "multi" && state.multiSelectedProducts.length > 0));
+  const showSummary = !["blank", "review"].includes(stage) && !!state.catalogProduct;
 
-  const activeStages = mode === "edit" ? EDIT_STAGES : state.creationMode === "multi" ? MULTI_STAGES : SINGLE_STAGES;
+  const activeStages = mode === "edit" ? EDIT_STAGES : SINGLE_STAGES;
 
   const currentIdx = activeStages.indexOf(stage);
   const sidebarSteps: SidebarStep[] = activeStages.map((s, idx) => {
@@ -590,7 +582,7 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
         };
       }
       case "design":
-        return { ...base, onBack: () => go(state.creationMode === "multi" ? "blank" : "variants") };
+        return { ...base, onBack: () => go("variants") };
       case "production": {
         const ready = !!state.placement && !!state.activeTemplate;
         return {
@@ -652,7 +644,7 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
   })();
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen">
     {/* Mobile step header */}
     <MobileStepHeader
       steps={sidebarSteps}
@@ -660,11 +652,11 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
       stepIndex={currentIdx}
       totalSteps={activeStages.length}
     />
-    <div className="flex flex-1 min-h-0">
+    <div className="flex min-h-screen">
     {/* Desktop sidebar */}
     <BuilderStepSidebar steps={sidebarSteps} />
     {/* Main workspace */}
-    <div className="flex-1 min-w-0 overflow-y-auto">
+    <div className="flex-1 min-w-0">
     <div className={`mx-auto max-w-3xl px-4 py-6 pb-24 ${showSummary ? "lg:grid lg:grid-cols-[1fr_220px] lg:gap-6 lg:items-start" : ""}`}>
     <div className="space-y-6">
       {editError && (
@@ -680,36 +672,8 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
         </div>
       )}
 
-      {/* Stage: mode */}
-      {stage === "mode" && (
-        <section>
-          <CreationModeSelector onSelect={(m) => {
-            update({ creationMode: m });
-            go("blank");
-          }} />
-        </section>
-      )}
-
-      {/* Stage: blank — multi mode */}
-      {stage === "blank" && state.creationMode === "multi" && (
-        <section className="space-y-4">
-          <h2 className="text-base font-semibold">Select blanks</h2>
-          <MultiBlankSelector
-            selected={state.multiSelectedProducts}
-            onChange={(products) => update({ multiSelectedProducts: products })}
-          />
-          <div className="flex justify-between pt-2">
-            <button onClick={() => go("mode")} className="text-sm text-secondary-400 underline">← Back</button>
-            <button
-              disabled={state.multiSelectedProducts.length === 0}
-              onClick={handleMultiProceed}
-              className="btn-primary px-5 py-2 text-sm disabled:opacity-40"
-            >Continue ({state.multiSelectedProducts.length} selected)</button>
-          </div>
-        </section>
-      )}
-      {/* Stage: blank — single mode */}
-      {stage === "blank" && state.creationMode !== "multi" && (
+      {/* Stage: blank */}
+      {stage === "blank" && (
         <section className="space-y-3">
           <h2 className="text-base font-semibold">Choose a blank product</h2>
           <BlankSelector onSelect={(p) => {
@@ -719,7 +683,6 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
             });
             go("variants");
           }} />
-          <button onClick={() => go("mode")} className="text-sm text-secondary-400 underline">← Back</button>
         </section>
       )}
 
@@ -735,26 +698,8 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
         </section>
       )}
 
-      {/* Stage: design — multi mode skips variants/production/designer/mockups */}
-      {stage === "design" && state.creationMode === "multi" && (
-        <section className="space-y-3">
-          <h2 className="text-base font-semibold">Choose a design for all products</h2>
-          <DesignPicker
-            selected={state.design}
-            onSelect={(d, validation) => {
-              setArtworkValidation(validation);
-              update({ design: d, artworkUrl: d.artwork_url });
-              // Multi mode: go straight to review/dry-run
-              setMultiDryRunEntries([]);
-              go("review");
-            }}
-          />
-          <button onClick={() => go("blank")} className="text-sm text-secondary-400 underline">← Back</button>
-        </section>
-      )}
-
-      {/* Stage: design — single mode */}
-      {stage === "design" && state.creationMode !== "multi" && (
+      {/* Stage: design */}
+      {stage === "design" && (
         <section className="space-y-3">
           <h2 className="text-base font-semibold">Choose a design</h2>
           <DesignPicker
@@ -927,77 +872,8 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
         </section>
       )}
 
-      {/* Stage: review — multi mode: dry-run matrix, no DB writes */}
-      {stage === "review" && state.creationMode === "multi" && (
-        <section className="space-y-4">
-          <MultiDryRunPanel
-            entries={multiDryRunEntries.length > 0 ? multiDryRunEntries : state.multiSelectedProducts.map((p) => ({
-              product: p,
-              variantCount: 0,
-              minCost: null, maxCost: null, minRetail: null, maxRetail: null,
-              dpiResult: null,
-              dryRunResult: "pending" as const,
-              errors: [],
-            }))}
-            onRunAll={handleMultiDryRun}
-            onRemove={handleRemoveFromDryRun}
-            running={multiDryRunning}
-          />
-          {/* Post-validation actions — only shown after at least one run */}
-          {multiDryRunEntries.length > 0 && !multiDryRunning && (() => {
-            const passing = multiDryRunEntries.filter((e) => e.dryRunResult === "PASS" || e.dryRunResult === "WARNING");
-            const failing = multiDryRunEntries.filter((e) => e.dryRunResult === "FAIL");
-            return (
-              <div className="space-y-3">
-                {failing.length > 0 && (
-                  <div className="flex items-start gap-2 bg-red-50 text-red-700 rounded-lg p-3 text-sm">
-                    <AlertCircle size={15} className="mt-0.5 flex-shrink-0" />
-                    <span>
-                      {failing.length} product{failing.length !== 1 ? "s" : ""} failed validation and will be skipped.
-                      Fix the errors above and re-run validation, or deselect those products.
-                    </span>
-                  </div>
-                )}
-                {passing.length > 0 && (
-                  <div className="flex items-center justify-between bg-secondary-50 rounded-xl p-4">
-                    <div>
-                      <p className="text-sm font-semibold text-secondary-900">
-                        {passing.length} product{passing.length !== 1 ? "s" : ""} ready to build
-                      </p>
-                      <p className="text-xs text-secondary-500 mt-0.5">
-                        Each product will be built individually through the single-product flow.
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => {
-                        // Seed the first passing product into single-product flow and restart
-                        const first = passing[0].product;
-                        update({
-                          creationMode: "single",
-                          catalogProduct: first,
-                          technique: first.techniques?.find((t: { is_default: boolean }) => t.is_default)?.key
-                            ?? first.techniques?.[0]?.key ?? null,
-                          multiSelectedProducts: [],
-                        });
-                        go("variants");
-                      }}
-                      className="btn-primary px-5 py-2 text-sm flex-shrink-0"
-                    >
-                      Build {passing[0].product.title.split(" ").slice(0, 2).join(" ")} →
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-          <div className="flex justify-between pt-2">
-            <button onClick={() => go("design")} className="text-sm text-secondary-400 underline">← Back</button>
-          </div>
-        </section>
-      )}
-
-      {/* Stage: review — single mode */}
-      {stage === "review" && state.creationMode !== "multi" && (
+      {/* Stage: review */}
+      {stage === "review" && (
         <section className="space-y-4">
           {productId ? (
             <div className="text-center space-y-4 py-8">
@@ -1057,9 +933,9 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
     {showSummary && (
       <aside className="hidden lg:block">
         <BuildSummary
-          mode={state.creationMode}
+          mode="single"
           product={state.catalogProduct}
-          multiProducts={state.multiSelectedProducts}
+          multiProducts={[]}
           variantCount={state.selectedVariants.length}
           designName={state.design?.name ?? null}
           technique={state.technique}
@@ -1090,56 +966,3 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
   );
 }
 
-// ── Multi-blank selector (used only in multi mode) ────────────────────────────
-function MultiBlankSelector({
-  selected,
-  onChange,
-}: {
-  selected: PrintfulProduct[];
-  onChange: (products: PrintfulProduct[]) => void;
-}) {
-  const [products, setProducts] = useState<PrintfulProduct[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-
-  useEffect(() => {
-    fetch("/api/printful/products")
-      .then((r) => r.json())
-      .then(async (d) => {
-        const list: PrintfulProduct[] = d.result ?? [];
-        setProducts(list);
-        // Batch-prefetch all summaries in one request (max 20 per call)
-        const ids = list.map((p) => p.id);
-        for (let i = 0; i < ids.length; i += 20) {
-          await prefetchSummaries(ids.slice(i, i + 20));
-        }
-      })
-      .finally(() => setLoading(false));
-  }, []);
-
-  const filtered = products.filter((p) =>
-    !search || p.title.toLowerCase().includes(search.toLowerCase())
-  );
-  const selectedIds = new Set(selected.map((p) => p.id));
-
-  const toggle = (p: PrintfulProduct) => {
-    if (selectedIds.has(p.id)) onChange(selected.filter((s) => s.id !== p.id));
-    else onChange([...selected, p]);
-  };
-
-  if (loading) return <div className="flex justify-center py-12"><Loader2 size={28} className="animate-spin text-secondary-300" /></div>;
-
-  return (
-    <div className="space-y-4">
-      <div className="relative">
-        <svg className="absolute left-3 top-2.5 text-secondary-400 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search blanks…" className="input-field pl-9 py-2" />
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        {filtered.map((p) => (
-          <ProductCard key={p.id} product={p} selected={selectedIds.has(p.id)} onSelect={toggle} prefetched />
-        ))}
-      </div>
-    </div>
-  );
-}

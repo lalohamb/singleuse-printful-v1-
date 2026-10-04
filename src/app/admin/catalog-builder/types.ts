@@ -7,7 +7,6 @@ import type { Design } from "@/types";
 export type CreationMode = "single" | "multi" | null;
 
 export type BuilderStage =
-  | "mode"
   | "blank"
   | "variants"
   | "design"
@@ -54,12 +53,10 @@ export interface ProductSummary {
 }
 
 export interface CatalogBuilderState {
-  // Creation mode
-  creationMode: CreationMode;
-
-  // Stage 1: Blank (single) / multi-select
+  // Stage 1: Blank
   catalogProduct: PrintfulProduct | null;
-  multiSelectedProducts: PrintfulProduct[]; // multi mode
+  // multiSelectedProducts preserved for future batch phase — not active in current UX
+  multiSelectedProducts: PrintfulProduct[];
 
   // Stage 2: Variants
   selectedVariants: PrintfulVariant[];
@@ -112,7 +109,6 @@ export interface MultiProductEntry {
 
 export function initialBuilderState(): CatalogBuilderState {
   return {
-    creationMode: null,
     catalogProduct: null,
     multiSelectedProducts: [],
     selectedVariants: [],
