@@ -62,9 +62,18 @@ export default function ProductDesigner() {
   useEffect(() => {
     if (!product || !technique) return;
     setError(null);
+    // Clear stale state immediately so placement buttons never show old technique's data
+    setPrintfiles(null);
+    setTemplates(null);
+    setPlacement(null);
+    setActiveTemplate(null);
+
+    const controller = new AbortController();
+    const { signal } = controller;
+
     Promise.all([
-      fetch(`/api/printful/printfiles/${product.id}?technique=${encodeURIComponent(technique)}`).then((r) => r.json()),
-      fetch(`/api/printful/templates/${product.id}?technique=${technique}`).then((r) => r.json()),
+      fetch(`/api/printful/printfiles/${product.id}?technique=${encodeURIComponent(technique)}`, { signal }).then((r) => r.json()),
+      fetch(`/api/printful/templates/${product.id}?technique=${technique}`, { signal }).then((r) => r.json()),
     ])
       .then(([pf, tmpl]) => {
         if (pf.error) throw new Error(pf.error);
@@ -72,7 +81,13 @@ export default function ProductDesigner() {
         setPrintfiles(pf.result);
         setTemplates(tmpl.result);
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => {
+        // AbortError is expected when technique changes before the request completes.
+        if (e instanceof Error && e.name === "AbortError") return;
+        setError(e.message);
+      });
+
+    return () => controller.abort();
   }, [product, technique]);
 
   // Resolve active template when variant + placement change

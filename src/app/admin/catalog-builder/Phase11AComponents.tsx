@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Check, Loader2, Package, Layers, AlertCircle } from "lucide-react";
-import type { PrintfulProduct, PrintfulVariant } from "@/lib/printful/types";
+import type { PrintfulProduct, CatalogVariant } from "@/lib/printful/types";
 import type { CreationMode, ProductSummary, VariantPricing } from "./types";
 
 // ── Batch summary cache (module-level, lives for the page session) ────────────
@@ -136,7 +136,7 @@ export function ProductCard({
 // confusing single-column matrix. Now detects dimension shape and renders the
 // appropriate selector. Also fixes empty-string color (falsy) on some products.
 
-function variantLabel(v: PrintfulVariant): string {
+function variantLabel(v: CatalogVariant): string {
   const parts = [v.color, v.size].filter(Boolean);
   return parts.length > 0 ? parts.join(" / ") : v.name;
 }
@@ -147,12 +147,14 @@ export function VariantMatrix({
   onChange,
 }: {
   catalogProductId: number;
-  selected: PrintfulVariant[];
-  onChange: (v: PrintfulVariant[]) => void;
+  selected: CatalogVariant[];
+  onChange: (v: CatalogVariant[]) => void;
 }) {
-  const [variants, setVariants] = useState<PrintfulVariant[]>([]);
+  const [variants, setVariants] = useState<CatalogVariant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [eligibility, setEligibility] = useState<"eligible" | "unavailable" | "error" | null>(null);
+  const [eligibilityReason, setEligibilityReason] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -161,10 +163,11 @@ export function VariantMatrix({
       .then((r) => r.json())
       .then((d) => {
         if (d.error) throw new Error(d.error);
-        const vs: PrintfulVariant[] = d.result?.variants ?? [];
+        const vs: CatalogVariant[] = d.result?.variants ?? [];
         setVariants(vs);
-        // Auto-select the only variant if exactly one exists and it is in stock
-        if (vs.length === 1 && vs[0].in_stock) onChange([vs[0]]);
+        setEligibility(d.result?.eligibility ?? null);
+        setEligibilityReason(d.result?.eligibility_reason ?? null);
+        if (vs.length === 1) onChange([vs[0]]);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -174,122 +177,100 @@ export function VariantMatrix({
   if (loading) return <div className="flex justify-center py-8"><Loader2 size={24} className="animate-spin text-secondary-300" /></div>;
   if (error) return <div className="bg-red-50 text-red-700 rounded-lg p-3 text-sm">{error}</div>;
 
-  const selectedIds = new Set(selected.map((v) => v.id));
-  const available = variants.filter((v) => v.in_stock);
+  if (eligibility === "unavailable") {
+    return (
+      <div className="flex items-start gap-2 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+        <AlertCircle size={15} className="text-yellow-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-medium text-yellow-800">Not available in your region</p>
+          {eligibilityReason && <p className="text-xs text-yellow-700 mt-0.5">{eligibilityReason}</p>}
+        </div>
+      </div>
+    );
+  }
 
-  const toggle = (v: PrintfulVariant) => {
-    if (!v.in_stock) return;
+  if (eligibility === "error") {
+    return (
+      <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3">
+        <AlertCircle size={15} className="text-red-500 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-medium text-red-700">Could not load variants</p>
+          {eligibilityReason && <p className="text-xs text-red-600 mt-0.5">{eligibilityReason}</p>}
+        </div>
+      </div>
+    );
+  }
+
+  const selectedIds = new Set(selected.map((v) => v.id));
+
+  const toggle = (v: CatalogVariant) => {
     if (selectedIds.has(v.id)) onChange(selected.filter((s) => s.id !== v.id));
     else onChange([...selected, v]);
   };
 
-  // Determine dimension shape
-  // Use trimmed non-empty string check — some products have color="" (falsy)
   const distinctColors = [...new Set(variants.map((v) => v.color?.trim()).filter(Boolean))];
   const distinctSizes  = [...new Set(variants.map((v) => v.size?.trim()).filter(Boolean))];
   const hasMultipleColors = distinctColors.length > 1;
   const hasMultipleSizes  = distinctSizes.length > 1;
   const isFullMatrix = hasMultipleColors && hasMultipleSizes;
-  const isColorOnly  = hasMultipleColors && !hasMultipleSizes; // hats: many colors, one size
+  const isColorOnly  = hasMultipleColors && !hasMultipleSizes;
   const isSizeOnly   = !hasMultipleColors && hasMultipleSizes;
-  // Everything else (single variant, no dimensions, or truly flat) → flat list
 
-  // ── Single variant: auto-selected, show confirmation ─────────────────────
+  // ── Single variant: auto-selected ────────────────────────────────────────
   if (variants.length === 1) {
     const v = variants[0];
     return (
-      <div className="space-y-3">
-        <div className="flex items-center gap-3 p-3 bg-secondary-50 rounded-lg">
-          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-            v.in_stock ? "border-secondary-900 bg-secondary-900" : "border-secondary-200"
-          }`}>
-            {v.in_stock && <Check size={11} className="text-white" />}
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-medium text-secondary-900">{variantLabel(v)}</p>
-            <p className="text-xs text-secondary-500">
-              {v.in_stock ? `$${parseFloat(v.price).toFixed(2)} cost — auto-selected` : "Out of stock"}
-            </p>
-          </div>
+      <div className="flex items-center gap-3 p-3 bg-secondary-50 rounded-lg">
+        <div className="w-5 h-5 rounded-full border-2 border-secondary-900 bg-secondary-900 flex items-center justify-center flex-shrink-0">
+          <Check size={11} className="text-white" />
         </div>
-        {!v.in_stock && (
-          <p className="text-xs text-red-600">This product has no available variants.</p>
-        )}
+        <p className="text-sm font-medium text-secondary-900">{variantLabel(v)} — auto-selected</p>
       </div>
     );
   }
 
-  // ── Color-only (hats): color swatches / buttons ───────────────────────────
+  const btnClass = (isSel: boolean) =>
+    `flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
+      isSel ? "border-secondary-900 bg-secondary-900 text-white" : "border-secondary-200 text-secondary-700 hover:border-secondary-400"
+    }`;
+
+  // ── Color-only (hats) ─────────────────────────────────────────────────────
   if (isColorOnly) {
-    const toggleColor = (v: PrintfulVariant) => toggle(v);
-    const selectAll = () => onChange([...available]);
-    const clear = () => onChange([]);
     return (
       <div className="space-y-3">
         <div className="flex items-center gap-3 flex-wrap">
-          <button onClick={selectAll} className="text-xs text-primary-600 underline">Select all ({available.length})</button>
-          <button onClick={clear} className="text-xs text-secondary-400 underline">Clear</button>
-          <span className="text-xs text-secondary-500 ml-auto">{selected.length} selected</span>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {variants.map((v) => {
-            const isSel = selectedIds.has(v.id);
-            const label = v.color?.trim() || v.name;
-            return (
-              <button
-                key={v.id}
-                onClick={() => toggleColor(v)}
-                disabled={!v.in_stock}
-                title={v.in_stock ? `$${parseFloat(v.price).toFixed(2)} cost` : "Out of stock"}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
-                  !v.in_stock
-                    ? "border-secondary-100 text-secondary-300 cursor-not-allowed line-through"
-                    : isSel
-                    ? "border-secondary-900 bg-secondary-900 text-white"
-                    : "border-secondary-200 text-secondary-700 hover:border-secondary-400"
-                }`}
-              >
-                {isSel && <Check size={11} />}
-                {label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  // ── Size-only: size buttons ───────────────────────────────────────────────
-  if (isSizeOnly) {
-    return (
-      <div className="space-y-3">
-        <div className="flex items-center gap-3 flex-wrap">
-          <button onClick={() => onChange([...available])} className="text-xs text-primary-600 underline">Select all ({available.length})</button>
+          <button onClick={() => onChange([...variants])} className="text-xs text-primary-600 underline">Select all ({variants.length})</button>
           <button onClick={() => onChange([])} className="text-xs text-secondary-400 underline">Clear</button>
           <span className="text-xs text-secondary-500 ml-auto">{selected.length} selected</span>
         </div>
         <div className="flex flex-wrap gap-2">
-          {variants.map((v) => {
-            const isSel = selectedIds.has(v.id);
-            return (
-              <button
-                key={v.id}
-                onClick={() => toggle(v)}
-                disabled={!v.in_stock}
-                title={v.in_stock ? `$${parseFloat(v.price).toFixed(2)} cost` : "Out of stock"}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
-                  !v.in_stock
-                    ? "border-secondary-100 text-secondary-300 cursor-not-allowed line-through"
-                    : isSel
-                    ? "border-secondary-900 bg-secondary-900 text-white"
-                    : "border-secondary-200 text-secondary-700 hover:border-secondary-400"
-                }`}
-              >
-                {isSel && <Check size={11} />}
-                {v.size}
-              </button>
-            );
-          })}
+          {variants.map((v) => (
+            <button key={v.id} onClick={() => toggle(v)} className={btnClass(selectedIds.has(v.id))}>
+              {selectedIds.has(v.id) && <Check size={11} />}
+              {v.color?.trim() || v.name}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Size-only ─────────────────────────────────────────────────────────────
+  if (isSizeOnly) {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <button onClick={() => onChange([...variants])} className="text-xs text-primary-600 underline">Select all ({variants.length})</button>
+          <button onClick={() => onChange([])} className="text-xs text-secondary-400 underline">Clear</button>
+          <span className="text-xs text-secondary-500 ml-auto">{selected.length} selected</span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {variants.map((v) => (
+            <button key={v.id} onClick={() => toggle(v)} className={btnClass(selectedIds.has(v.id))}>
+              {selectedIds.has(v.id) && <Check size={11} />}
+              {v.size}
+            </button>
+          ))}
         </div>
       </div>
     );
@@ -299,22 +280,20 @@ export function VariantMatrix({
   if (isFullMatrix) {
     const colors = distinctColors;
     const sizes  = distinctSizes;
-    const matrix = new Map<string, PrintfulVariant>();
+    const matrix = new Map<string, CatalogVariant>();
     for (const v of variants) {
-      const c = v.color?.trim() || "Default";
-      const s = v.size?.trim()  || "One Size";
-      matrix.set(`${c}|${s}`, v);
+      matrix.set(`${v.color?.trim() || "Default"}|${v.size?.trim() || "One Size"}`, v);
     }
 
     const toggleColor = (color: string) => {
-      const cv = variants.filter((v) => (v.color?.trim() || "Default") === color && v.in_stock);
+      const cv = variants.filter((v) => (v.color?.trim() || "Default") === color);
       const allSel = cv.every((v) => selectedIds.has(v.id));
       if (allSel) onChange(selected.filter((s) => (s.color?.trim() || "Default") !== color));
       else onChange([...selected, ...cv.filter((v) => !selectedIds.has(v.id))]);
     };
 
     const toggleSize = (size: string) => {
-      const sv = variants.filter((v) => (v.size?.trim() || "One Size") === size && v.in_stock);
+      const sv = variants.filter((v) => (v.size?.trim() || "One Size") === size);
       const allSel = sv.every((v) => selectedIds.has(v.id));
       if (allSel) onChange(selected.filter((s) => (s.size?.trim() || "One Size") !== size));
       else onChange([...selected, ...sv.filter((v) => !selectedIds.has(v.id))]);
@@ -323,7 +302,7 @@ export function VariantMatrix({
     return (
       <div className="space-y-3">
         <div className="flex items-center gap-3 flex-wrap">
-          <button onClick={() => onChange([...available])} className="text-xs text-primary-600 underline">Select all ({available.length})</button>
+          <button onClick={() => onChange([...variants])} className="text-xs text-primary-600 underline">Select all ({variants.length})</button>
           <button onClick={() => onChange([])} className="text-xs text-secondary-400 underline">Clear</button>
           <span className="text-xs text-secondary-500 ml-auto">{selected.length} selected</span>
         </div>
@@ -333,7 +312,7 @@ export function VariantMatrix({
               <tr>
                 <th className="text-left p-1.5 text-secondary-500 font-medium w-28">Color</th>
                 {sizes.map((s) => {
-                  const sv = variants.filter((v) => (v.size?.trim() || "One Size") === s && v.in_stock);
+                  const sv = variants.filter((v) => (v.size?.trim() || "One Size") === s);
                   const allSel = sv.length > 0 && sv.every((v) => selectedIds.has(v.id));
                   return (
                     <th key={s} className="p-1.5 text-center min-w-[48px]">
@@ -348,7 +327,7 @@ export function VariantMatrix({
             </thead>
             <tbody>
               {colors.map((color) => {
-                const cv = variants.filter((v) => (v.color?.trim() || "Default") === color && v.in_stock);
+                const cv = variants.filter((v) => (v.color?.trim() || "Default") === color);
                 const allSel = cv.length > 0 && cv.every((v) => selectedIds.has(v.id));
                 const someSel = cv.some((v) => selectedIds.has(v.id));
                 return (
@@ -364,15 +343,10 @@ export function VariantMatrix({
                     {sizes.map((size) => {
                       const v = matrix.get(`${color}|${size}`);
                       if (!v) return <td key={size} className="p-1.5 text-center text-secondary-200 text-[10px]">—</td>;
-                      if (!v.in_stock) return (
-                        <td key={size} className="p-1.5 text-center">
-                          <span className="inline-block w-9 h-7 rounded border border-secondary-100 bg-secondary-50 text-[9px] text-secondary-300 leading-7 text-center">OOS</span>
-                        </td>
-                      );
                       const isSel = selectedIds.has(v.id);
                       return (
                         <td key={size} className="p-1.5 text-center">
-                          <button onClick={() => toggle(v)} title={`$${parseFloat(v.price).toFixed(2)} cost`}
+                          <button onClick={() => toggle(v)}
                             className={`w-9 h-7 rounded border text-[10px] font-medium transition-all ${
                               isSel ? "border-secondary-900 bg-secondary-900 text-white" : "border-secondary-200 text-secondary-600 hover:border-secondary-500"
                             }`}>
@@ -391,30 +365,21 @@ export function VariantMatrix({
     );
   }
 
-  // ── Flat fallback: generic one-dimensional or unlabelled variants ─────────
+  // ── Flat fallback ─────────────────────────────────────────────────────────
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3">
-        <button onClick={() => onChange([...available])} className="text-xs text-primary-600 underline">Select all ({available.length})</button>
+        <button onClick={() => onChange([...variants])} className="text-xs text-primary-600 underline">Select all ({variants.length})</button>
         <button onClick={() => onChange([])} className="text-xs text-secondary-400 underline">Clear</button>
         <span className="text-xs text-secondary-500 ml-auto">{selected.length} selected</span>
       </div>
       <div className="flex flex-wrap gap-2">
-        {variants.map((v) => {
-          const isSel = selectedIds.has(v.id);
-          return (
-            <button key={v.id} onClick={() => toggle(v)} disabled={!v.in_stock}
-              title={v.in_stock ? `$${parseFloat(v.price).toFixed(2)} cost` : "Out of stock"}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
-                !v.in_stock ? "border-secondary-100 text-secondary-300 cursor-not-allowed line-through"
-                : isSel ? "border-secondary-900 bg-secondary-900 text-white"
-                : "border-secondary-200 text-secondary-700 hover:border-secondary-400"
-              }`}>
-              {isSel && <Check size={11} />}
-              {variantLabel(v)}
-            </button>
-          );
-        })}
+        {variants.map((v) => (
+          <button key={v.id} onClick={() => toggle(v)} className={btnClass(selectedIds.has(v.id))}>
+            {selectedIds.has(v.id) && <Check size={11} />}
+            {variantLabel(v)}
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -423,7 +388,10 @@ export function VariantMatrix({
 // ── PricingPreview: full cost/retail/profit/margin breakdown ─────────────────
 
 export function PricingPreview({ variantPricing }: { variantPricing: VariantPricing[] }) {
-  const priced = variantPricing.filter((v) => v.retail_price > 0 && v.provider_cost > 0);
+  const priced = variantPricing.filter(
+    (v): v is VariantPricing & { provider_cost: number } =>
+      v.retail_price > 0 && v.provider_cost != null && v.provider_cost > 0
+  );
   if (priced.length === 0) return null;
 
   const minCost   = Math.min(...priced.map((v) => v.provider_cost));
@@ -485,7 +453,10 @@ export function BuildSummary({
   variantPricing: VariantPricing[];
   dpiResult?: string | null;
 }) {
-  const priced = variantPricing.filter((v) => v.retail_price > 0 && v.provider_cost > 0);
+  const priced = variantPricing.filter(
+    (v): v is VariantPricing & { provider_cost: number } =>
+      v.retail_price > 0 && v.provider_cost != null && v.provider_cost > 0
+  );
   const minRetail = priced.length ? Math.min(...priced.map((v) => v.retail_price)) : null;
   const maxRetail = priced.length ? Math.max(...priced.map((v) => v.retail_price)) : null;
   const minCost   = priced.length ? Math.min(...priced.map((v) => v.provider_cost)) : null;

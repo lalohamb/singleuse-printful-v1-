@@ -1,7 +1,7 @@
 // Catalog Builder state types
 // These are builder-only types — not stored in DB until draft creation.
 
-import type { PrintfulProduct, PrintfulVariant, PrintfulLayoutTemplate, PrintfulMockupTask } from "@/lib/printful/types";
+import type { PrintfulProduct, PrintfulVariant, CatalogVariant, PrintfulLayoutTemplate, PrintfulMockupTask } from "@/lib/printful/types";
 import type { Design } from "@/types";
 
 export type CreationMode = "single" | "multi" | null;
@@ -33,7 +33,8 @@ export interface VariantPricing {
   label: string;
   color: string | null;
   size: string | null;
-  provider_cost: number;
+  // null = unknown; V2 catalog-variant endpoint does not provide cost
+  provider_cost: number | null;
   retail_price: number;
 }
 
@@ -44,12 +45,18 @@ export interface ProductSummary {
   brand: string | null;
   image: string;
   techniques: Array<{ key: string; display_name: string; is_default: boolean }>;
-  total_variants: number;
-  available_variants: number;
+  // null when eligibility !== "eligible"
+  total_variants: number | null;
+  // null — V2 catalog-variant endpoint does not provide in_stock per variant
+  available_variants: number | null;
   color_count: number;
   size_count: number;
+  // null — commercial data not available from V2 catalog-variant endpoint
   min_cost: number | null;
   max_cost: number | null;
+  // Eligibility from V2 regional check
+  eligibility: "eligible" | "unavailable" | "error";
+  eligibility_reason: string | null;
 }
 
 export interface CatalogBuilderState {
@@ -59,7 +66,7 @@ export interface CatalogBuilderState {
   multiSelectedProducts: PrintfulProduct[];
 
   // Stage 2: Variants
-  selectedVariants: PrintfulVariant[];
+  selectedVariants: CatalogVariant[];
 
   // Stage 3: Design
   design: Design | null;
@@ -101,7 +108,7 @@ export interface CatalogBuilderState {
 // Per-product entry in multi-product mode
 export interface MultiProductEntry {
   catalogProduct: PrintfulProduct;
-  selectedVariants: PrintfulVariant[];
+  selectedVariants: CatalogVariant[];
   technique: string | null;
   placement: string | null;
   variantPricing: VariantPricing[];

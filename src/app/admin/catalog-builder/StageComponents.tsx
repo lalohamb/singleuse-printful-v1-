@@ -242,13 +242,20 @@ export function BlankSelector({ onSelect }: { onSelect: (p: PrintfulProduct) => 
               const cached = _summaryCache.get(p.id);
               const summary = cached && cached !== "loading" ? cached : null;
               const summaryLoading = cached === "loading";
-              const unavailable = summary !== null && summary.available_variants === 0;
-              const unknown = cached === undefined || cached === null;
+              // Eligibility from ProductSummary — contract §6
+              // unknown = cache not yet populated (undefined) or failed to load (null with no summary)
+              // Do NOT collapse unknown → unavailable
+              const eligibility = summary?.eligibility ?? null; // null = unknown
+              const isUnavailable = eligibility === "unavailable";
+              const isError      = eligibility === "error";
+              const isEligible   = eligibility === "eligible";
+              const isUnknown    = eligibility === null;
+              const isDisabled   = isUnavailable; // only unavailable disables; error/unknown do not
               return (
                 <div
                   key={p.id}
                   className={`flex items-center gap-3 p-3 transition-colors ${
-                    unavailable ? "opacity-60 bg-secondary-50" : "hover:bg-secondary-50"
+                    isUnavailable ? "opacity-60 bg-secondary-50" : isError ? "bg-red-50" : "hover:bg-secondary-50"
                   }`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -280,18 +287,25 @@ export function BlankSelector({ onSelect }: { onSelect: (p: PrintfulProduct) => 
                                 ? `–$${summary.max_cost.toFixed(2)}` : ""}
                             </span>
                           )}
-                          {unavailable && (
-                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600">Unavailable</span>
+                          {isUnavailable && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700">
+                              {summary.eligibility_reason ?? "Not available for the current fulfillment region."}
+                            </span>
+                          )}
+                          {isError && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600">
+                              Could not verify availability
+                            </span>
                           )}
                         </>
-                      ) : unknown ? (
+                      ) : isUnknown ? (
                         <span className="text-[10px] text-secondary-400">{p.variant_count} variants</span>
                       ) : null}
                     </div>
                   </div>
                   <button
-                    onClick={() => !unavailable && onSelect(p)}
-                    disabled={unavailable}
+                    onClick={() => !isDisabled && onSelect(p)}
+                    disabled={isDisabled}
                     className="flex-shrink-0 px-4 py-2 rounded-lg bg-secondary-900 text-white text-xs font-semibold hover:bg-secondary-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     Select
@@ -459,12 +473,14 @@ export function DesignPicker({
   selected,
   onSelect,
   catalogProductId,
+  technique,
   placement,
   variantId,
 }: {
   selected: Design | null;
   onSelect: (d: Design, validation: ArtworkValidationResult | null) => void;
   catalogProductId?: number;
+  technique?: string | null;
   placement?: string | null;
   variantId?: number;
 }) {
@@ -494,10 +510,10 @@ export function DesignPicker({
   }, []);
 
   async function runValidation(width: number, height: number): Promise<ArtworkValidationResult | null> {
-    if (!catalogProductId || !placement) return null;
+    if (!catalogProductId || !technique || !placement) return null;
     setValidating(true);
     try {
-      const spec = await fetchPrintfileSpec(catalogProductId, placement, variantId);
+      const spec = await fetchPrintfileSpec(catalogProductId, technique, placement, variantId);
       if (!spec) return null;
       return validateArtworkForPrintfile(width, height, spec);
     } finally {

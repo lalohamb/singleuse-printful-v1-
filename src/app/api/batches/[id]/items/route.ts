@@ -10,7 +10,7 @@ import {
   type BatchRecipe,
 } from "@/lib/catalog/batch-engine";
 import { getCatalogVariants } from "@/lib/printful/catalog";
-import { getLayoutTemplates, getPrintfiles } from "@/lib/printful/templates";
+import { getLayoutTemplates, getPrintfiles, resolveLayoutTemplateForVariantPlacement } from "@/lib/printful/templates";
 import { PrintfulApiError } from "@/lib/printful/errors";
 import type { RecipeLayoutTemplate } from "@/lib/catalog/recipe-engine";
 
@@ -103,22 +103,21 @@ export async function POST(
     // Fetch variants from Printful server-side — client data is NOT used
     let availableVariants: BatchRecipe["availableVariants"] = [];
     try {
-      const raw = await getCatalogVariants(db.printful_catalog_id);
+      const result = await getCatalogVariants(db.printful_catalog_id);
+      if (result.eligibility !== "eligible") {
+        return NextResponse.json({
+          error: `Recipe '${db.name}': catalog product ${db.printful_catalog_id} is not eligible (${result.eligibility}): ${result.reason ?? ""}`,
+          code: "PROVIDER_RESOLUTION_FAILED",
+        }, { status: 502 });
+      }
       const rules = db.variant_rules as { colors?: string[]; sizes?: string[]; exclude_variant_ids?: number[] };
       const excludeIds = new Set(rules.exclude_variant_ids ?? []);
 
-      availableVariants = raw
+      availableVariants = result.variants
         .filter((v) => {
           if (excludeIds.has(v.id)) return false;
           if (rules.colors?.length && !rules.colors.includes(v.color ?? "")) return false;
           if (rules.sizes?.length && !rules.sizes.includes(v.size ?? "")) return false;
-          return true;
-        })
-        .filter((v) => {
-          // availability_status is array of region objects
-          if (Array.isArray(v.availability_status)) {
-            return v.availability_status.some((s) => s.status === "active");
-          }
           return true;
         })
         .map((v) => ({
@@ -126,8 +125,6 @@ export async function POST(
           name: v.name,
           color: v.color ?? "",
           size: v.size ?? "",
-          price: String(v.price ?? "0"),
-          availability_status: "active" as const,
         }));
 
       if (availableVariants.length === 0) {
@@ -156,8 +153,15 @@ export async function POST(
         getLayoutTemplates(db.printful_catalog_id, { technique: db.technique }),
         getPrintfiles(db.printful_catalog_id, db.technique),
       ]);
-      // Use first template matching the recipe placement
-      const template = templatesResp.templates[0];
+      // Resolve template through variant_mapping for the recipe's placement.
+      // Using the first available variant as representative — safe because all
+      // variants for a given placement share the same template.
+      const representativeVariantId = availableVariants[0]?.id;
+      const template = resolveLayoutTemplateForVariantPlacement(
+        templatesResp,
+        db.placement,
+        representativeVariantId
+      );
       if (template) {
         // Find canvas DPI from matching printfile
         const pf = printfilesResp.printfiles.find((p) => p.printfile_id === template.printfile_id);

@@ -60,21 +60,18 @@ export async function POST(
     name: string;
     color: string;
     size: string;
-    price: string;
-    availability_status: string;
   }>;
 
   try {
-    const raw = await getCatalogVariants(recipe.printful_catalog_id);
-    allVariants = raw.map((v) => ({
+    const result = await getCatalogVariants(recipe.printful_catalog_id);
+    if (result.eligibility !== "eligible") {
+      return NextResponse.json({ error: `Catalog product not eligible (${result.eligibility}): ${result.reason ?? ""}` }, { status: 502 });
+    }
+    allVariants = result.variants.map((v) => ({
       id: v.id,
       name: v.name,
       color: v.color ?? "",
       size: v.size ?? "",
-      price: String(v.price ?? "0"),
-      availability_status: Array.isArray(v.availability_status)
-        ? (v.availability_status.some((s) => s.status === "active") ? "active" : "discontinued")
-        : "active",
     }));
   } catch (err) {
     if (err instanceof PrintfulApiError) {
@@ -98,8 +95,9 @@ export async function POST(
     return true;
   });
 
-  const available = filtered.filter((v) => v.availability_status === "active");
-  const unavailable = filtered.filter((v) => v.availability_status !== "active");
+  // V2 catalog variants carry no availability_status — all identity records are eligible
+  const available = filtered;
+  const unavailable: typeof filtered = [];
 
   // Validate: must have at least one available variant
   if (available.length === 0) {

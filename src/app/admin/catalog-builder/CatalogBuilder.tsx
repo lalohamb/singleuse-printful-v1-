@@ -20,6 +20,7 @@ import {
 } from "./Phase11AComponents";
 import { initialBuilderState, type BuilderStage, type CatalogBuilderState, type BuiltMockup, type VariantPricing } from "./types";
 import type { ArtworkValidationResult } from "@/lib/fulfillment/artwork-validation";
+import { fetchPrintfileSpec, validateArtworkForPrintfile } from "@/lib/fulfillment/artwork-validation";
 
 const CANVAS_W = 400;
 const CANVAS_H = 400;
@@ -148,7 +149,7 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
             label: String(v.label),
             color: (v.color as string | null),
             size: (v.size as string | null),
-            provider_cost: Number(v.provider_cost ?? 0),
+            provider_cost: v.provider_cost != null ? Number(v.provider_cost) : null,
             retail_price: Number(v.retail_price),
           })),
           persistedMockups: images.map((img: Record<string,unknown>, i: number) => ({
@@ -464,15 +465,15 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
           // Fetch variants for this product
           const vRes = await fetch(`/api/printful/products/${p.id}`);
           const vData = await vRes.json();
-          const variants: Array<{ id: number; price: string; in_stock: boolean; color: string; size: string; name: string }> =
+          const variants: Array<{ id: number; color: string; size: string; name: string }> =
             vData.result?.variants ?? [];
-          const available = variants.filter((v) => v.in_stock);
-          const costs = available.map((v) => parseFloat(v.price)).filter((c) => c > 0);
+          // V2 catalog variants have no price or in_stock — all are identity records
+          const available = variants;
+          const costs: number[] = [];
 
           // Build a minimal spec for dry-run
           const defaultTechnique = technique ?? p.techniques.find((t) => t.is_default)?.key ?? p.techniques[0]?.key ?? "";
           const defaultPlacement = placement ?? "front";
-          const basePrice = costs.length ? Math.min(...costs) * 2.5 : 0;
 
           const spec = {
             printful_catalog_id: p.id,
@@ -481,8 +482,8 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
               label: v.name,
               color: v.color || null,
               size: v.size || null,
-              retail_price: Math.ceil(parseFloat(v.price) * 2.5),
-              provider_cost: parseFloat(v.price),
+              retail_price: 0,
+              provider_cost: null,
               image_url: null,
             })),
             design_id: design.id,
@@ -494,7 +495,7 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
             slug: `${p.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}-draft-${p.id}`,
             description: null, short_description: null, brand: null,
             product_type: null, category_id: null, meta_title: null, meta_description: null,
-            price: basePrice > 0 ? Math.ceil(basePrice * 100) / 100 : 1,
+            price: 1,
             mockups: [],
             publication_mode: "draft" as const,
             idempotency_key: `multi-dryrun-${p.id}-${Date.now()}`,
@@ -617,8 +618,8 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
                 label: v.name,
                 color: v.color || null,
                 size: v.size || null,
-                provider_cost: parseFloat(v.price) || 0,
-                retail_price: Math.ceil(parseFloat(v.price) * 2.5),
+                provider_cost: null,
+                retail_price: 0,
               })) });
             }
             go("pricing");
@@ -705,6 +706,7 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
           <DesignPicker
             selected={state.design}
             catalogProductId={state.catalogProduct?.id}
+            technique={state.technique}
             placement={state.placement}
             variantId={state.selectedVariants[0]?.id}
             onSelect={(d, validation) => {
@@ -732,6 +734,9 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
                   onSelect={(k) => {
                     update({ technique: k });
                     loadProduction(state.catalogProduct!.id, k);
+                    // Invalidate artwork validation — it was computed for the previous technique.
+                    // It will be recomputed when the operator selects a placement.
+                    setArtworkValidation(null);
                   }}
                 />
               </div>
@@ -744,6 +749,17 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
                   onSelect={(p) => {
                     const tmpl = resolveTemplate(p);
                     update({ placement: p, activeTemplate: tmpl, printfileId: null });
+                    // Revalidate artwork against the newly selected placement + current technique.
+                    // Clears any stale validation from a previous placement or technique.
+                    if (state.design?.width && state.design?.height && state.catalogProduct && state.technique) {
+                      setArtworkValidation(null); // clear stale result immediately
+                      fetchPrintfileSpec(state.catalogProduct.id, state.technique, p, state.selectedVariants[0]?.id)
+                        .then((spec) => {
+                          if (!spec) return;
+                          setArtworkValidation(validateArtworkForPrintfile(state.design!.width!, state.design!.height!, spec));
+                        })
+                        .catch(() => { /* non-fatal */ });
+                    }
                   }}
                 />
               </div>

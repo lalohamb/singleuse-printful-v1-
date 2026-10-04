@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requireAdmin } from "@/lib/require-admin";
 import { getCatalogVariants } from "@/lib/printful/catalog";
-import { getLayoutTemplates, getPrintfiles } from "@/lib/printful/templates";
+import { getLayoutTemplates, getPrintfiles, resolveLayoutTemplateForVariantPlacement } from "@/lib/printful/templates";
 import { PrintfulApiError } from "@/lib/printful/errors";
 import { computePositionFromTemplate } from "@/lib/catalog/positioning";
 
@@ -115,8 +115,12 @@ export async function POST(req: Request) {
 
     // 1. Fetch catalog variants
     try {
-      const raw = await getCatalogVariants(recipe.printful_catalog_id);
+      const result = await getCatalogVariants(recipe.printful_catalog_id);
       report.catalog_product_exists = true;
+      if (result.eligibility !== "eligible") {
+        errors.push(`Catalog product ${recipe.printful_catalog_id} not eligible (${result.eligibility}): ${result.reason ?? ""}`);
+      } else {
+      const raw = result.variants;
       report.total_catalog_variants = raw.length;
 
       const rules = recipe.variant_rules as { colors?: string[]; sizes?: string[]; exclude_variant_ids?: number[] };
@@ -131,12 +135,8 @@ export async function POST(req: Request) {
 
       report.filtered_variants = filtered.length;
 
-      const available = filtered.filter((v) => {
-        if (Array.isArray(v.availability_status)) {
-          return v.availability_status.some((s) => s.status === "active");
-        }
-        return v.in_stock;
-      });
+      // All V2 variants are eligible identity records — no stock/availability concept
+      const available = filtered;
 
       report.available_variants = available.length;
       report.unavailable_variants = filtered.length - available.length;
@@ -157,21 +157,15 @@ export async function POST(req: Request) {
         warnings.push(`${report.unavailable_variants} variant(s) match rules but are currently unavailable`);
       }
 
-      // Pricing sample
+      // Pricing sample — no cost data from V2 catalog variants
       if (available.length > 0) {
-        const sampleCost = parseFloat(available[0].price ?? "0");
-        report.sample_cost = sampleCost;
+        report.sample_cost = null;
         const pr = recipe.pricing_rules as { strategy: string; fixed_price?: number; cost_plus_margin?: number; min_price?: number; rounding?: string };
         if (pr.strategy === "FIXED_PRICE" && pr.fixed_price) {
           report.sample_retail_price = pr.fixed_price;
-        } else if (pr.strategy === "COST_PLUS" && typeof pr.cost_plus_margin === "number") {
-          let price = sampleCost + pr.cost_plus_margin;
-          if (pr.rounding === "nearest_99") price = Math.floor(price) + 0.99;
-          else if (pr.rounding === "ceil") price = Math.ceil(price);
-          if (pr.min_price) price = Math.max(price, pr.min_price);
-          report.sample_retail_price = Math.round(price * 100) / 100;
         }
       }
+      } // end eligibility block
     } catch (err) {
       if (err instanceof PrintfulApiError) {
         errors.push(`Catalog product ${recipe.printful_catalog_id} not found: ${err.clientMessage}`);
@@ -194,8 +188,13 @@ export async function POST(req: Request) {
         errors.push(`Placement '${recipe.placement}' not available. Available: ${report.available_placements.join(", ")}`);
       }
 
-      // Auto-position using first template + matching printfile
-      const template = templatesResp.templates[0];
+      // Auto-position using the template for the recipe's specific placement.
+      // Resolve through variant_mapping — never use templates[0] directly.
+      const template = resolveLayoutTemplateForVariantPlacement(
+        templatesResp,
+        recipe.placement
+        // No specific variant ID available here; falls back to first variant mapping.
+      );
       if (template) {
         const pf = printfilesResp.printfiles.find((p) => p.printfile_id === template.printfile_id);
         const canvasDpi = pf?.dpi ?? 150;

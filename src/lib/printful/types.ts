@@ -66,16 +66,52 @@ export interface PrintfulVariant {
   material: { name: string; percentage: number }[] | null;
 }
 
-// ── Print files ───────────────────────────────────────────────────────────────
-
-export interface PrintfulPrintfile {
-  variant_id: number;
-  placements: string[];
-  printfiles: PrintfulPrintfileDetail[];
-  available_placements: Record<string, string>;
-  option_groups: string[];
-  options: string[];
+// ── V2 catalog variant (live-proven fields from GET /v2/catalog-products/{id}/catalog-variants) ──
+// Only fields observed in the actual live response are typed here.
+// price, in_stock, availability_regions, availability_status are NOT present
+// in the V2 catalog-variant object — they come from separate sub-endpoints.
+export interface PrintfulCatalogVariantV2 {
+  id: number;
+  catalog_product_id: number;
+  name: string;
+  size: string;
+  color: string;
+  color_code: string | null;
+  color_code2: string | null;
+  image: string;
+  // placement_dimensions present in live response but not needed by CountyBuys currently
+  placement_dimensions?: Array<{ placement: string; height: number; width: number; orientation: string }>;
 }
+
+// ── CountyBuys normalized catalog variant ─────────────────────────────────────
+// Derived from PrintfulCatalogVariantV2. Contains only authoritative provider
+// identity and display fields. Commercial data (price, stock) is NOT included
+// because it is not available from the V2 catalog-variant endpoint.
+export interface CatalogVariant {
+  /** Printful catalog variant ID — authoritative provider identity */
+  id: number;
+  /** Printful catalog product ID */
+  catalog_product_id: number;
+  name: string;
+  size: string;
+  color: string;
+  color_code: string | null;
+  image: string;
+}
+
+// ── Catalog variant retrieval result ─────────────────────────────────────────
+// Wraps the variant array with an eligibility flag so callers can distinguish
+// "zero variants" from "regionally unavailable".
+export type CatalogVariantEligibility = "eligible" | "unavailable" | "error";
+
+export interface CatalogVariantResult {
+  eligibility: CatalogVariantEligibility;
+  variants: CatalogVariant[];
+  /** Human-readable reason when eligibility !== "eligible" */
+  reason?: string;
+}
+
+// ── Print files ───────────────────────────────────────────────────────────────
 
 export interface PrintfulPrintfileDetail {
   printfile_id: number;

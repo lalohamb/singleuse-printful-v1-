@@ -2,11 +2,7 @@ import { NextResponse } from "next/server";
 import { getPrintfiles } from "@/lib/printful/templates";
 import { PrintfulApiError } from "@/lib/printful/errors";
 import { requireAdmin } from "@/lib/require-admin";
-
-const VALID_TECHNIQUES = new Set([
-  "DIGITAL", "CUT-SEW", "UV", "EMBROIDERY", "SUBLIMATION", "ENGRAVING",
-  "DTG", "DTFILM", "DIRECT-TO-FABRIC", "KNITWEAR",
-]);
+import { VALID_TECHNIQUES } from "@/lib/printful/techniques";
 
 export async function GET(
   req: Request,

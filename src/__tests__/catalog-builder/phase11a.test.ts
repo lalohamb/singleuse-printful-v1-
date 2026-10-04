@@ -275,23 +275,27 @@ describe("PricingPreview", () => {
   ];
 
   test("min cost is correct", () => {
-    const minCost = Math.min(...vp.map((v) => v.provider_cost));
+    const withCost = vp.filter((v): v is VariantPricing & { provider_cost: number } => v.provider_cost != null);
+    const minCost = Math.min(...withCost.map((v) => v.provider_cost));
     expect(minCost).toBe(11.92);
   });
 
   test("max cost is correct", () => {
-    const maxCost = Math.max(...vp.map((v) => v.provider_cost));
+    const withCost = vp.filter((v): v is VariantPricing & { provider_cost: number } => v.provider_cost != null);
+    const maxCost = Math.max(...withCost.map((v) => v.provider_cost));
     expect(maxCost).toBe(15.92);
   });
 
   test("gross profit is retail minus cost", () => {
-    const profits = vp.map((v) => v.retail_price - v.provider_cost);
+    const withCost = vp.filter((v): v is VariantPricing & { provider_cost: number } => v.provider_cost != null);
+    const profits = withCost.map((v) => v.retail_price - v.provider_cost);
     expect(profits[0]).toBeCloseTo(18.07, 1);
     expect(profits[2]).toBeCloseTo(18.07, 1);
   });
 
   test("gross margin calculation", () => {
-    const margins = vp.map((v) => ((v.retail_price - v.provider_cost) / v.retail_price) * 100);
+    const withCost = vp.filter((v): v is VariantPricing & { provider_cost: number } => v.provider_cost != null);
+    const margins = withCost.map((v) => ((v.retail_price - v.provider_cost) / v.retail_price) * 100);
     expect(margins[0]).toBeCloseTo(60.3, 0);
   });
 
@@ -311,7 +315,10 @@ describe("PricingPreview", () => {
   });
 
   test("empty variantPricing renders nothing", () => {
-    const priced = ([] as VariantPricing[]).filter((v) => v.retail_price > 0 && v.provider_cost > 0);
+    const priced = ([] as VariantPricing[]).filter(
+      (v): v is VariantPricing & { provider_cost: number } =>
+        v.retail_price > 0 && v.provider_cost != null && v.provider_cost > 0
+    );
     expect(priced).toHaveLength(0);
   });
 

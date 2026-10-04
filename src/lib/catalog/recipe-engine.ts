@@ -204,7 +204,9 @@ export interface RecipeResolutionInput {
     name: string;
     color: string;
     size: string;
-    price: string; // provider cost as string (Printful format)
+    // Optional — V2 catalog-variant endpoint does not provide provider cost.
+    // Absent/null = unknown cost. Never fabricate as "0".
+    price?: string | null;
     availability_status?: string;
   }>;
   // Commercial overrides (title, slug, description, etc.)
@@ -277,10 +279,18 @@ export function resolveProductRecipe(input: RecipeResolutionInput): RecipeResolu
   let maxPrice = -Infinity;
 
   for (const v of filtered) {
-    const providerCost = parseFloat(v.price) || 0;
+    // price is optional — absent/null means provider cost is unknown.
+    // Unknown cost is represented as null in ProductSpecVariant, never as 0.
+    const providerCost = (v.price != null && v.price !== "") ? (parseFloat(v.price) || null) : null;
     let retailPrice: number;
     try {
-      retailPrice = applyPricingRules(providerCost, recipe.pricing_rules);
+      if (providerCost === null && recipe.pricing_rules.strategy === "COST_PLUS") {
+        // COST_PLUS requires an authoritative provider cost.
+        // Unknown cost is a blocking condition — do not fabricate.
+        errors.push({ field: "pricing_rules", message: `COST_PLUS requires an authoritative provider cost for variant ${v.name}, but provider cost is currently unavailable.` });
+        continue;
+      }
+      retailPrice = applyPricingRules(providerCost ?? 0, recipe.pricing_rules);
     } catch (e) {
       errors.push({ field: "pricing_rules", message: `Pricing failed for variant ${v.name}: ${(e as Error).message}` });
       continue;

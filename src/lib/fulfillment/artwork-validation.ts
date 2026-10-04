@@ -109,14 +109,19 @@ export function validateArtworkForPrintfile(
 
 // Fetch the printfile spec for a given catalog product + placement from the
 // existing /api/printful/printfiles/:productId endpoint.
+// technique must be the currently selected production technique — passing the
+// wrong technique returns placements for a different technique and produces
+// an incorrect DPI result.
 // Returns null if the spec cannot be obtained (UNVERIFIED).
 export async function fetchPrintfileSpec(
   catalogProductId: number,
+  technique: string,
   placement: string,
   variantId?: number
 ): Promise<PrintfileSpec | null> {
   try {
-    const res = await fetch(`/api/printful/printfiles/${catalogProductId}`);
+    const qs = `?technique=${encodeURIComponent(technique)}`;
+    const res = await fetch(`/api/printful/printfiles/${catalogProductId}${qs}`);
     if (!res.ok) return null;
     const data = await res.json();
     const result = data.result ?? data;

@@ -48,20 +48,20 @@ export async function POST(
   const warnings: string[] = [];
 
   // 1. Validate catalog product exists + fetch variants
-  let allVariants: Array<{ id: number; name: string; color: string; size: string; price: string; availability_status: string }> = [];
+  let allVariants: Array<{ id: number; name: string; color: string; size: string }> = [];
 
   try {
-    const raw = await getCatalogVariants(recipe.printful_catalog_id);
-    allVariants = raw.map((v) => ({
-      id: v.id,
-      name: v.name,
-      color: v.color ?? "",
-      size: v.size ?? "",
-      price: String(v.price ?? "0"),
-      availability_status: Array.isArray(v.availability_status)
-        ? (v.availability_status.some((s) => s.status === "active") ? "active" : "discontinued")
-        : "active",
-    }));
+    const result = await getCatalogVariants(recipe.printful_catalog_id);
+    if (result.eligibility !== "eligible") {
+      errors.push(`Catalog product ${recipe.printful_catalog_id} not eligible (${result.eligibility}): ${result.reason ?? ""}`);
+    } else {
+      allVariants = result.variants.map((v) => ({
+        id: v.id,
+        name: v.name,
+        color: v.color ?? "",
+        size: v.size ?? "",
+      }));
+    }
   } catch (err) {
     if (err instanceof PrintfulApiError) {
       errors.push(`Catalog product ${recipe.printful_catalog_id} not found or inaccessible: ${err.clientMessage}`);
@@ -92,16 +92,15 @@ export async function POST(
       return true;
     });
 
-    const available = filtered.filter((v) => v.availability_status === "active");
-    const unavailable = filtered.filter((v) => v.availability_status !== "active");
+    // V2 catalog variants carry no availability_status — all identity records are eligible
+    const available = filtered;
+    const unavailable: typeof filtered = [];
 
     if (available.length === 0) {
-      errors.push(`No available variants match recipe rules (${filtered.length} filtered, ${unavailable.length} unavailable)`);
-    } else if (unavailable.length > 0) {
-      warnings.push(`${unavailable.length} variant(s) match rules but are currently unavailable`);
+      errors.push(`No available variants match recipe rules (${filtered.length} filtered)`);
     }
 
-    // 5. Validate pricing rules produce valid price for at least one variant
+    // 5. Validate pricing rules
     const pr = recipe.pricing_rules as { strategy: string; fixed_price?: number; cost_plus_margin?: number; min_price?: number };
     if (pr.strategy === "FIXED_PRICE") {
       if (!pr.fixed_price || pr.fixed_price <= 0) {
@@ -111,15 +110,9 @@ export async function POST(
       if (typeof pr.cost_plus_margin !== "number" || pr.cost_plus_margin < 0) {
         errors.push("COST_PLUS strategy requires cost_plus_margin >= 0");
       } else {
-        // Check at least one variant produces a valid price
-        const sampleCost = parseFloat(available[0]?.price ?? "0");
-        const price = sampleCost + pr.cost_plus_margin;
-        if (price <= 0) {
-          errors.push(`COST_PLUS pricing produces price <= 0 for sample variant (cost: ${sampleCost}, margin: ${pr.cost_plus_margin})`);
-        }
-        if (pr.min_price && pr.min_price > 0) {
-          warnings.push(`min_price floor of $${pr.min_price} will apply`);
-        }
+        // Provider cost is not available from the V2 catalog-variant endpoint.
+        // COST_PLUS cannot be validated or activated without an authoritative provider cost.
+        errors.push("COST_PLUS requires an authoritative provider cost, but provider cost is currently unavailable from the catalog variant endpoint.");
       }
     }
 

@@ -50,11 +50,12 @@ export function DesignTab({ data, onReload }: { data: ProductWorkspaceData; onRe
       setPendingArtwork({ url: uploadData.url, storagePath: uploadData.storage_path, fileName: file.name, width: w, height: h });
 
       // Validate against printfile spec
-      if (product.printful_catalog_id && primaryDesign?.placement) {
+      if (product.printful_catalog_id && primaryDesign?.placement && primaryDesign?.technique) {
         setValidating(true);
         const firstVariant = variants[0];
         const spec = await fetchPrintfileSpec(
           product.printful_catalog_id,
+          primaryDesign.technique,
           primaryDesign.placement,
           firstVariant?.printful_variant_id ? Number(firstVariant.printful_variant_id) : undefined
         );

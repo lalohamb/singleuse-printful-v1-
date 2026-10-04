@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/require-admin";
-import { getCatalogProduct } from "@/lib/printful/catalog";
+import { getCatalogProduct, getCatalogVariants } from "@/lib/printful/catalog";
 import { PrintfulApiError } from "@/lib/printful/errors";
 
 // GET /api/catalog-builder/product-summary?id=<id>
 // GET /api/catalog-builder/product-summary?ids=1,2,3   ← batch (max 20)
-// Server-authoritative — never trusts client-supplied costs.
+// Server-authoritative.
+//
+// V2 catalog-variant objects do NOT include price or in_stock.
+// min_cost/max_cost are reported as null (unknown) — not fabricated.
+// available_variants is reported as null when eligibility is not "eligible".
 export async function GET(req: Request) {
   const authError = await requireAdmin();
   if (authError) return authError;
@@ -25,16 +29,18 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "invalid id" }, { status: 400 });
 
   async function summarise(id: number) {
-    const product = await getCatalogProduct(id);
-    const variants = (product as unknown as {
-      variants?: Array<{ id: number; price: string; in_stock: boolean; color: string; size: string }>;
-    }).variants ?? [];
+    // getCatalogProduct: V1 /products/{id} — flat product object
+    // getCatalogVariants: V2 /v2/catalog-products/{id}/catalog-variants — never throws
+    const [product, variantResult] = await Promise.all([
+      getCatalogProduct(id),
+      getCatalogVariants(id),
+    ]);
 
-    const available = variants.filter((v) => v.in_stock);
-    const costs = available.map((v) => parseFloat(v.price)).filter((c) => !isNaN(c) && c > 0);
+    const eligible = variantResult.eligibility === "eligible";
+    const variants = variantResult.variants;
 
-    const colors = [...new Set(variants.map((v) => v.color).filter(Boolean))];
-    const sizes  = [...new Set(variants.map((v) => v.size).filter(Boolean))];
+    const colors = eligible ? [...new Set(variants.map((v) => v.color).filter(Boolean))] : [];
+    const sizes  = eligible ? [...new Set(variants.map((v) => v.size).filter(Boolean))] : [];
 
     return {
       id: product.id,
@@ -42,12 +48,19 @@ export async function GET(req: Request) {
       brand: product.brand,
       image: product.image,
       techniques: product.techniques,
-      total_variants: variants.length,
-      available_variants: available.length,
+      // Variant counts: null when not eligible (unavailable/error)
+      total_variants: eligible ? variants.length : null,
+      // available_variants: null — V2 does not provide in_stock per variant
+      // Callers must not treat null as 0 (unavailable)
+      available_variants: eligible ? variants.length : null,
       color_count: colors.length,
       size_count: sizes.length,
-      min_cost: costs.length > 0 ? Math.min(...costs) : null,
-      max_cost: costs.length > 0 ? Math.max(...costs) : null,
+      // Commercial data not available from V2 catalog-variant endpoint
+      min_cost: null,
+      max_cost: null,
+      // Eligibility
+      eligibility: variantResult.eligibility,
+      eligibility_reason: variantResult.reason ?? null,
     };
   }
 
@@ -55,7 +68,6 @@ export async function GET(req: Request) {
     if (ids.length === 1) {
       return NextResponse.json(await summarise(ids[0]));
     }
-    // Batch: resolve concurrently, return map keyed by id
     const results = await Promise.allSettled(ids.map(summarise));
     const out: Record<number, unknown> = {};
     for (let i = 0; i < ids.length; i++) {
