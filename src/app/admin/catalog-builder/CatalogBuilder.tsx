@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Check, Loader2, AlertCircle } from "lucide-react";
+import { Check, Loader2, AlertCircle } from "lucide-react";
 import { generateSlug } from "@/lib/catalog/types";
 import type { PrintfulLayoutTemplate, PrintfulMockupTask, PrintfulPrintfilesResponse, PrintfulTemplatesResponse } from "@/lib/printful/types";
 import type { CanvasRect } from "@/components/product-designer/coordinates";
@@ -15,8 +15,9 @@ import OptionsSelector from "@/components/product-designer/OptionsSelector";
 import { BlankSelector, DesignPicker, ArtworkValidationPanel } from "./StageComponents";
 import {
   CreationModeSelector, ProductCard, VariantMatrix, PricingPreview, BuildSummary,
-  MultiDryRunPanel, StickyWizardNav, prefetchSummaries,
-  type MultiDryRunEntry,
+  MultiDryRunPanel, StickyWizardNav, BuilderStepSidebar, MobileStepHeader,
+  prefetchSummaries,
+  type MultiDryRunEntry, type SidebarStep, type StageStatus,
 } from "./Phase11AComponents";
 import { initialBuilderState, type BuilderStage, type CatalogBuilderState, type BuiltMockup, type VariantPricing } from "./types";
 import type { PrintfulProduct } from "@/lib/printful/types";
@@ -38,7 +39,41 @@ const STAGE_LABELS: Record<BuilderStage, string> = {
   review: "Review & Publish",
 };
 
-const STAGES: BuilderStage[] = ["mode","blank","variants","design","production","designer","mockups","details","pricing","review"];
+// Concise sidebar labels (shorter than STAGE_LABELS)
+const SIDEBAR_LABELS: Record<BuilderStage, string> = {
+  mode: "Creation Mode",
+  blank: "Choose Blank",
+  variants: "Variants",
+  design: "Design",
+  production: "Production",
+  designer: "Position",
+  mockups: "Mockups",
+  details: "Details",
+  pricing: "Pricing",
+  review: "Review",
+};
+
+// Downstream dependency map: navigating back to a stage invalidates these
+const DOWNSTREAM: Partial<Record<BuilderStage, BuilderStage[]>> = {
+  mode:       ["blank","variants","design","production","designer","mockups","details","pricing","review"],
+  blank:      ["variants","design","production","designer","mockups","details","pricing","review"],
+  variants:   ["production","designer","mockups","pricing","review"],
+  design:     ["designer","mockups","review"],
+  production: ["designer","mockups","review"],
+  designer:   ["mockups","review"],
+  mockups:    ["details","pricing","review"],
+  details:    ["pricing","review"],
+  pricing:    ["review"],
+};
+
+// Single-product stage sequence
+const SINGLE_STAGES: BuilderStage[] = ["mode","blank","variants","design","production","designer","mockups","details","pricing","review"];
+// Multi-product stage sequence (validation-only, no per-product production/mockup)
+const MULTI_STAGES: BuilderStage[] = ["mode","blank","design","review"];
+// Edit mode stage sequence
+const EDIT_STAGES: BuilderStage[] = ["details","pricing","review"];
+
+const STAGES: BuilderStage[] = SINGLE_STAGES;
 
 
 export default function CatalogBuilder({ editProductId }: { editProductId?: string }) {
@@ -62,13 +97,28 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
   const [artworkValidation, setArtworkValidation] = useState<ArtworkValidationResult | null>(null);
   const [multiDryRunEntries, setMultiDryRunEntries] = useState<MultiDryRunEntry[]>([]);
   const [multiDryRunning, setMultiDryRunning] = useState(false);
+  // Tracks which stages have been explicitly completed — drives sidebar state
+  const [completedStages, setCompletedStages] = useState<Set<BuilderStage>>(new Set());
 
   const { upload, uploading, error: uploadError } = useArtworkUpload();
 
   const update = (patch: Partial<CatalogBuilderState>) =>
     setState((s) => ({ ...s, ...patch }));
 
-  const go = (s: BuilderStage) => { setError(null); setStage(s); };
+  // go() — navigate to a stage, mark current as complete, invalidate downstream
+  const go = (next: BuilderStage) => {
+    setError(null);
+    setCompletedStages((prev) => {
+      const updated = new Set(prev);
+      // Mark current stage complete when advancing forward
+      updated.add(stage);
+      // If navigating backward, remove downstream completed stages
+      const downstream = DOWNSTREAM[next] ?? [];
+      for (const d of downstream) updated.delete(d);
+      return updated;
+    });
+    setStage(next);
+  };
 
   // ── EDIT MODE: load existing product state ────────────────────────────────
   useState(() => {
@@ -493,16 +543,28 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
   }
 
   // ── Progress bar ──────────────────────────────────────────────────────────
-  const stageIdx = STAGES.indexOf(stage);
-
   if (editLoading) return (
     <div className="flex justify-center py-20"><Loader2 size={28} className="animate-spin text-secondary-300" /></div>
   );
 
   const showSummary = !["mode", "blank", "review"].includes(stage) && !!(state.catalogProduct || (state.creationMode === "multi" && state.multiSelectedProducts.length > 0));
 
+  const activeStages = mode === "edit" ? EDIT_STAGES : state.creationMode === "multi" ? MULTI_STAGES : SINGLE_STAGES;
+
+  const currentIdx = activeStages.indexOf(stage);
+  const sidebarSteps: SidebarStep[] = activeStages.map((s, idx) => {
+    const isDone = completedStages.has(s);
+    const isCurrent = s === stage;
+    const status: StageStatus =
+      isCurrent ? "current"
+      : isDone ? "complete"
+      : idx < currentIdx ? "available"
+      : "future";
+    const clickable = status === "complete" || status === "available";
+    return { stage: s, label: SIDEBAR_LABELS[s] ?? s, status, onClick: clickable ? () => go(s) : undefined };
+  });
+
   // ── Sticky nav config per stage ───────────────────────────────────────────────
-  // mode and review stages manage their own navigation inline.
   interface NavConfig {
     stepLabel: string; stepIndex: number; totalSteps: number;
     onBack?: () => void; onContinue?: () => void;
@@ -510,8 +572,8 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
     continueDisabledReason?: string; statusText?: string; loading?: boolean;
   }
   const stickyNav = ((): NavConfig | null => {
-    const stageIdx = STAGES.indexOf(stage);
-    const base = { stepLabel: STAGE_LABELS[stage], stepIndex: stageIdx, totalSteps: STAGES.length };
+    const stageIdx = activeStages.indexOf(stage);
+    const base = { stepLabel: SIDEBAR_LABELS[stage] ?? stage, stepIndex: stageIdx, totalSteps: activeStages.length };
     switch (stage) {
       case "blank":
         return null; // blank uses card-click navigation, no Continue needed
@@ -590,8 +652,20 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
   })();
 
   return (
-    <div className="max-w-5xl mx-auto pb-20">
-    <div className={`gap-6 ${showSummary ? "grid grid-cols-1 lg:grid-cols-[1fr_220px]" : ""}`}>
+    <div className="min-h-screen flex flex-col">
+    {/* Mobile step header */}
+    <MobileStepHeader
+      steps={sidebarSteps}
+      currentLabel={SIDEBAR_LABELS[stage] ?? stage}
+      stepIndex={currentIdx}
+      totalSteps={activeStages.length}
+    />
+    <div className="flex flex-1 min-h-0">
+    {/* Desktop sidebar */}
+    <BuilderStepSidebar steps={sidebarSteps} />
+    {/* Main workspace */}
+    <div className="flex-1 min-w-0 overflow-y-auto">
+    <div className={`mx-auto max-w-3xl px-4 py-6 pb-24 ${showSummary ? "lg:grid lg:grid-cols-[1fr_220px] lg:gap-6 lg:items-start" : ""}`}>
     <div className="space-y-6">
       {editError && (
         <div className="flex items-start gap-2 bg-red-50 text-red-700 rounded-lg p-3 text-sm">
@@ -599,23 +673,6 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
           <span>Failed to load product for editing: {editError}</span>
         </div>
       )}
-      {/* Progress */}
-      <div className="flex items-center gap-1 overflow-x-auto pb-1">
-        {STAGES.map((s, i) => (
-          <div key={s} className="flex items-center gap-1 flex-shrink-0">
-            <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
-              i < stageIdx ? "bg-green-100 text-green-700" :
-              i === stageIdx ? "bg-secondary-900 text-white" :
-              "bg-secondary-100 text-secondary-400"
-            }`}>
-              {i < stageIdx ? <Check size={10} /> : <span>{i + 1}</span>}
-              <span className="hidden sm:inline">{STAGE_LABELS[s]}</span>
-            </div>
-            {i < STAGES.length - 1 && <ChevronRight size={12} className="text-secondary-300 flex-shrink-0" />}
-          </div>
-        ))}
-      </div>
-
       {error && (
         <div className="flex items-start gap-2 bg-red-50 text-red-700 rounded-lg p-3 text-sm">
           <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
@@ -1013,7 +1070,8 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
       </aside>
     )}
     </div>
-    {/* Sticky wizard nav — Issue B fix */}
+    </div>
+    </div>
     {stickyNav && (
       <StickyWizardNav
         stepLabel={stickyNav.stepLabel}

@@ -803,3 +803,153 @@ export function StickyWizardNav({
     </div>
   );
 }
+
+// ── BuilderStepSidebar — desktop left-side vertical step navigation ───────────
+// Phase 11A.2: replaces the horizontal stepper.
+// Renders the correct stage list for single, multi, and edit modes.
+// Stage states: complete | current | available | future | needs-attention
+
+export type StageStatus = "complete" | "current" | "available" | "future" | "needs-attention";
+
+export interface SidebarStep {
+  stage: string;
+  label: string;
+  status: StageStatus;
+  onClick?: () => void;
+}
+
+export function BuilderStepSidebar({ steps }: { steps: SidebarStep[] }) {
+  return (
+    <nav
+      aria-label="Builder steps"
+      className="hidden lg:flex flex-col w-44 flex-shrink-0 pt-1"
+    >
+      <p className="text-[10px] font-semibold text-secondary-400 uppercase tracking-widest mb-3 px-2">
+        Build Product
+      </p>
+      <ol className="space-y-0.5">
+        {steps.map((step) => {
+          const isCurrent = step.status === "current";
+          const isClickable = (step.status === "complete" || step.status === "available") && !!step.onClick;
+          const isNeedsAttention = step.status === "needs-attention";
+
+          return (
+            <li key={step.stage}>
+              <button
+                onClick={isClickable ? step.onClick : undefined}
+                disabled={!isClickable}
+                aria-current={isCurrent ? "step" : undefined}
+                className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left text-xs transition-colors ${
+                  isCurrent
+                    ? "bg-secondary-900 text-white font-semibold"
+                    : isNeedsAttention
+                    ? "text-yellow-700 hover:bg-yellow-50 cursor-pointer"
+                    : step.status === "complete"
+                    ? "text-secondary-600 hover:bg-secondary-100 cursor-pointer"
+                    : step.status === "available"
+                    ? "text-secondary-500 hover:bg-secondary-100 cursor-pointer"
+                    : "text-secondary-300 cursor-default"
+                }`}
+              >
+                {/* Status icon */}
+                <span className={`flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
+                  isCurrent
+                    ? "bg-white text-secondary-900"
+                    : step.status === "complete"
+                    ? "bg-green-100 text-green-700"
+                    : isNeedsAttention
+                    ? "bg-yellow-100 text-yellow-700"
+                    : "bg-secondary-100 text-secondary-400"
+                }`}>
+                  {step.status === "complete" ? (
+                    <Check size={8} />
+                  ) : isNeedsAttention ? (
+                    "!"
+                  ) : (
+                    <span className="leading-none">●</span>
+                  )}
+                </span>
+                <span className="truncate">{step.label}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
+// ── MobileStepHeader — compact step indicator for narrow viewports ────────────
+// Shows current step + "View Steps" toggle. Replaces horizontal stepper on mobile.
+
+export function MobileStepHeader({
+  steps,
+  currentLabel,
+  stepIndex,
+  totalSteps,
+}: {
+  steps: SidebarStep[];
+  currentLabel: string;
+  stepIndex: number;
+  totalSteps: number;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="lg:hidden mb-4">
+      <div className="flex items-center justify-between bg-secondary-50 border border-secondary-200 rounded-xl px-4 py-2.5">
+        <div>
+          <p className="text-[10px] text-secondary-400 uppercase tracking-wide">
+            Step {stepIndex + 1} of {totalSteps}
+          </p>
+          <p className="text-sm font-semibold text-secondary-900 leading-tight">{currentLabel}</p>
+        </div>
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className="flex items-center gap-1 text-xs text-secondary-500 hover:text-secondary-900 transition-colors"
+          aria-expanded={open}
+        >
+          {open ? "Hide" : "View Steps"}
+          <svg
+            className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`}
+            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      </div>
+
+      {open && (
+        <div className="mt-1 bg-white border border-secondary-200 rounded-xl shadow-lg p-3 space-y-0.5">
+          {steps.map((step) => {
+            const isCurrent = step.status === "current";
+            const isClickable = (step.status === "complete" || step.status === "available") && !!step.onClick;
+            return (
+              <button
+                key={step.stage}
+                onClick={() => { if (isClickable && step.onClick) { step.onClick(); setOpen(false); } }}
+                disabled={!isClickable}
+                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-xs transition-colors ${
+                  isCurrent ? "bg-secondary-900 text-white font-semibold"
+                  : step.status === "complete" ? "text-secondary-600 hover:bg-secondary-100"
+                  : step.status === "needs-attention" ? "text-yellow-700 hover:bg-yellow-50"
+                  : "text-secondary-300 cursor-default"
+                }`}
+              >
+                <span className={`flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
+                  isCurrent ? "bg-white text-secondary-900"
+                  : step.status === "complete" ? "bg-green-100 text-green-700"
+                  : step.status === "needs-attention" ? "bg-yellow-100 text-yellow-700"
+                  : "bg-secondary-100 text-secondary-400"
+                }`}>
+                  {step.status === "complete" ? <Check size={8} /> : step.status === "needs-attention" ? "!" : "●"}
+                </span>
+                {step.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
