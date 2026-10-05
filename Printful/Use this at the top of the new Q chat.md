@@ -1,0 +1,1 @@
+Read Printful/CURRENT-ARCHITECTURE-CONTRACT.md first. It is authoritative. Files under Printful/archive/ and Printful/reports/ are historical reference only. If this task conflicts with the contract, STOP and report the conflict.

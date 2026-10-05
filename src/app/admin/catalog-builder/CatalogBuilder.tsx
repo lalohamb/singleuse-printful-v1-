@@ -21,6 +21,7 @@ import {
 import { initialBuilderState, type BuilderStage, type CatalogBuilderState, type BuiltMockup, type VariantPricing } from "./types";
 import type { ArtworkValidationResult } from "@/lib/fulfillment/artwork-validation";
 import { fetchPrintfileSpec, validateArtworkForPrintfile } from "@/lib/fulfillment/artwork-validation";
+import { resolveProviderCost, type CatalogProductPricing } from "@/lib/printful/pricing";
 
 const CANVAS_W = 400;
 const CANVAS_H = 400;
@@ -92,6 +93,8 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
   const [multiDryRunEntries, setMultiDryRunEntries] = useState<MultiDryRunEntry[]>([]);
   const [multiDryRunning, setMultiDryRunning] = useState(false);
   const [completedStages, setCompletedStages] = useState<Set<BuilderStage>>(new Set());
+  const [pricingData, setPricingData] = useState<CatalogProductPricing | null>(null);
+  const [pricingLoading, setPricingLoading] = useState(false);
 
   const { upload, uploading, error: uploadError } = useArtworkUpload();
 
@@ -173,6 +176,52 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
       }
     })();
   });
+
+  // ── Fetch provider pricing and apply to variantPricing ─────────────────────
+  // Called when entering the pricing stage with a known product, technique, placement.
+  // Invalidated (pricingData set to null) when technique or placement changes.
+  async function fetchAndApplyCost(
+    catalogProductId: number,
+    technique: string,
+    placement: string,
+    variants: CatalogBuilderState["selectedVariants"],
+    currentPricing: CatalogBuilderState["variantPricing"]
+  ) {
+    setPricingLoading(true);
+    try {
+      const res = await fetch(`/api/printful/prices/${catalogProductId}`);
+      if (!res.ok) throw new Error("Failed to fetch pricing");
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      // Reconstruct CatalogProductPricing from serialized response
+      const pricing: CatalogProductPricing = {
+        catalog_product_id: data.catalog_product_id,
+        currency: data.currency,
+        placements: data.placements,
+        variantPrices: new Map(
+          (data.variants as { id: number; techniques: unknown[] }[]).map((v) => [v.id, v.techniques as CatalogProductPricing["variantPrices"] extends Map<number, infer T> ? T : never])
+        ),
+      };
+      setPricingData(pricing);
+
+      // Apply resolved cost to each variant in variantPricing
+      const updated = currentPricing.map((vp) => {
+        const variantId = parseInt(vp.printful_variant_id, 10);
+        const result = resolveProviderCost(pricing, variantId, technique, placement);
+        return {
+          ...vp,
+          provider_cost: result.status === "resolved" ? result.cost : null,
+        };
+      });
+      update({ variantPricing: updated });
+    } catch {
+      // Cost fetch failed — leave provider_cost as null, do not block retail pricing
+      setPricingData(null);
+    } finally {
+      setPricingLoading(false);
+    }
+  }
 
   // ── Stage: production — load printfiles + templates ───────────────────────
   // Issue E fix: always clear printfiles/templates/placement/activeTemplate before
@@ -612,17 +661,30 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
           ...base,
           onBack: () => go("mockups"),
           onContinue: () => {
-            if (state.variantPricing.length === 0) {
-              update({ variantPricing: state.selectedVariants.map((v) => ({
+            let pricing = state.variantPricing;
+            if (pricing.length === 0) {
+              pricing = state.selectedVariants.map((v) => ({
                 printful_variant_id: String(v.id),
                 label: v.name,
                 color: v.color || null,
                 size: v.size || null,
                 provider_cost: null,
                 retail_price: 0,
-              })) });
+              }));
+              update({ variantPricing: pricing });
             }
             go("pricing");
+            // Fetch authoritative provider cost when entering pricing stage.
+            // Only fetch if product, technique, and placement are all known.
+            if (state.catalogProduct && state.technique && state.placement) {
+              fetchAndApplyCost(
+                state.catalogProduct.id,
+                state.technique,
+                state.placement,
+                state.selectedVariants,
+                pricing
+              );
+            }
           },
           continueDisabled: !ready,
           continueDisabledReason: !state.title ? "Enter a product title." : !state.slug ? "Enter a product slug." : undefined,
@@ -734,9 +796,10 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
                   onSelect={(k) => {
                     update({ technique: k });
                     loadProduction(state.catalogProduct!.id, k);
-                    // Invalidate artwork validation — it was computed for the previous technique.
-                    // It will be recomputed when the operator selects a placement.
+                    // Invalidate artwork validation and stale provider cost.
                     setArtworkValidation(null);
+                    setPricingData(null);
+                    update({ variantPricing: state.variantPricing.map((vp) => ({ ...vp, provider_cost: null })) });
                   }}
                 />
               </div>
@@ -749,6 +812,9 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
                   onSelect={(p) => {
                     const tmpl = resolveTemplate(p);
                     update({ placement: p, activeTemplate: tmpl, printfileId: null });
+                    // Invalidate stale provider cost — placement changed.
+                    setPricingData(null);
+                    update({ variantPricing: state.variantPricing.map((vp) => ({ ...vp, provider_cost: null })) });
                     // Revalidate artwork against the newly selected placement + current technique.
                     // Clears any stale validation from a previous placement or technique.
                     if (state.design?.width && state.design?.height && state.catalogProduct && state.technique) {
@@ -859,13 +925,18 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
       {stage === "pricing" && (
         <section className="space-y-4">
           <h2 className="text-base font-semibold">Set pricing</h2>
+          {pricingLoading && (
+            <p className="text-xs text-secondary-400">Fetching provider cost…</p>
+          )}
           <PricingPreview variantPricing={state.variantPricing} />
           <div className="space-y-2">
             {state.variantPricing.map((vp, i) => (
               <div key={vp.printful_variant_id} className="flex items-center gap-3 p-3 bg-secondary-50 rounded-lg">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-secondary-900 truncate">{vp.label}</p>
-                  <p className="text-xs text-secondary-400">Cost: ${vp.provider_cost?.toFixed(2) ?? "—"}</p>
+                  <p className="text-xs text-secondary-400">
+                    {pricingLoading ? "Cost: fetching…" : vp.provider_cost != null ? `Cost: $${vp.provider_cost.toFixed(2)}` : "Cost unavailable"}
+                  </p>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm text-secondary-500">$</span>

@@ -83,18 +83,17 @@ export function BlankSelector({ onSelect }: { onSelect: (p: PrintfulProduct) => 
   const [topCategory, setTopCategory] = useState<string>("All");
   const [subType, setSubType] = useState<string>("All");
   const [sort, setSort] = useState<SortKey>("default");
-  const [summaryTick, setSummaryTick] = useState(0);
 
+  // Contract §13: do NOT fan out summary/variant requests across all catalog products on load.
+  // Initial load fetches only the catalog list. Summaries are populated lazily on product selection.
   useEffect(() => {
     fetch("/api/printful/products")
       .then((r) => r.json())
-      .then(async (d) => {
+      .then((d) => {
         if (d.error) throw new Error(d.error);
         const list: PrintfulProduct[] = d.result ?? [];
         setProducts(list);
         setCatalogLoading(false);
-        await batchFetchSummaries(list.map((p) => p.id));
-        setSummaryTick((t) => t + 1);
       })
       .catch((e) => { setError(e.message); setCatalogLoading(false); });
   }, []);
@@ -150,7 +149,7 @@ export function BlankSelector({ onSelect }: { onSelect: (p: PrintfulProduct) => 
       });
     }
     return list;
-  }, [products, topCategory, subType, search, sort, summaryTick]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [products, topCategory, subType, search, sort]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const clearFilters = () => { setSearch(""); setTopCategory("All"); setSubType("All"); };
   const hasFilters = search !== "" || topCategory !== "All" || subType !== "All";
