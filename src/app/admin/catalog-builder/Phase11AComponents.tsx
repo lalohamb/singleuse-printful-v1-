@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Check, Loader2, Package, Layers, AlertCircle } from "lucide-react";
-import type { PrintfulProduct, CatalogVariant } from "@/lib/printful/types";
+import type { V2CatalogProduct, CatalogVariant } from "@/lib/printful/types";
 import type { CreationMode, ProductSummary, VariantPricing } from "./types";
 
 // ── Batch summary cache (module-level, lives for the page session) ────────────
@@ -60,9 +60,9 @@ export function ProductCard({
   onSelect,
   prefetched,
 }: {
-  product: PrintfulProduct;
+  product: V2CatalogProduct;
   selected: boolean;
-  onSelect: (p: PrintfulProduct) => void;
+  onSelect: (p: V2CatalogProduct) => void;
   prefetched?: boolean; // true = read from cache, don't fire own fetch
 }) {
   const [summary, setSummary] = useState<ProductSummary | null>(
@@ -444,8 +444,8 @@ export function BuildSummary({
   dpiResult,
 }: {
   mode: "single" | "multi" | null;
-  product: PrintfulProduct | null;
-  multiProducts?: PrintfulProduct[];
+  product: V2CatalogProduct | null;
+  multiProducts?: V2CatalogProduct[];
   variantCount: number;
   designName: string | null;
   technique: string | null;
@@ -584,7 +584,7 @@ export function BuildSummary({
 // NO database writes. NO mockup generation. NO Printful orders.
 
 export interface MultiDryRunEntry {
-  product: PrintfulProduct;
+  product: V2CatalogProduct;
   variantCount: number;
   minCost: number | null;
   maxCost: number | null;

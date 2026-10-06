@@ -153,11 +153,11 @@ describe("effectiveAmount", () => {
     expect(effectiveAmount("19.64", "19.64")).toBe(19.64);
   });
 
-  test("falls back to price when discounted_price is 0", () => {
-    expect(effectiveAmount("19.64", "0.00")).toBe(19.64);
+  test("explicit discounted_price '0.00' is a valid known zero — returns 0", () => {
+    expect(effectiveAmount("19.64", "0.00")).toBe(0);
   });
 
-  test("falls back to price when discounted_price is not a number", () => {
+  test("falls back to price when discounted_price is unparseable", () => {
     expect(effectiveAmount("5.95", "")).toBe(5.95);
   });
 

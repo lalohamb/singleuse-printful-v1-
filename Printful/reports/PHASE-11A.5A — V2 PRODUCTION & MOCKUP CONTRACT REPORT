@@ -1,0 +1,225 @@
+PHASE 11A.5A — V2 PRODUCTION & MOCKUP CONTRACT REPORT
+ARCHITECTURE CONTRACT
+Read: Printful/CURRENT-ARCHITECTURE-CONTRACT.md — read in full before analysis.
+
+Conflicts: NONE. All findings below are consistent with the contract. The V2 mockup-templates endpoint is a new endpoint not yet referenced in the contract (§4 lists only V1 mockup-generator endpoints). This audit establishes the live-proven facts required before any implementation under §12.
+
+V2 MOCKUP TEMPLATES
+Endpoint: GET /v2/catalog-products/679/mockup-templates
+
+HTTP: 200
+
+Envelope: { data: [...], paging: { total, limit, offset }, extra, _links } — standard V2 envelope, identical to the V2 catalog-variants envelope already handled by printfulGetV2().
+
+Pagination: YES. paging.total = 60, paging.limit = 20, paging.offset = 0. Three pages required to retrieve all 60 templates. Pagination behavior is identical to getCatalogVariants() — must accumulate all pages.
+
+Template count: 60 total across 3 pages.
+
+LIVE TEMPLATE FIELDS
+Every template record contains exactly these fields (no variation across all 60 records):
+
+Field	Type	Notes
+catalog_variant_ids	number[]	V2 catalog variant IDs — same ID space as CatalogVariant.id
+placement	string	e.g. "front", "back", "sleeve_left", "sleeve_right"
+technique	string	e.g. "dtfilm" — lowercase, matches V2 pricing convention
+print_area_width	number	pixels
+print_area_height	number	pixels
+print_area_top	number	pixels
+print_area_left	number	pixels
+template_width	number	pixels
+template_height	number	pixels
+image_url	string	template overlay image URL
+background_url	string | null	null for all 60 records on product 679
+background_color	string	hex color
+printfile_id	number	links to printfile spec
+orientation	string	"any" for all 60 records on product 679
+template_positioning	string	"overlay" for all 60 records
+template_type	null	null for all 60 records
+role	string	"primary" or "template"
+No template_id field. The V2 response does not use the V1 template_id integer. Templates are identified by their combination of catalog_variant_ids + placement + technique + role.
+
+No variant_mapping structure. The V2 response is a flat array of template objects, each directly listing which catalog variant IDs it applies to. There is no nested variant_mapping → templates indirection.
+
+VARIANT 17008 RESOLUTION
+Variant present: YES — 17008 appears in catalog_variant_ids of exactly 4 templates (front/primary, sleeve_left/primary, sleeve_left/template, sleeve_right/primary, sleeve_right/template — see geometry section).
+
+Technique dtfilm present: YES — all 60 templates for product 679 have technique: "dtfilm". The technique field is lowercase, consistent with V2 pricing convention.
+
+Placement front present: YES — 10 templates have placement: "front".
+
+Matching template count for 17008 + dtfilm + front: 1 — exactly one template matches. It has role: "primary".
+
+Print-area width: 1429.0 px
+
+Print-area height: 1809.0 px
+
+Print-area top: 464.0 px
+
+Print-area left: 801.0 px
+
+Template dimensions: 3000.0 × 3000.0 px
+
+Printfile ID: 446
+
+V2 VARIANT + TECHNIQUE + PLACEMENT RESOLUTION
+PROVEN YES
+
+Reason: The live response for product 679 contains a template record with catalog_variant_ids: [17003, 17004, 17005, 17006, 17007, 17008, 17009, 17080], technique: "dtfilm", placement: "front", role: "primary". This record contains all print-area geometry fields needed for artwork positioning. Resolution algorithm:
+
+templates.filter(t =>
+    t.catalog_variant_ids.includes(selectedVariantId)
+    && t.technique === technique
+    && t.placement === placement
+    && t.role === "primary"
+)
+→ [exactly 1 record]
+→ print_area_width, print_area_height, print_area_top, print_area_left
+
+Copy
+No V1 variant ID is required. No variant_mapping lookup is required. The V2 catalog variant ID ( 17008) is used directly.
+
+VARIANT-SPECIFIC GEOMETRY
+Distinct dtfilm/front geometries: 1 — all 10 front/dtfilm templates share identical print-area geometry ( w=1429, h=1809, top=464, left=801). The 10 templates differ only in which 8-variant color group they cover (product 679 has 80 variants split into 10 groups of 8 by color).
+
+Variant groups: 10 color groups × 8 variants each = 80 total variants. Each group has its own template record (for mockup rendering purposes — different background colors), but all share the same print-area geometry.
+
+17008 geometry shared with: All 80 variants of product 679 for the front/dtfilm placement. Geometry is identical across all color groups.
+
+Variant-specific differences observed: YES — but only for sleeve placements, and the difference is role-based, not variant-based . Each sleeve placement has two geometry variants:
+
+role: "primary" — smaller print area ( 343×343 px) — same variant IDs
+
+role: "template" — larger print area ( 572×572 px) — same variant IDs
+
+Both sleeve geometry variants cover all 80 variants identically. The geometry difference is between role: "primary" and role: "template", not between different variant groups. For production artwork positioning, role: "primary" is the correct selection.
+
+Conclusion on variant-specific geometry: For product 679, geometry does NOT vary by catalog variant ID for any placement. The role field is the only differentiator, and role: "primary" is unambiguous.
+
+V2 MOCKUP STYLES
+Endpoint: GET /v2/catalog-products/679/mockup-styles
+
+HTTP: 200
+
+Envelope: { data: [...], paging: { total: 4, limit: 10, offset: 0 }, extra, _links } — standard V2 envelope, all 4 records returned in one page.
+
+Styles returned: 4 records — one per placement ( front, back, sleeve_left, sleeve_right), all technique dtfilm.
+
+Each record contains:
+
+placement, display_name, technique
+
+print_area_width, print_area_height — in inches (not pixels), e.g. 15.5 × 19.6 for front
+
+print_area_type: "simple"
+
+dpi: 150
+
+mockup_styles[] — array of style objects with id, category_name, view_name, restricted_to_variants
+
+Relationship to variant: restricted_to_variants: null for all styles on product 679 — no variant-specific style restrictions.
+
+Relationship to technique: Each record is scoped to one technique ( dtfilm).
+
+Relationship to placement: Each record is scoped to one placement.
+
+Needed for production geometry: NO. Mockup styles provide:
+
+Print area dimensions in inches (useful for DPI validation — 15.5 × 19.6 in @ 150 DPI = 2325 × 2940 px minimum artwork)
+
+Style IDs for selecting mockup presentation (Ghost, Flat, Men's, Women's, Lifestyle)
+
+They do NOT provide pixel-level print-area coordinates ( print_area_top, print_area_left) needed for artwork canvas positioning. Those come exclusively from the mockup-templates endpoint. Mockup styles are needed only when selecting which visual presentation to generate — not for production geometry or artwork positioning.
+
+CURRENT V1 DEPENDENCIES
+File	Function/Usage	Purpose	Catalog Builder	Legacy Sync
+src/lib/printful/templates.ts	getPrintfiles() → GET /mockup-generator/printfiles/{id}?technique=	Available placements, printfile IDs, variant→printfile mapping	YES	YES
+src/lib/printful/templates.ts	getLayoutTemplates() → GET /mockup-generator/templates/{id}?technique=	variant_mapping, print-area geometry, conflicting_placements	YES	YES
+src/app/api/printful/templates/[productId]/route.ts	Route wrapping getLayoutTemplates()	Serves templates to Catalog Builder production stage	YES	NO
+src/app/api/printful/printfiles/[productId]/route.ts	Route wrapping getPrintfiles()	Serves printfiles to Catalog Builder production stage	YES	NO
+src/lib/fulfillment/artwork-validation.ts	fetchPrintfileSpec() → /api/printful/printfiles/{id}	DPI validation — resolves printfile spec via V1 variant_printfiles	YES	YES
+src/lib/printful/mockups.ts	createMockupTask() → POST /mockup-generator/create-task/{id}	Mockup task creation	YES	YES
+src/lib/printful/mockups.ts	getMockupTask() → GET /mockup-generator/task?task_key=	Mockup task polling	YES	YES
+src/components/product-designer/ProductDesigner.tsx	useEffect → variant_mapping.find(m => m.variant_id === selectedVariant.id)	Template resolution using PrintfulVariant.id (V1 ID from /products/{id})	NO	YES (legacy designer)
+Key observation on ProductDesigner: It uses PrintfulVariant (from V1 GET /products/{id}) whose .id is a V1 variant ID. Its template lookup variant_mapping.find(m => m.variant_id === selectedVariant.id) performs an exact match against V1 IDs — this works correctly because both sides are V1. This is the legacy sync path, not the Catalog Builder path.
+
+variant_mapping[0] FALLBACKS
+File	Function	Scope	Would become unnecessary with V2?
+src/lib/printful/templates.ts	resolveLayoutTemplateForVariantPlacement()	Shared utility — called by batch routes and recipe validation	YES — if callers migrate to V2 templates
+src/app/admin/catalog-builder/CatalogBuilder.tsx	resolveTemplate() (inline)	Catalog Builder production stage only	YES — V2 template lookup uses catalog_variant_ids.includes(), no fallback needed
+Both fallbacks exist because V2 catalog variant IDs do not match V1 variant_mapping IDs. If the Catalog Builder migrates to V2 mockup-templates, neither fallback is needed for that path. The fallback in resolveLayoutTemplateForVariantPlacement() would remain relevant only for callers that still use V1 templates (batch routes, recipe validation, legacy ProductDesigner).
+
+CAN CATALOG BUILDER MOVE TO V2 TEMPLATE IDENTITY WITHOUT V1 CROSSWALK
+YES
+
+The V2 mockup-templates endpoint ( GET /v2/catalog-products/{id}/mockup-templates) provides:
+
+catalog_variant_ids — V2 IDs, same space as CatalogVariant.id
+
+technique — lowercase string, same convention as V2 pricing
+
+placement — string key
+
+print_area_width, print_area_height, print_area_top, print_area_left — pixel coordinates
+
+template_width, template_height — pixel dimensions
+
+image_url — template overlay image
+
+role — "primary" selects the production template unambiguously
+
+Resolution algorithm requires no V1 crosswalk:
+
+GET /v2/catalog-products/{id}/mockup-templates   (paginated, accumulate all)
+→ filter: catalog_variant_ids.includes(selectedVariantId)
+         && technique === selectedTechnique
+         && placement === selectedPlacement
+         && role === "primary"
+→ [0 or 1 result]
+→ print_area geometry for canvas positioning
+
+Copy
+The variant_mapping[0] fallback becomes unnecessary for this path. The V2 response directly encodes which catalog variant IDs share a template — no ID translation required.
+
+WHAT WOULD STILL REQUIRE V1 AFTER CATALOG BUILDER MIGRATION
+Capability	Still requires V1	Reason
+Available placements list	YES — GET /mockup-generator/printfiles/{id}?technique=	V2 mockup-templates returns templates for known placements but does not enumerate available placements as a named list. V2 mockup-styles returns placements but only for placements that have styles, not necessarily all printable placements.
+Printfile spec for DPI validation	YES — GET /mockup-generator/printfiles/{id}?technique=	fetchPrintfileSpec() reads variant_printfiles[].placements[placement] → printfile_id → printfiles[].width/height/dpi. V2 mockup-styles provides print_area_width/height in inches and dpi but not the full printfile canvas dimensions in pixels.
+conflicting_placements	YES — GET /mockup-generator/templates/{id}?technique=	Not present in V2 mockup-templates response.
+Mockup task creation	YES — POST /mockup-generator/create-task/{id}	V2 mockup task API ( POST /v2/mockup-tasks) exists but is a different contract not yet verified. Contract §12 prohibits implementation without live verification.
+Mockup task polling	YES — GET /mockup-generator/task?task_key=	Same as above.
+Legacy ProductDesigner template resolution	YES — GET /mockup-generator/templates/{id}	Uses PrintfulVariant (V1 IDs). Would require separate migration.
+Batch/recipe template resolution	YES — resolveLayoutTemplateForVariantPlacement()	Currently uses V1 templates. Separate migration scope.
+RECOMMENDED NEXT IMPLEMENTATION BOUNDARY
+The minimum V2 migration for the Catalog Builder production stage is:
+
+New function getV2MockupTemplates(productId) — paginated, accumulates all pages, uses printfulGetV2(). Returns the flat array of V2 template records.
+
+New resolver resolveV2MockupTemplate(templates, variantId, technique, placement) — filters by catalog_variant_ids.includes(variantId) && technique && placement && role === "primary". Returns the matching record or null.
+
+New API route GET /api/printful/v2-templates/[productId] — or extend the existing templates route with a ?v2=true flag — serves V2 template data to the Catalog Builder.
+
+CatalogBuilder.tsx — replace loadProduction() template fetch and resolveTemplate() with V2 equivalents. The variant_mapping[0] fallback in resolveTemplate() is removed.
+
+V1 printfiles route remains — still needed for available placements and DPI validation.
+
+V1 templates route remains — still needed for conflicting_placements and legacy ProductDesigner.
+
+This boundary is surgical: only the Catalog Builder production stage template resolution changes. Everything else (printfiles, mockup task creation, legacy ProductDesigner, batch routes) remains on V1 until separately authorized.
+
+SAFETY SUMMARY
+CODE MODIFIED:      NO
+DATABASE WRITES:    0
+PRODUCTS CREATED:   0
+MOCKUPS GENERATED:  0
+ORDERS CREATED:     0
+
+Live API calls made:
+  GET /v2/catalog-products/679/mockup-templates  (3 pages — 200 OK each)
+  GET /v2/catalog-products/679/mockup-styles     (1 page  — 200 OK)
+
+Total provider calls: 4
+
+Copy
+WAITING FOR OPERATOR REVIEW: YES
+
+STOP. No implementation performed.

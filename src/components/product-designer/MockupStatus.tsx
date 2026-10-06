@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { PrintfulMockupTask } from "@/lib/printful/types";
+import type { PrintfulMockupTask, V2MockupTask, MockupPollResult } from "@/lib/printful/types";
 
 interface Props {
   taskKey: string;
-  onComplete: (task: PrintfulMockupTask) => void;
+  onComplete: (result: MockupPollResult) => void;
   onFailed: (error: string) => void;
 }
 
@@ -13,13 +13,40 @@ const INITIAL_DELAY_MS = 3000;
 const POLL_INTERVAL_MS = 4000;
 const MAX_POLLS = 30; // ~2 min timeout
 
+// Adapt a raw V1 PrintfulMockupTask into MockupPollResult.
+function adaptV1(raw: PrintfulMockupTask): MockupPollResult {
+  return {
+    source: "v1",
+    status: raw.status,
+    failureReason: raw.status === "failed" ? (raw.error ?? "Mockup generation failed.") : null,
+    v1Task: raw.status === "completed" ? raw : null,
+    v2Task: null,
+  };
+}
+
+// Adapt a raw V2MockupTask into MockupPollResult.
+function adaptV2(raw: V2MockupTask): MockupPollResult {
+  return {
+    source: "v2",
+    status: raw.status,
+    failureReason: raw.status === "failed" ? (raw.failure_reasons?.[0] ?? "Mockup generation failed.") : null,
+    v1Task: null,
+    v2Task: raw.status === "completed" ? raw : null,
+  };
+}
+
+// Detect whether a taskKey is a V2 numeric ID (positive integer string).
+function isV2TaskKey(key: string): boolean {
+  const n = parseInt(key, 10);
+  return Number.isFinite(n) && n > 0 && String(n) === key.trim();
+}
+
 export default function MockupStatus({ taskKey, onComplete, onFailed }: Props) {
   const [dots, setDots] = useState(".");
   const pollCount = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    // Animate dots
     const dotTimer = setInterval(
       () => setDots((d) => (d.length >= 3 ? "." : d + ".")),
       500
@@ -35,22 +62,27 @@ export default function MockupStatus({ taskKey, onComplete, onFailed }: Props) {
       try {
         const res = await fetch(`/api/printful/mockups/${encodeURIComponent(taskKey)}`);
         if (res.status === 429) {
-          // Back off on rate limit
           timerRef.current = setTimeout(poll, POLL_INTERVAL_MS * 3);
           return;
         }
         const data = await res.json();
-        const task: PrintfulMockupTask = data.result;
+        const raw = data.result;
 
-        if (task.status === "completed") {
-          onComplete(task);
+        // Adapt to normalized MockupPollResult based on task key type.
+        // V2: numeric string → V2MockupTask (has failure_reasons[], catalog_variant_mockups[]).
+        // V1: non-numeric string → PrintfulMockupTask (has error?, mockups[]).
+        const result: MockupPollResult = isV2TaskKey(taskKey)
+          ? adaptV2(raw as V2MockupTask)
+          : adaptV1(raw as PrintfulMockupTask);
+
+        if (result.status === "completed") {
+          onComplete(result);
           return;
         }
-        if (task.status === "failed") {
-          onFailed(task.error ?? "Mockup generation failed.");
+        if (result.status === "failed") {
+          onFailed(result.failureReason ?? "Mockup generation failed.");
           return;
         }
-        // still pending
         timerRef.current = setTimeout(poll, POLL_INTERVAL_MS);
       } catch {
         timerRef.current = setTimeout(poll, POLL_INTERVAL_MS);

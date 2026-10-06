@@ -281,7 +281,13 @@ export function resolveProductRecipe(input: RecipeResolutionInput): RecipeResolu
   for (const v of filtered) {
     // price is optional — absent/null means provider cost is unknown.
     // Unknown cost is represented as null in ProductSpecVariant, never as 0.
-    const providerCost = (v.price != null && v.price !== "") ? (parseFloat(v.price) || null) : null;
+    // Use finite-safe parse: "0.00" → 0 (valid known zero), missing/invalid → null.
+    const rawPrice = v.price;
+    let providerCost: number | null = null;
+    if (rawPrice != null && rawPrice !== "") {
+      const parsed = parseFloat(rawPrice);
+      providerCost = isFinite(parsed) ? parsed : null;
+    }
     let retailPrice: number;
     try {
       if (providerCost === null && recipe.pricing_rules.strategy === "COST_PLUS") {

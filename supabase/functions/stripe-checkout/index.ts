@@ -65,10 +65,24 @@ function validateSnapshot(snap: Record<string, unknown>): string | null {
 }
 
 // ── Printful live shipping quote ──────────────────────────────────────────────
+// V2 path (DIRECT_CATALOG_ORDER items only):
+//   POST /v2/shipping-rates
+//   order_items[].source = "catalog", catalog_variant_id, quantity
+//   Response: { data: [{ shipping, rate, currency, ... }], extra: [] }
+//
+// V1 path (SYNC_VARIANT items or mixed carts):
+//   POST /shipping/rates
+//   items[].variant_id, quantity
+//   Response: { code, result: [{ rate, ... }] }
+//
+// Fallback: default_shipping_cost from settings, or 6.99 hardcoded.
 type VerifiedItemForShipping = {
   printful_id: string | null;
   variant_id: string;
   quantity: number;
+  // catalog_variant_id is set for DIRECT_CATALOG_ORDER items (V2 path)
+  catalog_variant_id?: number | null;
+  is_catalog_builder?: boolean;
 };
 
 async function getPrintfulShipping(
@@ -86,6 +100,37 @@ async function getPrintfulShipping(
     const token = Deno.env.get("PRINTFUL_API_TOKEN");
     if (!token) return fallback;
 
+    // Use V2 only when ALL items are catalog_builder (DIRECT_CATALOG_ORDER).
+    // Mixed or sync carts use V1 to preserve existing behavior.
+    const allCatalogBuilder = items.length > 0 && items.every((i) => i.is_catalog_builder && i.catalog_variant_id);
+
+    if (allCatalogBuilder) {
+      // V2 path: POST /v2/shipping-rates
+      // Live-proven: order_items[].source="catalog", catalog_variant_id, quantity
+      // Response envelope: { data: [{ shipping, rate, currency, ... }], extra: [] }
+      const orderItems = items.map((i) => ({
+        source: "catalog" as const,
+        catalog_variant_id: i.catalog_variant_id!,
+        quantity: i.quantity,
+      }));
+      const res = await fetch("https://api.printful.com/v2/shipping-rates", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recipient: { address1: "1 Main St", city: "New York", state_code: "NY", country_code: "US", zip: "10001" },
+          order_items: orderItems,
+          currency: "USD",
+          locale: "en_US",
+        }),
+      });
+      if (!res.ok) return fallback;
+      const data = await res.json();
+      // V2 envelope: data[0].rate (string)
+      const rate = parseFloat(data?.data?.[0]?.rate ?? "0");
+      return rate > 0 ? rate : fallback;
+    }
+
+    // V1 path: POST /shipping/rates — sync/mixed carts (preserved)
     const lineItems = items
       .filter((i) => i.variant_id)
       .map((i) => ({ variant_id: Number(i.variant_id), quantity: i.quantity }));
@@ -103,6 +148,7 @@ async function getPrintfulShipping(
     });
     if (!res.ok) return fallback;
     const data = await res.json();
+    // V1 envelope: result[0].rate (string)
     const rate = parseFloat(data?.result?.[0]?.rate ?? "0");
     return rate > 0 ? rate : fallback;
   } catch {
@@ -362,11 +408,18 @@ Deno.serve(async (req: Request) => {
       verifiedItems.reduce((sum, i) => sum + i.price * i.quantity, 0) * 100
     ) / 100;
 
-    const shippingItems = verifiedItems.map((i) => ({
-      printful_id: i.printful_id,
-      variant_id: i.printful_variant_id ?? i.variant_id,
-      quantity: i.quantity,
-    }));
+    const shippingItems = verifiedItems.map((i) => {
+      const product = productMap.get(i.product_id);
+      const isCatalogBuilder = (product?.catalog_source ?? "printful_sync") === "catalog_builder";
+      const catalogVariantId = isCatalogBuilder ? Number(i.printful_variant_id) : null;
+      return {
+        printful_id: i.printful_id,
+        variant_id: i.printful_variant_id ?? i.variant_id,
+        quantity: i.quantity,
+        catalog_variant_id: (catalogVariantId && catalogVariantId > 0) ? catalogVariantId : null,
+        is_catalog_builder: isCatalogBuilder,
+      };
+    });
     const resolvedShipping = await getPrintfulShipping(supabase, shippingItems);
 
     const verifiedTotal = Math.round((verifiedSubtotal + resolvedShipping) * 100) / 100;

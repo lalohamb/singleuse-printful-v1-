@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getMockupTask } from "@/lib/printful/mockups";
-import { persistGeneratedMockups } from "@/lib/printful/persist";
+import { persistGeneratedMockups, persistV2Mockups, type V2MockupEntry } from "@/lib/printful/persist";
 import { PrintfulApiError } from "@/lib/printful/errors";
 import { requireAdmin } from "@/lib/require-admin";
 
@@ -10,18 +10,61 @@ const sb = () => createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// POST /api/printful/mockups/persist
+//
+// V2 path (Catalog Builder):
+//   Body: { source: "v2", taskId: number, mockups: V2MockupEntry[] }
+//   Mockup URLs are passed directly from the completed V2MockupTask result.
+//   No provider re-fetch. No V1 endpoint called.
+//   catalog_variant_id remains in V2 identity space.
+//
+// V1 legacy path (ProductDesigner):
+//   Body: { taskKey: string, productId?: string, productDesignId?: string }
+//   Fetches the completed V1 task via getMockupTask() to get mockup URLs.
+//   Uses genuine V1 task_key (non-numeric string).
+
 export async function POST(req: Request) {
   const authError = await requireAdmin();
   if (authError) return authError;
 
-  let body: { taskKey: string; productId?: string; productDesignId?: string };
+  let body: {
+    // V2 Catalog Builder fields
+    source?: "v2";
+    taskId?: number;
+    mockups?: V2MockupEntry[];
+    // V1 legacy fields
+    taskKey?: string;
+    productId?: string;
+    productDesignId?: string;
+  };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { taskKey, productId, productDesignId } = body;
+  // ── V2 path: Catalog Builder ────────────────────────────────────────────────
+  // Detected by source === "v2". Mockup URLs already available — no provider call.
+  if (body.source === "v2") {
+    const { taskId, mockups } = body;
+    if (typeof taskId !== "number" || taskId <= 0) {
+      return NextResponse.json({ error: "V2 persist requires numeric taskId" }, { status: 400 });
+    }
+    if (!Array.isArray(mockups) || mockups.length === 0) {
+      return NextResponse.json({ error: "V2 persist requires non-empty mockups array" }, { status: 400 });
+    }
+    try {
+      const persisted = await persistV2Mockups(mockups, taskId);
+      return NextResponse.json({ result: persisted });
+    } catch (err) {
+      console.error("[printful/mockups/persist V2]", err);
+      return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    }
+  }
+
+  // ── V1 legacy path: ProductDesigner ─────────────────────────────────────────
+  // Uses genuine V1 task_key (non-numeric string from POST /mockup-generator/create-task).
+  const { taskKey, productId } = body;
   if (!taskKey || typeof taskKey !== "string" || taskKey.trim() === "") {
     return NextResponse.json({ error: "Invalid taskKey" }, { status: 400 });
   }
@@ -74,7 +117,7 @@ export async function POST(req: Request) {
     if (err instanceof PrintfulApiError) {
       return NextResponse.json({ error: err.clientMessage }, { status: err.status });
     }
-    console.error("[printful/mockups/persist]", err);
+    console.error("[printful/mockups/persist V1]", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

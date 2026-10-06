@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useCallback } from "react";
-import type { PrintfulLayoutTemplate } from "@/lib/printful/types";
+import type { TemplateGeometry } from "@/lib/printful/types";
 import { clampToPrintArea, type CanvasRect } from "./coordinates";
 
 interface Props {
-  template: PrintfulLayoutTemplate;
+  template: TemplateGeometry;
   artworkUrl: string | null;
   artworkRect: CanvasRect;
   onArtworkChange: (rect: CanvasRect) => void;

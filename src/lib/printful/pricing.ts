@@ -72,15 +72,21 @@ export interface CatalogProductPricing {
 }
 
 // ── Effective amount helper ───────────────────────────────────────────────────
-// Use discounted_price when it is a valid positive number string.
-// Fall back to price. Never return null — caller must handle missing entries.
+// Returns the best available price as a number, or null if the data is
+// missing or unparseable.
+//
+// Rules:
+//   - discounted_price is preferred when it is a finite non-negative number
+//   - falls back to price when discounted_price is absent/unparseable
+//   - explicit "0.00" is a valid known zero — returned as 0, not null
+//   - missing or non-numeric strings return null (unknown, not zero)
 
-export function effectiveAmount(price: string, discountedPrice: string): number {
+export function effectiveAmount(price: string, discountedPrice: string): number | null {
   const discounted = parseFloat(discountedPrice);
-  if (isFinite(discounted) && discounted > 0) return discounted;
+  if (isFinite(discounted) && discounted >= 0) return discounted;
   const base = parseFloat(price);
   if (isFinite(base) && base >= 0) return base;
-  return 0;
+  return null;
 }
 
 // ── Provider cost resolver ────────────────────────────────────────────────────
@@ -138,7 +144,14 @@ export function resolveProviderCost(
   }
 
   const variantAmount = effectiveAmount(techniqueEntry.price, techniqueEntry.discounted_price);
+  if (variantAmount === null) {
+    return { status: "unknown", reason: `Technique "${techniqueKey}" has unparseable price data for variant ${variantId}` };
+  }
+
   const placementAmount = effectiveAmount(placementEntry.price, placementEntry.discounted_price);
+  if (placementAmount === null) {
+    return { status: "unknown", reason: `Placement "${placementId}" has unparseable price data` };
+  }
 
   // Sum layer additional prices
   let layerAmount = 0;

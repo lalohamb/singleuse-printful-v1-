@@ -13,15 +13,21 @@ export interface PersistedMockup {
   option_group: string | null;
 }
 
+// V2 mockup entry — used when persisting directly from a completed V2MockupTask.
+// No provider re-fetch required: mockup_url is already available in the V2 result.
+export interface V2MockupEntry {
+  placement: string;
+  mockup_url: string;
+  catalog_variant_id: number;   // V2 catalog variant ID — preserved as-is, not translated
+}
+
 /**
  * Downloads completed Printful mockup images server-side and stores them
  * permanently in Supabase Storage.
  *
- * Call this after a task reaches "completed" status.
+ * V1 path: accepts PrintfulGeneratedMockup[] (from V1 task result).
+ * Call this after a V1 task reaches "completed" status.
  * Printful mockup URLs are temporary — do not store them as permanent references.
- *
- * V2 note: when migrating to Mockup Generator v2, only the shape of
- * PrintfulGeneratedMockup changes. This function's signature stays the same.
  */
 export async function persistGeneratedMockups(
   mockups: PrintfulGeneratedMockup[],
@@ -44,6 +50,39 @@ export async function persistGeneratedMockups(
       original_url: m.mockup_url,
       option: m.option,
       option_group: m.option_group,
+    });
+  }
+
+  return results;
+}
+
+/**
+ * V2 path: persists mockup URLs directly from a completed V2MockupTask result.
+ * No provider re-fetch. No V1 endpoint called.
+ * catalog_variant_id remains in V2 identity space — not translated.
+ */
+export async function persistV2Mockups(
+  mockups: V2MockupEntry[],
+  taskId: number
+): Promise<PersistedMockup[]> {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const taskKey = String(taskId);
+  const results: PersistedMockup[] = [];
+
+  for (let i = 0; i < mockups.length; i++) {
+    const m = mockups[i];
+    const stored_url = await downloadAndStore(supabase, m.mockup_url, taskKey, i);
+    results.push({
+      placement: m.placement,
+      variant_ids: [m.catalog_variant_id],   // V2 catalog variant ID preserved
+      stored_url,
+      original_url: m.mockup_url,
+      option: null,
+      option_group: null,
     });
   }
 

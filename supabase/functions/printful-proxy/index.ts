@@ -299,15 +299,20 @@ Deno.serve(async (req: Request) => {
     }
 
     // GET /orders/:id  — fetch a single Printful order by numeric ID
+    // V2: GET /v2/orders/{id} — live-proven (Batch 2 verification)
+    // Response envelope: { data: { id, external_id, status, ... }, extra: [] }
     const orderGetMatch = route.match(/^\/orders\/(\d+)$/);
     if (req.method === "GET" && orderGetMatch) {
-      const data = await pfGet(token, `/orders/${orderGetMatch[1]}`);
-      return json(data, 200, req);
+      const res = await fetch(`${PRINTFUL_BASE}/v2/orders/${orderGetMatch[1]}`, { headers: pfHeaders(token) });
+      if (!res.ok) throw new Error(`Printful /v2/orders/${orderGetMatch[1]} → ${res.status}`);
+      return json(await res.json(), 200, req);
     }
 
     // POST /orders/:id/confirm  — manually confirm a Printful draft order
-    // Admin-only: caller must be authenticated admin (enforced at Next.js API layer).
-    // Printful: POST /orders/{id}/confirm transitions draft → pending/in-production.
+    // LEGACY V1 EXCEPTION:
+    //   V2 /confirmation endpoint exists but is NOT live-verified because
+    //   confirmation may trigger manufacturing. Do not auto-migrate or auto-call.
+    //   This action is explicit operator/admin only — never called automatically.
     const orderConfirmMatch = route.match(/^\/orders\/(\d+)\/confirm$/);
     if (req.method === "POST" && orderConfirmMatch) {
       const res = await fetch(`${PRINTFUL_BASE}/orders/${orderConfirmMatch[1]}/confirm`, {
@@ -319,15 +324,19 @@ Deno.serve(async (req: Request) => {
     }
 
     // DELETE /orders/:id  — cancel a Printful draft order
-    // Only works while order is in draft status. Printful rejects cancellation
-    // of orders already in production.
+    // V2: DELETE /v2/orders/{id} — live-proven (Batch 2 verification)
+    // V2 success = HTTP 204 No Content, empty body. Do not parse JSON on 204.
     const orderCancelMatch = route.match(/^\/orders\/(\d+)$/);
     if (req.method === "DELETE" && orderCancelMatch) {
-      const res = await fetch(`${PRINTFUL_BASE}/orders/${orderCancelMatch[1]}`, {
+      const res = await fetch(`${PRINTFUL_BASE}/v2/orders/${orderCancelMatch[1]}`, {
         method: "DELETE",
         headers: pfHeaders(token),
       });
-      const data = await res.json();
+      if (res.status === 204) {
+        return json({ success: true }, 200, req);
+      }
+      // Non-204 response: parse error body
+      const data = await res.json().catch(() => ({ error: "Unknown error" }));
       return json(data, res.status, req);
     }
 

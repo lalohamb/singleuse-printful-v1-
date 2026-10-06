@@ -107,12 +107,89 @@ export function validateArtworkForPrintfile(
   };
 }
 
-// Fetch the printfile spec for a given catalog product + placement from the
-// existing /api/printful/printfiles/:productId endpoint.
-// technique must be the currently selected production technique — passing the
-// wrong technique returns placements for a different technique and produces
-// an incorrect DPI result.
-// Returns null if the spec cannot be obtained (UNVERIFIED).
+// ── V2 artwork validation ────────────────────────────────────────────────────
+// Validates artwork using V2 mockup-style physical dimensions + DPI.
+// Does NOT use fill_mode (absent from V2 responses).
+// Applies fit-scaling directly — live-proven equivalent to V1 fill_mode="fit"
+// for the following bounded cases:
+//   technique: dtfilm, dtg, embroidery
+//   print_area_type: "simple" or null
+// For any other technique or print_area_type, returns UNVERIFIED.
+// For missing/invalid dimensions or DPI, returns UNVERIFIED.
+// Never falls back to variantPrintfiles[0] or any V1 record.
+
+// Techniques and print_area_types for which V2 fit-scaling is live-proven.
+const V2_VERIFIED_TECHNIQUES = new Set(["dtfilm", "dtg", "embroidery"]);
+const V2_VERIFIED_AREA_TYPES = new Set(["simple", null as unknown as string]);
+
+export interface V2StyleSpec {
+  print_area_width: number;   // inches
+  print_area_height: number;  // inches
+  dpi: number;
+  print_area_type: string | null;
+  technique: string;
+}
+
+export function validateArtworkFromV2Style(
+  artworkWidth: number,
+  artworkHeight: number,
+  style: V2StyleSpec
+): ArtworkValidationResult {
+  const unverified: ArtworkValidationResult = {
+    status: "UNVERIFIED",
+    artworkWidth,
+    artworkHeight,
+    canvasWidth: 0,
+    canvasHeight: 0,
+    canvasDpi: 0,
+    renderedWidthPx: 0,
+    renderedHeightPx: 0,
+    printWidthInches: 0,
+    printHeightInches: 0,
+    effectiveDpiX: 0,
+    effectiveDpiY: 0,
+    effectiveDpi: 0,
+    minDpi: MIN_DPI,
+    recommendedDpi: RECOMMENDED_DPI,
+    message: "Artwork validation could not be completed — provider metadata unavailable.",
+    detail: "DPI validation requires V2 mockup-style data for this placement and technique.",
+  };
+
+  // Guard: technique must be in the verified set
+  if (!V2_VERIFIED_TECHNIQUES.has(style.technique.toLowerCase())) return unverified;
+
+  // Guard: print_area_type must be in the verified set
+  if (!V2_VERIFIED_AREA_TYPES.has(style.print_area_type as string)) return unverified;
+
+  // Guard: dimensions and DPI must be finite positive numbers
+  if (
+    !Number.isFinite(style.print_area_width) || style.print_area_width <= 0 ||
+    !Number.isFinite(style.print_area_height) || style.print_area_height <= 0 ||
+    !Number.isFinite(style.dpi) || style.dpi <= 0
+  ) return unverified;
+
+  // Derive canvas pixel dimensions from physical dimensions × DPI.
+  // Live-proven: 15.5in × 150dpi = 2325px (exact match to V1 printfile for product 679/dtfilm/front).
+  const canvasW = Math.round(style.print_area_width * style.dpi);
+  const canvasH = Math.round(style.print_area_height * style.dpi);
+
+  // Apply fit-scaling (same algorithm as validateArtworkForPrintfile with fill_mode="fit").
+  // Justified by live-proven equivalence across dtfilm, dtg, embroidery techniques.
+  const spec: PrintfileSpec = {
+    printfile_id: 0,
+    width: canvasW,
+    height: canvasH,
+    dpi: style.dpi,
+    fill_mode: "fit",
+  };
+  return validateArtworkForPrintfile(artworkWidth, artworkHeight, spec);
+}
+
+// ── LEGACY V1 — fetchPrintfileSpec ────────────────────────────────────────────
+// LEGACY V1 ONLY — retained for ProductDesigner and other V1 callers.
+// Uses variantPrintfiles[0] fallback which is unsafe for V2 catalog variant IDs.
+// Do NOT call from the modern Catalog Builder path.
+// Modern Catalog Builder uses validateArtworkFromV2Style() instead.
 export async function fetchPrintfileSpec(
   catalogProductId: number,
   technique: string,

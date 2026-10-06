@@ -138,7 +138,19 @@ export interface PrintfulPrintfilesResponse {
 
 // ── Layout templates ──────────────────────────────────────────────────────────
 
-export interface PrintfulLayoutTemplate {
+// Shared geometry interface — used by DesignCanvas and coordinates.ts.
+// Both PrintfulLayoutTemplate (V1) and V2MockupTemplate satisfy this interface.
+export interface TemplateGeometry {
+  template_width: number;
+  template_height: number;
+  print_area_width: number;
+  print_area_height: number;
+  print_area_top: number;
+  print_area_left: number;
+  image_url: string;
+}
+
+export interface PrintfulLayoutTemplate extends TemplateGeometry {
   template_id: number;
   image_url: string;
   background_url: string | null;
@@ -216,4 +228,138 @@ export interface PrintfulExtraMockup {
   url: string;
   option: string | null;
   option_group: string | null;
+}
+
+// ── V2 normalized catalog product ───────────────────────────────────────────
+// Returned by getCatalogProductsV2() and getCatalogProductV2().
+// Contains only fields that V2 actually provides.
+// currency, files[], and options[] are intentionally absent — V2 does not
+// provide them and they must not be fabricated to satisfy the V1 PrintfulProduct
+// interface. Callers that genuinely need those fields must use V1 helpers.
+export interface V2CatalogProduct {
+  id: number;
+  main_category_id: number;
+  type: string;
+  type_name: string;                   // normalized from V2 `type`
+  title: string;                       // normalized from V2 `name`
+  brand: string | null;
+  model: string | null;
+  image: string;
+  variant_count: number;
+  is_discontinued: boolean;
+  avg_fulfillment_time: null;          // not provided by V2
+  description: string;
+  techniques: PrintfulTechnique[];
+  placements: V2CatalogProductPlacement[];
+  dimensions: null;                    // not provided by V2
+}
+
+// ── Normalized mockup poll result ─────────────────────────────────────────────
+// Adapter type used by MockupStatus and its callers.
+// Both V1 (PrintfulMockupTask) and V2 (V2MockupTask) polling results are
+// adapted into this shape before being passed to the UI layer.
+// This prevents the UI from reading V1-only fields (task_key, mockups[]) or
+// V2-only fields (failure_reasons[], catalog_variant_mockups[]) directly.
+export interface MockupPollResult {
+  /** "v1" | "v2" — identifies which provider path produced this result */
+  source: "v1" | "v2";
+  status: "pending" | "completed" | "failed";
+  /** Error message when status === "failed" */
+  failureReason: string | null;
+  /** V1 raw task — present only when source === "v1" and status === "completed" */
+  v1Task: PrintfulMockupTask | null;
+  /** V2 raw task — present only when source === "v2" and status === "completed" */
+  v2Task: V2MockupTask | null;
+}
+
+// ── V2 catalog product raw (live-proven fields from GET /v2/catalog-products and GET /v2/catalog-products/{id}) ──
+// V2 uses `name` where V1 used `title`. Normalized to `title` by getCatalogProductsV2/getCatalogProductV2.
+// V2 includes `placements[]` with conflicting_placements inline — no separate templates call needed.
+// V2 does NOT include `files[]`, `options[]`, or `currency` — do not fabricate them.
+export interface V2CatalogProductPlacement {
+  placement: string;
+  technique: string;
+  layers: Array<{ type: string; layer_options: unknown[] }>;
+  placement_options: unknown[];
+  conflicting_placements: string[];
+}
+
+export interface V2CatalogProductRaw {
+  id: number;
+  type: string;
+  main_category_id: number;
+  name: string;                        // V2 uses name; normalized to title
+  brand: string | null;
+  model: string | null;
+  image: string;
+  variant_count: number;
+  is_discontinued: boolean;
+  description: string;
+  sizes: string[];
+  colors: Array<{ name: string; value: string }>;
+  techniques: PrintfulTechnique[];     // same shape as V1
+  placements: V2CatalogProductPlacement[];
+  product_options: unknown[];
+}
+
+// ── V2 mockup template (live-proven fields from GET /v2/catalog-products/{id}/mockup-templates) ──
+export interface V2MockupTemplate {
+  catalog_variant_ids: number[];       // V2 catalog variant IDs — same namespace as CatalogVariant.id
+  placement: string;
+  technique: string;                   // lowercase, e.g. "dtfilm"
+  print_area_width: number;            // pixels
+  print_area_height: number;           // pixels
+  print_area_top: number;              // pixels
+  print_area_left: number;             // pixels
+  template_width: number;              // pixels
+  template_height: number;             // pixels
+  image_url: string;
+  background_url: string | null;
+  background_color: string;
+  printfile_id: number;
+  orientation: string;
+  template_positioning: string;
+  template_type: string | null;
+  role: "primary" | "template";
+}
+
+// ── V2 mockup style (live-proven fields from GET /v2/catalog-products/{id}/mockup-styles) ──
+export interface V2MockupStyleEntry {
+  id: number;
+  category_name: string;
+  view_name: string;
+  restricted_to_variants: number[] | null;
+}
+
+export interface V2MockupStyle {
+  placement: string;
+  display_name: string;
+  technique: string;
+  print_area_width: number;            // inches
+  print_area_height: number;           // inches
+  print_area_type: string | null;      // "simple", "color_group", null
+  dpi: number;
+  mockup_styles: V2MockupStyleEntry[];
+}
+
+// ── V2 mockup task (live-proven from POST /v2/mockup-tasks and GET /v2/mockup-tasks?id=) ──
+export interface V2MockupTaskMockup {
+  placement: string;
+  display_name: string;
+  technique: string;
+  style_id: number;
+  mockup_url: string;
+  view: string;
+}
+
+export interface V2CatalogVariantMockup {
+  catalog_variant_id: number;          // V2 catalog variant ID
+  mockups: V2MockupTaskMockup[];
+}
+
+export interface V2MockupTask {
+  id: number;                          // numeric integer — NOT a string task_key
+  status: "pending" | "completed" | "failed";
+  catalog_variant_mockups: V2CatalogVariantMockup[];
+  failure_reasons: string[];
 }

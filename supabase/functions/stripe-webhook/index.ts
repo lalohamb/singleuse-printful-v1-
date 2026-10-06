@@ -64,9 +64,30 @@ function validateStoredSnapshot(snap: FulfillmentSnapshot): string | null {
   return null;
 }
 
-// Build Printful direct catalog order item from immutable snapshot.
-// variant_id = Printful catalog variant ID — NOT sync_variant_id.
-function buildDirectCatalogItem(
+// Build Printful V2 direct catalog order item from immutable snapshot.
+// V2 shape: source="catalog", catalog_variant_id, placements[]
+// Live-proven: POST /v2/orders with this shape → HTTP 200, status: draft
+function buildV2CatalogOrderItem(
+  snapshot: FulfillmentSnapshot,
+  quantity: number,
+  retailPrice: number
+): Record<string, unknown> {
+  return {
+    source: "catalog" as const,
+    catalog_variant_id: snapshot.printful_catalog_variant_id,
+    quantity: Math.max(1, Math.floor(quantity)),
+    retail_price: retailPrice.toFixed(2),
+    placements: [{
+      placement: snapshot.placement,
+      technique: snapshot.technique,
+      layers: [{ type: "file", url: snapshot.artwork_url }],
+    }],
+  };
+}
+
+// Build Printful V1 direct catalog order item from immutable snapshot.
+// V1 shape: variant_id, files[], options[] — preserved for SYNC_VARIANT path.
+function buildV1CatalogItem(
   snapshot: FulfillmentSnapshot,
   quantity: number,
   retailPrice: number,
@@ -83,10 +104,21 @@ function buildDirectCatalogItem(
 }
 
 // ── Printful live shipping quote ──────────────────────────────────────────────
+// V2 path (DIRECT_CATALOG_ORDER items only):
+//   POST /v2/shipping-rates
+//   order_items[].source = "catalog", catalog_variant_id, quantity
+//   Response: { data: [{ shipping, rate, currency, ... }], extra: [] }
+//
+// V1 path (SYNC_VARIANT items or mixed carts):
+//   POST /shipping/rates
+//   items[].variant_id, quantity
+//   Response: { code, result: [{ rate, ... }] }
 type VerifiedItemForShipping = {
   printful_id: string | null;
   variant_id: string;
   quantity: number;
+  catalog_variant_id?: number | null;
+  is_catalog_builder?: boolean;
 };
 
 async function getPrintfulShipping(
@@ -104,6 +136,37 @@ async function getPrintfulShipping(
     const token = Deno.env.get("PRINTFUL_API_TOKEN");
     if (!token) return fallback;
 
+    // Use V2 only when ALL items are catalog_builder (DIRECT_CATALOG_ORDER).
+    // Mixed or sync carts use V1 to preserve existing behavior.
+    const allCatalogBuilder = items.length > 0 && items.every((i) => i.is_catalog_builder && i.catalog_variant_id);
+
+    if (allCatalogBuilder) {
+      // V2 path: POST /v2/shipping-rates
+      // Live-proven: order_items[].source="catalog", catalog_variant_id, quantity
+      // Response envelope: { data: [{ shipping, rate, currency, ... }], extra: [] }
+      const orderItems = items.map((i) => ({
+        source: "catalog" as const,
+        catalog_variant_id: i.catalog_variant_id!,
+        quantity: i.quantity,
+      }));
+      const res = await fetch("https://api.printful.com/v2/shipping-rates", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recipient: { address1: "1 Main St", city: "New York", state_code: "NY", country_code: "US", zip: "10001" },
+          order_items: orderItems,
+          currency: "USD",
+          locale: "en_US",
+        }),
+      });
+      if (!res.ok) return fallback;
+      const data = await res.json();
+      // V2 envelope: data[0].rate (string)
+      const rate = parseFloat(data?.data?.[0]?.rate ?? "0");
+      return rate > 0 ? rate : fallback;
+    }
+
+    // V1 path: POST /shipping/rates — sync/mixed carts (preserved)
     const lineItems = items
       .filter((i) => i.variant_id)
       .map((i) => ({ variant_id: Number(i.variant_id), quantity: i.quantity }));
@@ -121,6 +184,7 @@ async function getPrintfulShipping(
     });
     if (!res.ok) return fallback;
     const data = await res.json();
+    // V1 envelope: result[0].rate (string)
     const rate = parseFloat(data?.result?.[0]?.rate ?? "0");
     return rate > 0 ? rate : fallback;
   } catch {
@@ -346,26 +410,34 @@ Deno.serve(async (req: Request) => {
           }
         }
 
-        // ── Phase 5.1A: Origin-aware Printful fulfillment ─────────────────────
+        // ── Phase 5.1A / Workstream B: Origin-aware Printful fulfillment ──────
         //
-        // catalog_builder → DIRECT_CATALOG_ORDER from frozen snapshot ONLY.
-        //   NO live-resolution fallback. Missing snapshot = fulfillment blocked.
+        // DIRECT_CATALOG_ORDER (all-catalog_builder cart) → V2 POST /v2/orders
+        //   order_items[].source="catalog", catalog_variant_id, placements[]
+        //   Response: { data: { id, external_id, status, ... }, extra: [] }
+        //   Live-proven: Batch 2 verification, order 179545353.
         //
-        // printful_sync → SYNC_VARIANT (existing behavior, preserved).
+        // SYNC_VARIANT (any sync item, or mixed cart) → V1 POST /orders
+        //   Preserved exactly. Mixed carts use V1 whole-order behavior.
+        //   Do NOT invent a V2 sync item shape.
         //
         // Duplicate protection:
         //   If printful_order_id is already set on this order, a Printful order
         //   was already created. Skip to avoid duplicate. This guards against
         //   concurrent webhook executions and Stripe retries.
         //
-        // Lost-response recovery:
-        //   If POST /orders returns 400 OR-13 (duplicate external_id), the order
-        //   was already created but the response was lost. Recover via
-        //   GET /orders/@<external_id>.
+        // Lost-response recovery (V2):
+        //   V2 returns error.reason="BadRequest" + "External ID validation error"
+        //   (not OR-13). Recover via GET /v2/orders/@<external_id>.
+        //   Response: { data: { id, ... }, extra: [] } — parse data.id.
+        //
+        // Lost-response recovery (V1):
+        //   OR-13 → GET /orders/@<external_id> → result.id (unchanged).
         //
         // PRINTFUL_AUTO_CONFIRM:
         //   Missing/empty/invalid = false (draft only, safe default).
         //   Only explicit "true" triggers manufacturing.
+        //   V2 orders are draft by default — no confirm parameter needed.
         const printfulToken = Deno.env.get("PRINTFUL_API_TOKEN");
         const autoConfirmRaw = Deno.env.get("PRINTFUL_AUTO_CONFIRM");
         const autoConfirm = autoConfirmRaw === "true"; // fail-safe: anything else = false
@@ -393,15 +465,24 @@ Deno.serve(async (req: Request) => {
               ? JSON.parse(session.metadata.shipping_address)
               : {};
 
-            const printfulItems: Record<string, unknown>[] = [];
+            // Determine fulfillment path: V2 if ALL items are DIRECT_CATALOG_ORDER,
+            // V1 if any item is SYNC_VARIANT or has no snapshot (mixed/sync cart).
+            // Do NOT invent a V2 shape for sync items.
+            const allDirectCatalog = orderItems.length > 0 && orderItems.every((item: any) => {
+              const svId: string = item.store_variant_id ?? item.variant_id;
+              const snap = storedSnapshots[svId] as FulfillmentSnapshot | undefined;
+              return snap?.strategy === "DIRECT_CATALOG_ORDER";
+            });
+
+            const v2OrderItems: Record<string, unknown>[] = [];
+            const v1PrintfulItems: Record<string, unknown>[] = [];
 
             for (const item of orderItems) {
               const storeVariantId: string = item.store_variant_id ?? item.variant_id;
               const snapshot = storedSnapshots[storeVariantId] as FulfillmentSnapshot | undefined;
 
               if (snapshot?.strategy === "DIRECT_CATALOG_ORDER") {
-                // ── DIRECT_CATALOG_ORDER: catalog_builder product ─────────────
-                // Phase 5.1A: validate snapshot before use — no live fallback.
+                // ── DIRECT_CATALOG_ORDER: validate snapshot before use ─────────
                 const snapError = validateStoredSnapshot(snapshot);
                 if (snapError) {
                   throw new Error(
@@ -409,45 +490,17 @@ Deno.serve(async (req: Request) => {
                     `Order preserved. Admin resolution required.`
                   );
                 }
-                printfulItems.push(
-                  buildDirectCatalogItem(
-                    snapshot,
-                    item.quantity,
-                    item.price ?? 0,
-                    item.variant_label ?? item.title ?? ""
-                  )
-                );
-              } else if (snapshot === undefined || snapshot === null) {
-                // ── Phase 5.1A: No snapshot present ──────────────────────────
-                // Check if this is a catalog_builder item — if so, block fulfillment.
-                // We cannot live-resolve for catalog_builder items.
-                // For printful_sync items without a snapshot, use existing path.
-                const pfVariantId = item.printful_variant_id;
-                if (!pfVariantId) {
-                  throw new Error(
-                    `No Printful variant ID for store_variant_id=${storeVariantId}. ` +
-                    `Order preserved in DB for admin resolution.`
-                  );
+                if (allDirectCatalog) {
+                  // V2 path: build V2 order item with placements[]
+                  v2OrderItems.push(buildV2CatalogOrderItem(snapshot, item.quantity, item.price ?? 0));
+                } else {
+                  // Mixed cart: fall back to V1 shape for this item
+                  v1PrintfulItems.push(buildV1CatalogItem(
+                    snapshot, item.quantity, item.price ?? 0, item.variant_label ?? item.title ?? ""
+                  ));
                 }
-                const numericId = Number(pfVariantId);
-                if (!Number.isFinite(numericId) || numericId <= 0) {
-                  throw new Error(
-                    `printful_variant_id "${pfVariantId}" is not a valid numeric provider ID ` +
-                    `for store_variant_id=${storeVariantId}.`
-                  );
-                }
-                const pfItem: Record<string, unknown> = {
-                  variant_id: numericId,
-                  quantity: item.quantity,
-                  retail_price: String((item.price || 0).toFixed(2)),
-                  name: item.title || "",
-                };
-                if (item.personalization_text || item.pt) {
-                  pfItem.files = [{ type: "default", url: "", options: [{ id: "text", value: item.personalization_text || item.pt }] }];
-                }
-                printfulItems.push(pfItem);
               } else {
-                // SYNC_VARIANT snapshot present — use existing path
+                // ── SYNC_VARIANT or no snapshot: V1 path (preserved) ──────────
                 const pfVariantId = item.printful_variant_id;
                 if (!pfVariantId) {
                   throw new Error(
@@ -471,77 +524,127 @@ Deno.serve(async (req: Request) => {
                 if (item.personalization_text || item.pt) {
                   pfItem.files = [{ type: "default", url: "", options: [{ id: "text", value: item.personalization_text || item.pt }] }];
                 }
-                printfulItems.push(pfItem);
+                v1PrintfulItems.push(pfItem);
               }
-            }
-
-            if (printfulItems.length === 0) {
-              throw new Error("No fulfillable items in order");
             }
 
             const externalId = buildExternalId(updatedOrder.id);
-
-            const printfulOrder = {
-              external_id: externalId,
-              shipping: "STANDARD",
-              recipient: {
-                name: session.metadata?.shipping_name || "",
-                address1: shippingAddress.line1 || "",
-                address2: shippingAddress.line2 || "",
-                city: shippingAddress.city || "",
-                state_code: shippingAddress.state || "",
-                country_code: shippingAddress.country || "US",
-                zip: shippingAddress.zip || "",
-                email: session.metadata?.email || "",
-                phone: session.customer_details?.phone || session.metadata?.phone || "",
-              },
-              items: printfulItems,
+            const recipient = {
+              name: session.metadata?.shipping_name || "",
+              address1: shippingAddress.line1 || "",
+              address2: shippingAddress.line2 || "",
+              city: shippingAddress.city || "",
+              state_code: shippingAddress.state || "",
+              country_code: shippingAddress.country || "US",
+              zip: shippingAddress.zip || "",
+              email: session.metadata?.email || "",
+              phone: session.customer_details?.phone || session.metadata?.phone || "",
             };
 
-            const confirmParam = autoConfirm ? "?confirm=true" : "";
-            const printfulRes = await fetch(
-              `https://api.printful.com/orders${confirmParam}`,
-              {
+            let printfulRes: Response;
+            let useV2 = allDirectCatalog;
+
+            if (useV2) {
+              // ── V2 path: POST /v2/orders ──────────────────────────────────────
+              // Live-proven: Batch 2 verification. Draft by default — no confirm param.
+              // Response envelope: { data: { id, external_id, status, ... }, extra: [] }
+              if (v2OrderItems.length === 0) throw new Error("No fulfillable V2 items in order");
+              const v2Order = {
+                external_id: externalId,
+                shipping: "STANDARD",
+                recipient,
+                order_items: v2OrderItems,
+              };
+              printfulRes = await fetch("https://api.printful.com/v2/orders", {
                 method: "POST",
-                headers: {
-                  Authorization: `Bearer ${printfulToken}`,
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify(printfulOrder),
-              }
-            );
+                headers: { Authorization: `Bearer ${printfulToken}`, "Content-Type": "application/json" },
+                body: JSON.stringify(v2Order),
+              });
+            } else {
+              // ── V1 path: POST /orders — sync/mixed carts (preserved) ──────────
+              if (v1PrintfulItems.length === 0) throw new Error("No fulfillable items in order");
+              const confirmParam = autoConfirm ? "?confirm=true" : "";
+              const v1Order = {
+                external_id: externalId,
+                shipping: "STANDARD",
+                recipient,
+                items: v1PrintfulItems,
+              };
+              printfulRes = await fetch(`https://api.printful.com/orders${confirmParam}`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${printfulToken}`, "Content-Type": "application/json" },
+                body: JSON.stringify(v1Order),
+              });
+            }
 
             if (printfulRes.ok) {
               const printfulData = await printfulRes.json();
+              // V2 envelope: data.id  |  V1 envelope: result.id
+              const providerId = useV2
+                ? String(printfulData.data.id)
+                : String(printfulData.result.id);
+              const providerStatus = useV2
+                ? (printfulData.data.status || "draft")
+                : (printfulData.result.status || "pending");
               await supabase
                 .from("orders")
                 .update({
-                  printful_order_id: String(printfulData.result.id),
-                  fulfillment_status: printfulData.result.status || "pending",
-                  printful_fulfillment_status: printfulData.result.status || "pending",
+                  printful_order_id: providerId,
+                  fulfillment_status: providerStatus,
+                  printful_fulfillment_status: providerStatus,
                   fulfillment_provider: "printful",
                   updated_at: new Date().toISOString(),
                 })
                 .eq("stripe_session_id", session.id);
             } else {
               const errBody = await printfulRes.json().catch(() => ({}));
-              const errCode = (errBody as any)?.error?.api_error_code ?? "";
 
-              // ── Lost-response recovery ──────────────────────────────────────
-              // Printful OR-13: order with this external_id already exists.
-              // This means a previous webhook execution created the order but
-              // the response was lost before we could record printful_order_id.
-              // Recover by fetching the existing order via @external_id.
-              if (errCode === "OR-13" || printfulRes.status === 400 && String((errBody as any)?.error?.message ?? "").includes("External ID")) {
-                console.log("[webhook] OR-13 duplicate external_id — recovering via GET /orders/@", externalId);
+              // ── Lost-response recovery ────────────────────────────────────────
+              // V2: error.reason="BadRequest" AND message contains "External ID validation error"
+              //   → recover via GET /v2/orders/@{external_id} → data.id
+              // V1: api_error_code="OR-13" (preserved)
+              //   → recover via GET /orders/@{external_id} → result.id
+              const isV2Duplicate =
+                useV2 &&
+                (errBody as any)?.error?.reason === "BadRequest" &&
+                String((errBody as any)?.error?.message ?? "").includes("External ID validation error");
+              const isV1Duplicate =
+                !useV2 &&
+                ((errBody as any)?.error?.api_error_code === "OR-13" ||
+                  (printfulRes.status === 400 && String((errBody as any)?.error?.message ?? "").includes("External ID")));
+
+              if (isV2Duplicate) {
+                console.log("[webhook] V2 duplicate external_id — recovering via GET /v2/orders/@", externalId);
+                const recoverRes = await fetch(
+                  `https://api.printful.com/v2/orders/@${encodeURIComponent(externalId)}`,
+                  { headers: { Authorization: `Bearer ${printfulToken}`, "Content-Type": "application/json" } }
+                );
+                if (recoverRes.ok) {
+                  const recoverData = await recoverRes.json();
+                  // V2 recovery envelope: { data: { id, status, ... }, extra: [] }
+                  await supabase
+                    .from("orders")
+                    .update({
+                      printful_order_id: String(recoverData.data.id),
+                      fulfillment_status: recoverData.data.status || "draft",
+                      printful_fulfillment_status: recoverData.data.status || "draft",
+                      fulfillment_provider: "printful",
+                      updated_at: new Date().toISOString(),
+                    })
+                    .eq("stripe_session_id", session.id);
+                  console.log("[webhook] V2 recovered Printful order", recoverData.data.id, "via external_id lookup");
+                } else {
+                  console.error("[webhook] V2 recovery failed:", recoverRes.status);
+                  await supabase
+                    .from("orders")
+                    .update({ printful_fulfillment_status: "failed", fulfillment_provider: "printful", updated_at: new Date().toISOString() })
+                    .eq("stripe_session_id", session.id);
+                }
+              } else if (isV1Duplicate) {
+                console.log("[webhook] V1 OR-13 duplicate external_id — recovering via GET /orders/@", externalId);
                 const recoverRes = await fetch(
                   `https://api.printful.com/orders/@${encodeURIComponent(externalId)}`,
-                  {
-                    headers: {
-                      Authorization: `Bearer ${printfulToken}`,
-                      "Content-Type": "application/json",
-                    },
-                  }
+                  { headers: { Authorization: `Bearer ${printfulToken}`, "Content-Type": "application/json" } }
                 );
                 if (recoverRes.ok) {
                   const recoverData = await recoverRes.json();
@@ -555,16 +658,12 @@ Deno.serve(async (req: Request) => {
                       updated_at: new Date().toISOString(),
                     })
                     .eq("stripe_session_id", session.id);
-                  console.log("[webhook] recovered Printful order", recoverData.result.id, "via external_id lookup");
+                  console.log("[webhook] V1 recovered Printful order", recoverData.result.id, "via external_id lookup");
                 } else {
-                  console.error("[webhook] OR-13 recovery failed:", recoverRes.status);
+                  console.error("[webhook] V1 OR-13 recovery failed:", recoverRes.status);
                   await supabase
                     .from("orders")
-                    .update({
-                      printful_fulfillment_status: "failed",
-                      fulfillment_provider: "printful",
-                      updated_at: new Date().toISOString(),
-                    })
+                    .update({ printful_fulfillment_status: "failed", fulfillment_provider: "printful", updated_at: new Date().toISOString() })
                     .eq("stripe_session_id", session.id);
                 }
               } else {
@@ -572,11 +671,7 @@ Deno.serve(async (req: Request) => {
                 console.error("Printful order failed:", printfulRes.status, errText.replace(/[\r\n]/g, " "));
                 await supabase
                   .from("orders")
-                  .update({
-                    printful_fulfillment_status: "failed",
-                    fulfillment_provider: "printful",
-                    updated_at: new Date().toISOString(),
-                  })
+                  .update({ printful_fulfillment_status: "failed", fulfillment_provider: "printful", updated_at: new Date().toISOString() })
                   .eq("stripe_session_id", session.id);
               }
             }

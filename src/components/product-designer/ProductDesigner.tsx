@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import type {
   PrintfulLayoutTemplate,
-  PrintfulMockupTask,
   PrintfulPrintfilesResponse,
-  PrintfulProduct,
   PrintfulTemplatesResponse,
   PrintfulVariant,
+  MockupPollResult,
+  V2CatalogProduct,
 } from "@/lib/printful/types";
 import { canvasToPrintfulCoordinates, type CanvasRect } from "./coordinates";
 import { useArtworkUpload } from "./useArtworkUpload";
@@ -23,11 +23,11 @@ import VariantSelector from "./VariantSelector";
 const CANVAS_W = 400;
 const CANVAS_H = 400;
 
-type Step = "product" | "variant" | "technique" | "placement" | "design" | "generating" | "done";
+type Step = "product" | "technique" | "variant" | "placement" | "design" | "generating" | "done";
 
 export default function ProductDesigner() {
   const [step, setStep] = useState<Step>("product");
-  const [product, setProduct] = useState<PrintfulProduct | null>(null);
+  const [product, setProduct] = useState<V2CatalogProduct | null>(null);
   const [variants, setVariants] = useState<PrintfulVariant[]>([]);
   const [selectedVariant, setSelectedVariant] = useState<PrintfulVariant | null>(null);
   const [technique, setTechnique] = useState<string | null>(null);
@@ -38,7 +38,7 @@ export default function ProductDesigner() {
   const [artworkUrl, setArtworkUrl] = useState<string | null>(null);
   const [artworkRect, setArtworkRect] = useState<CanvasRect>({ x: 100, y: 100, width: 100, height: 100 });
   const [taskKey, setTaskKey] = useState<string | null>(null);
-  const [completedTask, setCompletedTask] = useState<PrintfulMockupTask | null>(null);
+  const [completedResult, setCompletedResult] = useState<MockupPollResult | null>(null);
   const [selectedOptionGroups, setSelectedOptionGroups] = useState<string[]>([]);
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [generating, setGenerating] = useState(false);
@@ -46,17 +46,36 @@ export default function ProductDesigner() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { upload, uploading, error: uploadError } = useArtworkUpload();
 
-  // Load product variants
+  // Load product variants from V1 templates variant_mapping.
+  // ProductDesigner uses V1 variant IDs throughout (template resolution,
+  // mockup generation). The V2 product detail route returns CatalogVariant[]
+  // (V2 IDs) which are a different identity namespace — do not use them here.
+  // Variants are populated after templates load (technique step) from
+  // variant_mapping[].variant_id, which are genuine V1 IDs.
+  // The variant selector step is shown after technique selection.
   useEffect(() => {
-    if (!product) return;
-    fetch(`/api/printful/products/${product.id}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.error) throw new Error(d.error);
-        setVariants(d.result?.variants ?? []);
-      })
-      .catch((e) => setError(e.message));
-  }, [product]);
+    if (!templates) return;
+    // Derive V1 variant list from variant_mapping.
+    // Each entry has variant_id (V1) and templates[]. We need name/display info
+    // which is not in variant_mapping — use a synthetic label from the variant ID.
+    // ProductDesigner's VariantSelector only needs id and name for display.
+    const syntheticVariants: PrintfulVariant[] = templates.variant_mapping.map((m) => ({
+      id: m.variant_id,
+      product_id: product?.id ?? 0,
+      name: `Variant ${m.variant_id}`,
+      size: "",
+      color: "",
+      color_code: null,
+      color_code2: null,
+      image: "",
+      price: "0",
+      in_stock: true,
+      availability_regions: {},
+      availability_status: [],
+      material: null,
+    }));
+    setVariants(syntheticVariants);
+  }, [templates, product]);
 
   // Load printfiles + templates when technique changes
   useEffect(() => {
@@ -167,7 +186,7 @@ export default function ProductDesigner() {
     setActiveTemplate(null);
     setArtworkUrl(null);
     setTaskKey(null);
-    setCompletedTask(null);
+    setCompletedResult(null);
     setSelectedOptionGroups([]);
     setSelectedOptions([]);
     setError(null);
@@ -189,21 +208,6 @@ export default function ProductDesigner() {
             onSelect={(p) => {
               setProduct(p);
               setTechnique(p.techniques.find((t) => t.is_default)?.key ?? p.techniques[0]?.key ?? null);
-              setStep("variant");
-            }}
-          />
-        </section>
-      )}
-
-      {/* Step: select variant */}
-      {step === "variant" && product && (
-        <section className="space-y-2">
-          <p className="text-sm font-medium">{product.title} — Select a variant</p>
-          <VariantSelector
-            variants={variants}
-            selectedId={selectedVariant?.id ?? null}
-            onSelect={(v) => {
-              setSelectedVariant(v);
               setStep("technique");
             }}
           />
@@ -219,6 +223,24 @@ export default function ProductDesigner() {
             selected={technique}
             onSelect={(k) => {
               setTechnique(k);
+              setStep("variant");
+            }}
+          />
+        </section>
+      )}
+
+      {/* Step: select variant — populated from V1 templates variant_mapping */}
+      {step === "variant" && product && (
+        <section className="space-y-2">
+          <p className="text-sm font-medium">{product.title} — Select a variant</p>
+          {variants.length === 0 && (
+            <p className="text-sm text-gray-500">Loading variants…</p>
+          )}
+          <VariantSelector
+            variants={variants}
+            selectedId={selectedVariant?.id ?? null}
+            onSelect={(v) => {
+              setSelectedVariant(v);
               setStep("placement");
             }}
           />
@@ -295,8 +317,8 @@ export default function ProductDesigner() {
       {step === "generating" && taskKey && (
         <MockupStatus
           taskKey={taskKey}
-          onComplete={(task) => {
-            setCompletedTask(task);
+          onComplete={(result) => {
+            setCompletedResult(result);
             setStep("done");
           }}
           onFailed={(msg) => {
@@ -307,8 +329,8 @@ export default function ProductDesigner() {
       )}
 
       {/* Step: done */}
-      {step === "done" && completedTask && (
-        <MockupPreview task={completedTask} onReset={reset} />
+      {step === "done" && completedResult && (
+        <MockupPreview result={completedResult} onReset={reset} />
       )}
 
       {/* Back navigation */}
@@ -317,9 +339,9 @@ export default function ProductDesigner() {
           onClick={() => {
             const prev: Record<Step, Step> = {
               product: "product",
-              variant: "product",
-              technique: "variant",
-              placement: "technique",
+              technique: "product",
+              variant: "technique",
+              placement: "variant",
               design: "placement",
               generating: "design",
               done: "design",

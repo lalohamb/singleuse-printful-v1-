@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, AlertCircle } from "lucide-react";
 import { generateSlug } from "@/lib/catalog/types";
-import type { PrintfulLayoutTemplate, PrintfulMockupTask, PrintfulPrintfilesResponse, PrintfulTemplatesResponse } from "@/lib/printful/types";
+import type { V2MockupTemplate, V2MockupTask, V2MockupStyle, MockupPollResult } from "@/lib/printful/types";
 import type { CanvasRect } from "@/components/product-designer/coordinates";
 import { canvasToPrintfulCoordinates } from "@/components/product-designer/coordinates";
 import { useArtworkUpload } from "@/components/product-designer/useArtworkUpload";
@@ -19,8 +19,9 @@ import {
   type MultiDryRunEntry, type SidebarStep, type StageStatus,
 } from "./Phase11AComponents";
 import { initialBuilderState, type BuilderStage, type CatalogBuilderState, type BuiltMockup, type VariantPricing } from "./types";
+import { resolveV2Template } from "@/lib/printful/templates";
 import type { ArtworkValidationResult } from "@/lib/fulfillment/artwork-validation";
-import { fetchPrintfileSpec, validateArtworkForPrintfile } from "@/lib/fulfillment/artwork-validation";
+import { validateArtworkFromV2Style, type V2StyleSpec } from "@/lib/fulfillment/artwork-validation";
 import { resolveProviderCost, type CatalogProductPricing } from "@/lib/printful/pricing";
 
 const CANVAS_W = 400;
@@ -79,8 +80,10 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
   const [editUpdatedAt, setEditUpdatedAt] = useState<string | null>(null);
   const [stage, setStage] = useState<BuilderStage>(editProductId ? "details" : "blank");
   const [state, setState] = useState<CatalogBuilderState>(initialBuilderState);
-  const [printfiles, setPrintfiles] = useState<PrintfulPrintfilesResponse | null>(null);
-  const [templates, setTemplates] = useState<PrintfulTemplatesResponse | null>(null);
+  const [v2Templates, setV2Templates] = useState<V2MockupTemplate[]>([]);
+  const [v2Styles, setV2Styles] = useState<V2MockupStyle[]>([]);
+  const [availablePlacements, setAvailablePlacements] = useState<Record<string, string>>({});
+  const [conflictingPlacements, setConflictingPlacements] = useState<Record<string, string[]>>({});
   const [artworkRect, setArtworkRect] = useState<CanvasRect>({ x: 100, y: 100, width: 100, height: 100 });
   const [selectedOptionGroups, setSelectedOptionGroups] = useState<string[]>([]);
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
@@ -223,67 +226,103 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
     }
   }
 
-  // ── Stage: production — load printfiles + templates ───────────────────────
-  // Issue E fix: always clear printfiles/templates/placement/activeTemplate before
-  // fetching so the UI never shows stale data. On error, restore to empty (not null)
-  // so the spinner clears and the operator sees the error with a retry path.
+  // ── Stage: production — load V2 templates + styles ─────────────────────
+  // Fetches V2 mockup-templates (geometry + placement discovery) and
+  // V2 mockup-styles (display names + DPI validation data).
+  // Also extracts conflicting_placements from V2 product detail.
   async function loadProduction(catalogProductId: number, technique: string) {
     setError(null);
-    // Clear stale state immediately — prevents Continue staying enabled with old template
-    setPrintfiles(null);
-    setTemplates(null);
+    setV2Templates([]);
+    setV2Styles([]);
+    setAvailablePlacements({});
+    setConflictingPlacements({});
     update({ placement: null, activeTemplate: null, printfileId: null });
     try {
-      const [pf, tmpl] = await Promise.all([
-        fetch(`/api/printful/printfiles/${catalogProductId}?technique=${encodeURIComponent(technique)}`).then((r) => r.json()),
-        fetch(`/api/printful/templates/${catalogProductId}?technique=${encodeURIComponent(technique)}`).then((r) => r.json()),
+      const [tmplRes, stylesRes, productRes] = await Promise.all([
+        fetch(`/api/printful/mockup-templates/${catalogProductId}`).then((r) => r.json()),
+        fetch(`/api/printful/mockup-styles/${catalogProductId}`).then((r) => r.json()),
+        fetch(`/api/printful/products/${catalogProductId}`).then((r) => r.json()),
       ]);
-      if (pf.error) throw new Error(pf.error);
-      if (tmpl.error) throw new Error(tmpl.error);
-      setPrintfiles(pf.result);
-      setTemplates(tmpl.result);
+      if (tmplRes.error) throw new Error(tmplRes.error);
+      if (stylesRes.error) throw new Error(stylesRes.error);
+
+      const allTemplates: V2MockupTemplate[] = tmplRes.result ?? [];
+      const allStyles: V2MockupStyle[] = stylesRes.result ?? [];
+      const techNorm = technique.toLowerCase();
+
+      // Derive available placements: placements that have at least one primary
+      // template for the selected technique. Excludes presentation-only placements
+      // (e.g. "mockup") which have no primary template.
+      const placementSet = new Set<string>();
+      for (const t of allTemplates) {
+        if (t.technique.toLowerCase() === techNorm && t.role === "primary") {
+          placementSet.add(t.placement);
+        }
+      }
+
+      // Build display names from V2 mockup-styles
+      const placements: Record<string, string> = {};
+      for (const placement of placementSet) {
+        const style = allStyles.find(
+          (s) => s.placement === placement && s.technique.toLowerCase() === techNorm
+        );
+        placements[placement] = style?.display_name ?? placement;
+      }
+
+      // Extract conflicting_placements from V2 product detail
+      const conflicts: Record<string, string[]> = {};
+      const productData = productRes.result ?? {};
+      // V2 product detail has placements[] with conflicting_placements per placement/technique
+      const v2Placements: Array<{ placement: string; technique: string; conflicting_placements: string[] }> =
+        productData.placements ?? [];
+      for (const p of v2Placements) {
+        if (p.technique.toLowerCase() === techNorm) {
+          conflicts[p.placement] = p.conflicting_placements ?? [];
+        }
+      }
+
+      setV2Templates(allTemplates);
+      setV2Styles(allStyles);
+      setAvailablePlacements(placements);
+      setConflictingPlacements(conflicts);
     } catch (e) {
-      // Set empty objects so the spinner clears — error is shown, operator can retry
-      setPrintfiles({ product_id: catalogProductId, available_placements: {}, printfiles: [], variant_printfiles: [], option_groups: [], options: [] });
-      setTemplates(null);
+      setAvailablePlacements({});
       setError(e instanceof Error ? e.message : "Failed to load production data");
     }
   }
 
-  // ── Resolve active template when placement changes ────────────────────────
-  function resolveTemplate(placement: string): PrintfulLayoutTemplate | null {
-    if (!templates || !state.selectedVariants[0]) return null;
+  // ── Resolve V2 template for a placement ──────────────────────────────────
+  // Uses V2 catalog_variant_ids directly. No variant_mapping. No fallback.
+  function resolveV2TemplateForPlacement(placement: string): V2MockupTemplate | null {
+    if (!state.selectedVariants[0] || !state.technique) return null;
     const variantId = state.selectedVariants[0].id;
-    const mapping = templates.variant_mapping.find((m) => m.variant_id === variantId);
-    if (!mapping) return null;
-    const entry = mapping.templates.find((t) => t.placement === placement);
-    if (!entry) return null;
-    const tmpl = templates.templates.find((t) => t.template_id === entry.template_id) ?? null;
-    if (tmpl) {
-      const scaleX = CANVAS_W / tmpl.template_width;
-      const scaleY = CANVAS_H / tmpl.template_height;
-      const areaX = tmpl.print_area_left * scaleX;
-      const areaY = tmpl.print_area_top * scaleY;
-      const areaW = tmpl.print_area_width * scaleX;
-      const areaH = tmpl.print_area_height * scaleY;
-      const w = areaW * 0.5;
-      const h = areaH * 0.5;
-      setArtworkRect({ x: areaX + (areaW - w) / 2, y: areaY + (areaH - h) / 2, width: w, height: h });
-    }
+    const resolution = resolveV2Template(v2Templates, variantId, state.technique, placement);
+    if (resolution.status !== "resolved") return null;
+    const tmpl = resolution.template;
+    const scaleX = CANVAS_W / tmpl.template_width;
+    const scaleY = CANVAS_H / tmpl.template_height;
+    const areaX = tmpl.print_area_left * scaleX;
+    const areaY = tmpl.print_area_top * scaleY;
+    const areaW = tmpl.print_area_width * scaleX;
+    const areaH = tmpl.print_area_height * scaleY;
+    const w = areaW * 0.5;
+    const h = areaH * 0.5;
+    setArtworkRect({ x: areaX + (areaW - w) / 2, y: areaY + (areaH - h) / 2, width: w, height: h });
     return tmpl;
   }
 
-  // ── Generate mockup ───────────────────────────────────────────────────────
+  // ── Generate mockup (V2) ──────────────────────────────────────────────────
   async function handleGenerate() {
     const { catalogProduct, selectedVariants, activeTemplate, artworkUrl, placement, technique } = state;
-    if (!catalogProduct || !selectedVariants.length || !activeTemplate || !artworkUrl || !placement) return;
+    if (!catalogProduct || !selectedVariants.length || !activeTemplate || !artworkUrl || !placement || !technique) return;
     setGenerating(true);
     setError(null);
     const position = canvasToPrintfulCoordinates(artworkRect, activeTemplate, CANVAS_W, CANVAS_H);
+    // V2 request: catalog_variant_ids explicitly supplied — no auto-selection
     const body = JSON.stringify({
       productId: catalogProduct.id,
-      variant_ids: selectedVariants.map((v) => v.id),
-      technique: technique ?? undefined,
+      catalog_variant_ids: selectedVariants.map((v) => v.id),
+      technique,
       files: [{ placement, image_url: artworkUrl, position }],
     });
     // Retry up to 4 times on 429 with exponential backoff (2s, 4s, 8s, 16s)
@@ -304,7 +343,9 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
         if (res.status === 429) { lastError = "Printful rate limit reached."; continue; }
         const data = await res.json();
         if (data.error) { lastError = data.error; break; }
-        update({ mockupTaskKey: data.result.task_key, designConfiguration: { position, placement, technique, artworkUrl } });
+        // V2 task result has numeric id, not string task_key
+        const taskId: number = data.result.id;
+        update({ mockupTaskId: taskId, designConfiguration: { position, placement, technique, artworkUrl } });
         setGenerating(false);
         go("mockups");
         return;
@@ -318,19 +359,39 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
   }
 
   // ── Persist mockups ───────────────────────────────────────────────────────
-  async function handleMockupComplete(task: PrintfulMockupTask) {
-    update({ completedTask: task });
-    if (!task.mockups?.length) { go("details"); return; }
-    // Persist all mockups to Supabase Storage
+  async function handleMockupComplete(pollResult: MockupPollResult) {
+    // CatalogBuilder only uses the V2 path. pollResult.source must be "v2".
+    if (pollResult.source !== "v2" || !pollResult.v2Task) {
+      setError("Unexpected mockup result source. Expected V2.");
+      return;
+    }
+    const task: V2MockupTask = pollResult.v2Task;
+    update({ completedV2Task: task });
+
+    // Build the V2 mockup entry list from the completed task result.
+    // mockup_url values are already present — no provider re-fetch needed.
+    // catalog_variant_id remains in V2 identity space.
+    const v2Mockups = task.catalog_variant_mockups.flatMap((cvm) =>
+      cvm.mockups.map((m) => ({
+        placement: m.placement,
+        mockup_url: m.mockup_url,
+        catalog_variant_id: cvm.catalog_variant_id,
+      }))
+    );
+    if (!v2Mockups.length) { go("details"); return; }
+
     try {
+      // V2 persist path: source:"v2" + taskId + mockups[]
+      // The persist route downloads temporary URLs and uploads to Supabase Storage.
+      // No V1 getMockupTask() call occurs on the server side.
       const res = await fetch("/api/printful/mockups/persist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskKey: task.task_key }),
+        body: JSON.stringify({ source: "v2", taskId: task.id, mockups: v2Mockups }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      const persisted: BuiltMockup[] = (data.result ?? data.mockups ?? []).map((m: BuiltMockup, i: number) => ({
+      const persisted: BuiltMockup[] = (data.result ?? []).map((m: BuiltMockup, i: number) => ({
         ...m,
         is_primary: i === 0,
         display_order: i,
@@ -784,7 +845,7 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
       {stage === "production" && state.catalogProduct && (
         <section className="space-y-4">
           <h2 className="text-base font-semibold">Production settings</h2>
-          {!printfiles ? (
+          {Object.keys(availablePlacements).length === 0 ? (
             <div className="flex justify-center py-8"><Loader2 size={24} className="animate-spin text-secondary-300" /></div>
           ) : (
             <>
@@ -806,25 +867,31 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
               <div className="space-y-2">
                 <p className="text-sm font-medium text-secondary-700">Placement</p>
                 <PlacementSelector
-                  placements={printfiles.available_placements}
+                  placements={availablePlacements}
                   selected={state.placement}
-                  conflicting={state.placement && templates?.conflicting_placements[state.placement] ? templates.conflicting_placements[state.placement] : []}
+                  conflicting={state.placement ? (conflictingPlacements[state.placement] ?? []) : []}
                   onSelect={(p) => {
-                    const tmpl = resolveTemplate(p);
+                    const tmpl = resolveV2TemplateForPlacement(p);
                     update({ placement: p, activeTemplate: tmpl, printfileId: null });
-                    // Invalidate stale provider cost — placement changed.
                     setPricingData(null);
                     update({ variantPricing: state.variantPricing.map((vp) => ({ ...vp, provider_cost: null })) });
-                    // Revalidate artwork against the newly selected placement + current technique.
-                    // Clears any stale validation from a previous placement or technique.
-                    if (state.design?.width && state.design?.height && state.catalogProduct && state.technique) {
-                      setArtworkValidation(null); // clear stale result immediately
-                      fetchPrintfileSpec(state.catalogProduct.id, state.technique, p, state.selectedVariants[0]?.id)
-                        .then((spec) => {
-                          if (!spec) return;
-                          setArtworkValidation(validateArtworkForPrintfile(state.design!.width!, state.design!.height!, spec));
-                        })
-                        .catch(() => { /* non-fatal */ });
+                    // V2 DPI validation from mockup-styles
+                    if (state.design?.width && state.design?.height && state.technique) {
+                      setArtworkValidation(null);
+                      const techNorm = state.technique.toLowerCase();
+                      const style = v2Styles.find(
+                        (s) => s.placement === p && s.technique.toLowerCase() === techNorm
+                      );
+                      if (style) {
+                        const result = validateArtworkFromV2Style(state.design!.width!, state.design!.height!, {
+                          print_area_width: style.print_area_width,
+                          print_area_height: style.print_area_height,
+                          dpi: style.dpi,
+                          print_area_type: style.print_area_type,
+                          technique: style.technique,
+                        });
+                        setArtworkValidation(result);
+                      }
                     }
                   }}
                 />
@@ -852,11 +919,11 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
       )}
 
       {/* Stage: mockups */}
-      {stage === "mockups" && state.mockupTaskKey && (
+      {stage === "mockups" && state.mockupTaskId !== null && (
         <section className="space-y-4">
           <h2 className="text-base font-semibold">Generating mockups…</h2>
           <MockupStatus
-            taskKey={state.mockupTaskKey}
+            taskKey={String(state.mockupTaskId)}
             onComplete={handleMockupComplete}
             onFailed={(msg) => { setError(msg); go("designer"); }}
           />
@@ -934,9 +1001,21 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
               <div key={vp.printful_variant_id} className="flex items-center gap-3 p-3 bg-secondary-50 rounded-lg">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-secondary-900 truncate">{vp.label}</p>
-                  <p className="text-xs text-secondary-400">
-                    {pricingLoading ? "Cost: fetching…" : vp.provider_cost != null ? `Cost: $${vp.provider_cost.toFixed(2)}` : "Cost unavailable"}
-                  </p>
+                  {pricingLoading ? (
+                    <p className="text-xs text-secondary-400">Cost: fetching…</p>
+                  ) : vp.provider_cost != null && vp.retail_price > 0 ? (
+                    <>
+                      <p className="text-xs text-secondary-400">Cost: ${vp.provider_cost.toFixed(2)}</p>
+                      <p className="text-xs text-secondary-400">
+                        Profit: ${(vp.retail_price - vp.provider_cost).toFixed(2)}
+                        {" · "}Margin: {(((vp.retail_price - vp.provider_cost) / vp.retail_price) * 100).toFixed(1)}%
+                      </p>
+                    </>
+                  ) : vp.provider_cost != null ? (
+                    <p className="text-xs text-secondary-400">Cost: ${vp.provider_cost.toFixed(2)} · Margin unavailable</p>
+                  ) : (
+                    <p className="text-xs text-secondary-400">Cost unavailable · Margin unavailable</p>
+                  )}
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm text-secondary-500">$</span>

@@ -2,7 +2,7 @@
 import { type ReactNode, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingBag, LogOut, Menu, FolderTree, ExternalLink, Mail, CreditCard, Send, Search, Truck, Image, FileText, AlertTriangle, Palette, Home, Users, PanelBottom, Plug, Share2, Megaphone, Store, Sparkles, BarChart3, Heart, BookOpen, MessageCircle, Link2, DollarSign, ShieldCheck, Wand2 } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag, LogOut, Menu, FolderTree, ExternalLink, Mail, CreditCard, Send, Search, Truck, Image, FileText, AlertTriangle, Palette, Home, Users, PanelBottom, Plug, Share2, Megaphone, Store, Sparkles, BarChart3, Heart, BookOpen, MessageCircle, Link2, DollarSign, ShieldCheck, Wand2, LayoutList } from "lucide-react";
 import { useAdminAuth } from "@/lib/admin-auth";
 import { supabase } from "@/lib/supabase";
 import { resolveStorageUrl } from "@/lib/storage";
@@ -12,6 +12,7 @@ const navItems = [
   { path: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { path: "/admin/products", label: "Products", icon: Package },
   { path: "/admin/catalog-builder", label: "Catalog Builder", icon: Wand2 },
+  { path: "/admin/catalog", label: "Product Catalog", icon: LayoutList },
   { path: "/admin/categories", label: "Categories", icon: FolderTree },
   { path: "/admin/orders", label: "Orders - Printful", icon: ShoppingBag },
   { path: "/admin/customers", label: "Customers", icon: Users },

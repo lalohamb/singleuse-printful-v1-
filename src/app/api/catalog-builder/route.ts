@@ -193,7 +193,7 @@ export async function POST(req: Request) {
     color: v.color || null,
     size: v.size || null,
     retail_price: v.retail_price,
-    provider_cost: v.provider_cost || null,
+    provider_cost: v.provider_cost ?? null,
     image_url: v.image_url || null,
     available: true,
     updated_at: new Date().toISOString(),

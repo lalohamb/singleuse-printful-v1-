@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, Check, Loader2, Upload, AlertTriangle, CheckCircle, AlertCircle, Info, X, ChevronDown, ChevronUp } from "lucide-react";
-import type { PrintfulProduct, PrintfulVariant } from "@/lib/printful/types";
+import type { PrintfulProduct, PrintfulVariant, V2CatalogProduct } from "@/lib/printful/types";
 import type { Design } from "@/types";
 import {
   validateArtworkForPrintfile,
@@ -75,8 +75,8 @@ type SortKey = "default" | "name" | "cost-asc" | "cost-desc" | "colors";
 
 // ── Stage 1: Catalog Browser ──────────────────────────────────────────────────
 
-export function BlankSelector({ onSelect }: { onSelect: (p: PrintfulProduct) => void }) {
-  const [products, setProducts] = useState<PrintfulProduct[]>([]);
+export function BlankSelector({ onSelect }: { onSelect: (p: V2CatalogProduct) => void }) {
+  const [products, setProducts] = useState<V2CatalogProduct[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -91,7 +91,7 @@ export function BlankSelector({ onSelect }: { onSelect: (p: PrintfulProduct) => 
       .then((r) => r.json())
       .then((d) => {
         if (d.error) throw new Error(d.error);
-        const list: PrintfulProduct[] = d.result ?? [];
+        const list: V2CatalogProduct[] = d.result ?? [];
         setProducts(list);
         setCatalogLoading(false);
       })

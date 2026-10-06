@@ -1,14 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { PrintfulProduct } from "@/lib/printful/types";
+import type { PrintfulProduct, V2CatalogProduct } from "@/lib/printful/types";
 
 interface Props {
-  onSelect: (product: PrintfulProduct) => void;
+  onSelect: (product: V2CatalogProduct) => void;
 }
 
+// ProductSelector is used by the legacy ProductDesigner.
+// It calls /api/printful/products which now returns V2CatalogProduct[].
+// V2CatalogProduct has all fields ProductDesigner needs from the list:
+// id, title, image, techniques. It does NOT have currency, files, options.
+// ProductDesigner only reads id, title, image, techniques from the list — safe.
 export default function ProductSelector({ onSelect }: Props) {
-  const [products, setProducts] = useState<PrintfulProduct[]>([]);
+  const [products, setProducts] = useState<V2CatalogProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

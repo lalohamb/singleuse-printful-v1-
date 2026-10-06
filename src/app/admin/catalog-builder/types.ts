@@ -1,7 +1,7 @@
 // Catalog Builder state types
 // These are builder-only types — not stored in DB until draft creation.
 
-import type { PrintfulProduct, PrintfulVariant, CatalogVariant, PrintfulLayoutTemplate, PrintfulMockupTask } from "@/lib/printful/types";
+import type { V2CatalogProduct, CatalogVariant, V2MockupTemplate, V2MockupTask } from "@/lib/printful/types";
 import type { Design } from "@/types";
 
 export type CreationMode = "single" | "multi" | null;
@@ -61,9 +61,9 @@ export interface ProductSummary {
 
 export interface CatalogBuilderState {
   // Stage 1: Blank
-  catalogProduct: PrintfulProduct | null;
+  catalogProduct: V2CatalogProduct | null;
   // multiSelectedProducts preserved for future batch phase — not active in current UX
-  multiSelectedProducts: PrintfulProduct[];
+  multiSelectedProducts: V2CatalogProduct[];
 
   // Stage 2: Variants
   selectedVariants: CatalogVariant[];
@@ -75,15 +75,15 @@ export interface CatalogBuilderState {
   technique: string | null;
   placement: string | null;
   printfileId: string | null;
-  activeTemplate: PrintfulLayoutTemplate | null;
+  activeTemplate: V2MockupTemplate | null;   // V2 template — replaces V1 PrintfulLayoutTemplate
 
   // Stage 5: Designer (configuration)
   artworkUrl: string | null;
   designConfiguration: Record<string, unknown>;
 
   // Stage 6: Mockups
-  mockupTaskKey: string | null;
-  completedTask: PrintfulMockupTask | null;
+  mockupTaskId: number | null;               // V2 numeric task ID
+  completedV2Task: V2MockupTask | null;      // V2 completed task result
   persistedMockups: BuiltMockup[];
   selectedMockupIndices: number[];
 
@@ -107,7 +107,7 @@ export interface CatalogBuilderState {
 
 // Per-product entry in multi-product mode
 export interface MultiProductEntry {
-  catalogProduct: PrintfulProduct;
+  catalogProduct: V2CatalogProduct;
   selectedVariants: CatalogVariant[];
   technique: string | null;
   placement: string | null;
@@ -126,8 +126,8 @@ export function initialBuilderState(): CatalogBuilderState {
     activeTemplate: null,
     artworkUrl: null,
     designConfiguration: {},
-    mockupTaskKey: null,
-    completedTask: null,
+    mockupTaskId: null,
+    completedV2Task: null,
     persistedMockups: [],
     selectedMockupIndices: [],
     title: "",

@@ -1,20 +1,54 @@
 "use client";
 
 import { useState } from "react";
-import type { PrintfulMockupTask } from "@/lib/printful/types";
+import type { MockupPollResult } from "@/lib/printful/types";
 
 interface Props {
-  task: PrintfulMockupTask;
+  result: MockupPollResult;
   onReset: () => void;
 }
 
-export default function MockupPreview({ task, onReset }: Props) {
-  const mockups = task.mockups ?? [];
+export default function MockupPreview({ result, onReset }: Props) {
+  // Normalize mockup list from either V1 or V2 result shape.
+  // V1: result.v1Task.mockups[] — each has placement, mockup_url, extra[], option, option_group
+  // V2: result.v2Task.catalog_variant_mockups[].mockups[] — each has placement, mockup_url
+  const mockups: Array<{
+    placement: string;
+    mockup_url: string;
+    option: string | null;
+    option_group: string | null;
+    extra: Array<{ title: string; url: string }>;
+  }> = result.source === "v1" && result.v1Task
+    ? (result.v1Task.mockups ?? []).map((m) => ({
+        placement: m.placement,
+        mockup_url: m.mockup_url,
+        option: m.option,
+        option_group: m.option_group,
+        extra: m.extra,
+      }))
+    : result.source === "v2" && result.v2Task
+    ? result.v2Task.catalog_variant_mockups.flatMap((cvm) =>
+        cvm.mockups.map((m) => ({
+          placement: m.placement,
+          mockup_url: m.mockup_url,
+          option: null,
+          option_group: null,
+          extra: [],
+        }))
+      )
+    : [];
+
+  // taskKey for persist: V1 uses task_key string; V2 uses numeric id as string.
+  const persistKey = result.source === "v1" && result.v1Task
+    ? result.v1Task.task_key
+    : result.source === "v2" && result.v2Task
+    ? String(result.v2Task.id)
+    : null;
+
   const [persisting, setPersisting] = useState(false);
   const [persistedUrls, setPersistedUrls] = useState<string[] | null>(null);
   const [persistError, setPersistError] = useState<string | null>(null);
 
-  // Collect unique option_groups for filter tabs (null → "Default")
   const groups = Array.from(
     new Set(mockups.map((m) => m.option_group ?? "Default"))
   );
@@ -25,13 +59,14 @@ export default function MockupPreview({ task, onReset }: Props) {
   );
 
   async function handlePersist() {
+    if (!persistKey) return;
     setPersisting(true);
     setPersistError(null);
     try {
       const res = await fetch("/api/printful/mockups/persist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskKey: task.task_key }),
+        body: JSON.stringify({ taskKey: persistKey }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -55,7 +90,6 @@ export default function MockupPreview({ task, onReset }: Props) {
         </button>
       </div>
 
-      {/* Option group filter tabs — only shown when more than one group */}
       {groups.length > 1 && (
         <div className="flex flex-wrap gap-2">
           {groups.map((g) => (
@@ -74,7 +108,6 @@ export default function MockupPreview({ task, onReset }: Props) {
         </div>
       )}
 
-      {/* Mockup images */}
       {visible.map((m, i) => (
         <div key={i} className="space-y-2">
           <p className="text-xs font-medium capitalize text-gray-600">
@@ -107,13 +140,12 @@ export default function MockupPreview({ task, onReset }: Props) {
         </div>
       ))}
 
-      {/* Persist boundary */}
       <div className="border-t border-gray-100 pt-4 space-y-2">
         {persistedUrls ? (
           <p className="text-xs text-green-600">
             ✓ {persistedUrls.length} mockup{persistedUrls.length !== 1 ? "s" : ""} saved to storage.
           </p>
-        ) : (
+        ) : persistKey ? (
           <button
             onClick={handlePersist}
             disabled={persisting}
@@ -121,7 +153,7 @@ export default function MockupPreview({ task, onReset }: Props) {
           >
             {persisting ? "Saving…" : "Save mockups to storage"}
           </button>
-        )}
+        ) : null}
         {persistError && (
           <p className="text-xs text-red-500">{persistError}</p>
         )}

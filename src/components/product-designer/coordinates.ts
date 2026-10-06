@@ -1,4 +1,4 @@
-import type { PrintfulLayoutTemplate, PrintfulPosition } from "@/lib/printful/types";
+import type { TemplateGeometry, PrintfulPosition } from "@/lib/printful/types";
 
 export interface CanvasRect {
   x: number;
@@ -13,7 +13,7 @@ export interface CanvasRect {
  */
 export function canvasToPrintfulCoordinates(
   canvasRect: CanvasRect,
-  template: PrintfulLayoutTemplate,
+  template: TemplateGeometry,
   canvasWidth: number,
   canvasHeight: number
 ): PrintfulPosition {
@@ -45,7 +45,7 @@ export function canvasToPrintfulCoordinates(
  */
 export function printfulToCanvasCoordinates(
   position: PrintfulPosition,
-  template: PrintfulLayoutTemplate,
+  template: TemplateGeometry,
   canvasWidth: number,
   canvasHeight: number
 ): CanvasRect {
@@ -70,7 +70,7 @@ export function printfulToCanvasCoordinates(
  */
 export function clampToPrintArea(
   rect: CanvasRect,
-  template: PrintfulLayoutTemplate,
+  template: TemplateGeometry,
   canvasWidth: number,
   canvasHeight: number
 ): CanvasRect {
