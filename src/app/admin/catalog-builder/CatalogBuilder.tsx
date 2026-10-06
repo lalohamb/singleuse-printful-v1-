@@ -1080,12 +1080,18 @@ export default function CatalogBuilder({ editProductId }: { editProductId?: stri
                 </div>
               </div>
               {artworkValidation && <ArtworkValidationPanel result={artworkValidation} />}
+              {artworkValidation?.status === "FAIL" && (
+                <div className="bg-error-50 border border-error-200 rounded-lg p-3 text-sm text-error-700">
+                  <strong>DPI FAIL — publication blocked.</strong> Artwork resolution is below Printful&apos;s minimum requirement. Upload higher-resolution artwork before publishing.
+                </div>
+              )}
               <div className="flex justify-between pt-2">
                 <button onClick={() => go("pricing")} className="text-sm text-secondary-400 underline">← Back</button>
                 <button
-                  disabled={saving || publishing}
+                  disabled={saving || publishing || artworkValidation?.status === "FAIL"}
                   onClick={handleSaveAndPublish}
                   className="btn-primary px-6 py-2 text-sm disabled:opacity-40 flex items-center gap-2"
+                  title={artworkValidation?.status === "FAIL" ? "Artwork DPI FAIL — upload higher-resolution artwork to publish" : undefined}
                 >
                   {(saving || publishing) && <Loader2 size={14} className="animate-spin" />}
                   {saving ? "Saving…" : publishing ? "Publishing…" : mode === "edit" ? "Save Changes" : "Publish Product"}
